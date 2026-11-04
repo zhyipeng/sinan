@@ -60,3 +60,5 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .install-row input { flex: 1; border: 1px solid var(--line); border-radius: 7px; background: white; padding: 10px 12px; color: inherit; }
 .trust { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .trust input { accent-color: var(--accent); }
+
+.command-icon img { width: 32px; height: 32px; object-fit: contain; }

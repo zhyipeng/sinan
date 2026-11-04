@@ -12,9 +12,13 @@ declare global {
   }
 }
 
-const commands = ['Alpha', 'Beta', 'Gamma', 'Late'].map(title => ({id:title.toLowerCase(),title}));
+const commands: { id: string; title: string; execution?: string }[] = ['Alpha', 'Beta', 'Gamma', 'Late'].map(title => ({id:title.toLowerCase(),title}));
+commands.push({ id:'application', title:'Application', execution:'direct' });
+let executions=0, dismissals=0;
 const plugin = {id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
-const item = (title: string) => ({key:`example.fixture/demo/${title}`,pluginId:plugin.id,providerId:'demo',commandId:title.toLowerCase(),input:'fixture',title,subtitle:'Fixture',kind:'process',score:.7});
+const canvas=document.createElement('canvas'); canvas.width=64; canvas.height=64;
+const icon=canvas.toDataURL('image/png');
+const item = (title: string) => ({icon,key:`example.fixture/demo/${title}`,pluginId:plugin.id,providerId:'demo',commandId:title.toLowerCase(),input:'fixture',title,subtitle:'Fixture',kind:'process',score:.7});
 let sequence = '';
 let items = ['Alpha','Beta','Gamma'].map(item);
 let done = false;
@@ -25,6 +29,7 @@ const fixture = {
   advance() { items = [item('Late'),...items.filter(item=>item.title!=='Late')]; publish(); },
   complete() { done=true; publish(); },
   refresh() { publish(); },
+  counts() { return {executions,dismissals}; },
 };
 Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
@@ -33,9 +38,12 @@ setTransport({async call(object,_method,_window,args){
     case 2914360659: case 2382139382:return {plugins:[plugin],diagnostics:[]};
     case 1864886877:return '';
     case 1083380061:
-      sequence=String(args.args[0]);items=['Alpha','Beta','Gamma'].map(item);done=false;
+      sequence=String(args.args[0]);items=args.args[1]==='apps'?[item('Application')]:['Alpha','Beta','Gamma'].map(item);done=false;
       queueMicrotask(publish);return;
-    case 2263823638:return {text:args.args[2]};
+    case 2263823638:
+      executions++;
+      return args.args[1]==='application'?{text:'',dismiss:true}:{text:args.args[2]};
+    case 4294891803:dismissals++;return;
     default:return;
   }
 }});

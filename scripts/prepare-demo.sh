@@ -18,3 +18,13 @@ for speed in fast slow; do
     ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install ".sinan-dev/packages/search-$speed"
   fi
 done
+
+# First practical system plugin; installed after the existing examples.
+if [ "$(go env GOOS)" = darwin ]; then
+  mkdir -p .sinan-dev/packages/app-search/backend
+  cp plugins/system-app-search/manifest.json .sinan-dev/packages/app-search/manifest.json
+  go build -o .sinan-dev/packages/app-search/backend/plugin ./plugins/system-app-search/cmd
+  if [ ! -d .sinan-dev/plugins/system.app-search ]; then
+    ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install .sinan-dev/packages/app-search
+  fi
+fi

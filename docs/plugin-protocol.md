@@ -12,7 +12,7 @@
 {"searchProviders":[{"id":"demo","prefix":"","minLength":1}]}
 ```
 
-`prefix` 为不区分大小写的前缀，`minLength` 按 Unicode 字符计数。支持 `onCommand:<id>` 及有搜索贡献时的 `onSearch`；当前通过命令调用或被选中的搜索贡献按需激活，不支持启动激活。`permissions` 仅接受空数组，尚无系统 Host API。
+`prefix` 为不区分大小写的前缀，`minLength` 按 Unicode 字符计数。支持 `onCommand:<id>` 及有搜索贡献时的 `onSearch`；当前通过命令调用或被选中的搜索贡献按需激活，不支持启动激活。`permissions` 对可信原生进程接受 `applications.read`、`applications.launch` 两项不重复的用途声明；声明式插件仍只接受空数组。它们不是系统授权或沙箱检查，尚无系统 Host API。
 
 ## 进程入口
 
@@ -71,3 +71,11 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 `sinanctl search 查询` 按增量输出聚合 JSON，包含 `queryId`、`items`、`pending`、`failures` 和 `done`。CLI 退出时回收进程；桌面保持已激活进程。CLI 与桌面不要同时修改同一插件目录，当前无跨进程安装锁。
 
 新插件导入后，从桌面 `··· → 刷新` 发现变化，无需重编译宿主。刷新会终止已移除或 manifest 改变的实例；升级请先卸载再安装。尚未实现心跳、优雅关闭、事件总线、跨插件 RPC 或插件侧逐条流式结果。
+
+## 应用检索阶段的可选扩展
+
+命令可声明 `execution: "direct"` 让用户选择后立即执行；省略时保留命令输入表单。`searchOnly: true` 让命令仅通过动态结果提供入口，不进入静态命令列表。成功响应可带 `dismiss: true` 请求可信 Shell 隐藏窗口。原生应用启动失败时不应返回成功的隐藏请求。
+
+动态结果可带 `icon`，仅支持尺寸不超过 128×128、整个字段不超过 24 KiB 的 PNG base64 data URL；外链、SVG、本地文件地址及非法图片头会被丢弃，结果本身仍保留。
+
+这些字段仍属 API 1 的增量扩展，但旧宿主严格校验 manifest，安装含新字段的插件前需更新宿主。实现取舍与权限用途边界见 [ADR 0004](adr/0004-application-search.md)。

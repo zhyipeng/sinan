@@ -35,3 +35,19 @@ func TestLoadRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestApplicationPermissionsAndExecutionModes(t *testing.T) {
+	m, err := Load("../../../plugins/system-app-search")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Permissions = append(m.Permissions, "applications.read")
+	if m.Validate() == nil {
+		t.Fatal("duplicate permission accepted")
+	}
+	m.Permissions = nil
+	m.Contributes.Commands[0].Execution = "shell"
+	if m.Validate() == nil {
+		t.Fatal("unknown execution mode accepted")
+	}
+}

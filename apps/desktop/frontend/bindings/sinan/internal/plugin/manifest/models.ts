@@ -6,6 +6,8 @@ export interface Command {
     "title": string;
     "keywords"?: string[] | null;
     "message"?: string;
+    "execution"?: string;
+    "searchOnly"?: boolean;
 }
 
 export interface SearchProvider {

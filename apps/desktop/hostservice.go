@@ -38,6 +38,12 @@ func (h *HostService) ResizeLauncher(height int) {
 		h.launcher.resize(height)
 	}
 }
+
+func (h *HostService) HideLauncher() {
+	if h.launcher != nil {
+		h.launcher.window.Hide()
+	}
+}
 func (h *HostService) LauncherStatus() string {
 	if h.launcher != nil {
 		return h.launcher.status()

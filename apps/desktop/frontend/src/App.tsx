@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Events } from '@wailsio/runtime';
-import { Execute, Install, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall, StartSearch, CancelSearch } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, Install, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall, StartSearch, CancelSearch, HideLauncher } from '../bindings/sinan/apps/desktop/hostservice';
 
-type Command = { id: string; title: string; keywords?: string[] | null };
+type Command = { id: string; title: string; keywords?: string[] | null; execution?: string };
 type Plugin = { id: string; name: string; version: string; kind: string; state: string; commands: Command[] };
-type SearchItem = { key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
+type SearchItem = { icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
 type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
 type Data = { plugins: Plugin[]; diagnostics: string[] };
 function normalize(snapshot: { plugins: (Omit<Plugin, 'commands'> & { commands: Command[] | null })[] | null; diagnostics: string[] | null }): Data {
@@ -125,9 +125,19 @@ export default function App() {
 
   function choose(index: number) {
     const item = commands[index];
-    if (!item) return;
+    if (!item || busy) return;
     const plugin = data.plugins.find(plugin => plugin.id === item.pluginId);
     const command = plugin?.commands.find(command => command.id === item.commandId);
+    if (plugin && command?.execution === 'direct') {
+      const current = generation.current;
+      void perform(async () => {
+        const result = await Execute(plugin.id, command.id, item.input);
+        if (current !== generation.current) return;
+        if (result.dismiss) await HideLauncher();
+        else setOutput(result.text);
+      });
+      return;
+    }
     if (plugin && command) { setActive({ plugin, command }); setInput(item.input); setOutput(''); setError(''); }
   }
 
@@ -181,7 +191,7 @@ export default function App() {
     </section> : <section className="launcher">
       <div className="search">
         <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>
-        <input ref={searchRef} autoFocus aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelectedKey(''); }} onKeyDown={event => {
+        <input ref={searchRef} autoFocus aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelectedKey(''); setOutput(''); setError(''); }} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1); }
           if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1); }
@@ -192,13 +202,14 @@ export default function App() {
       {hasQuery && <>
         <div id="search-results" className="command-list" role="listbox" aria-label="搜索结果">
           {commands.map((item, index) => <button ref={element => { commandRefs.current[index] = element; }} className={`command ${index === selected ? 'selected' : ''}`} key={item.key} data-search-key={item.key} id={`search-result-${index}`} role="option" aria-selected={index === selected} onClick={() => choose(index)}>
-            <span className="command-icon">{item.kind === 'process' ? '↔' : '✧'}</span><span><strong>{item.title}</strong><small>{item.subtitle}</small></span><span className="open">↵</span>
+            <span className="command-icon">{item.icon ? <img src={item.icon} alt="" /> : item.kind === 'process' ? '↔' : '✧'}</span><span><strong>{item.title}</strong><small>{item.subtitle}</small></span><span className="open">↵</span>
           </button>)}
           {!commands.length && <div className="empty">{searching ? '搜索中…' : '没有匹配的命令'}</div>}
         </div>
         <footer><span>{commands.length} 个结果{searching ? ' · 搜索中…' : searchFailures ? ` · ${searchFailures} 个来源暂不可用` : ''}</span><span>↑ ↓ 选择　↵ 打开　esc 隐藏</span></footer>
       </>}
     </section>}
+    {!active && output && <output aria-live="polite">{output}</output>}
     {error && <p className="error" role="alert">{error}</p>}
   </main>;
 }

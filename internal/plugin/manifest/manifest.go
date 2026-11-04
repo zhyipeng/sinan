@@ -46,10 +46,12 @@ type SearchProvider struct {
 }
 
 type Command struct {
-	ID       string   `json:"id"`
-	Title    string   `json:"title"`
-	Keywords []string `json:"keywords,omitempty"`
-	Message  string   `json:"message,omitempty"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	Keywords   []string `json:"keywords,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	Execution  string   `json:"execution,omitempty"`
+	SearchOnly bool     `json:"searchOnly,omitempty"`
 }
 
 func ValidID(id string) bool { return idPattern.MatchString(id) && len(id) <= 128 }
@@ -83,14 +85,21 @@ func (m Manifest) Validate() error {
 	if m.APIVersion != protocol.APIVersion {
 		return errors.New("插件 API 版本不兼容")
 	}
-	if len(m.Permissions) != 0 {
-		return errors.New("当前原型尚不支持系统权限")
+	permissions := map[string]bool{}
+	for _, permission := range m.Permissions {
+		if m.Runtime.Kind != "process" || (permission != "applications.read" && permission != "applications.launch") || permissions[permission] {
+			return errors.New("权限用途无效或重复；当前仅支持可信原生插件的应用读取与启动声明")
+		}
+		permissions[permission] = true
 	}
 	if len(m.Contributes.Commands) == 0 {
 		return errors.New("插件至少需要提供一个命令")
 	}
 	seen := map[string]bool{}
 	for _, c := range m.Contributes.Commands {
+		if c.Execution != "" && c.Execution != "direct" {
+			return errors.New("命令执行模式无效")
+		}
 		if !commandPattern.MatchString(c.ID) || strings.TrimSpace(c.Title) == "" || seen[c.ID] {
 			return errors.New("命令 ID、标题无效或重复")
 		}

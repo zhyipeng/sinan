@@ -1,8 +1,12 @@
 package search
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	"image"
+	"image/png"
 	"strings"
 	"sync"
 	"testing"
@@ -121,4 +125,39 @@ func TestProviderFailureDoesNotRemoveOtherResults(t *testing.T) {
 	if !final.Done || len(final.Items) != 1 || final.Items[0].PluginID != "example.fast" || len(final.Failures) != 1 {
 		t.Fatal(final)
 	}
+}
+
+func TestIconRejectsExternalResourcesAndOversizedImages(t *testing.T) {
+	for _, value := range []string{"https://example.test/icon.png", "file:///tmp/icon.png", "data:image/svg+xml,<svg/>", "data:image/png;base64,invalid", strings.Repeat("x", 25000)} {
+		if validatedIcon(value) != "" {
+			t.Fatal("invalid icon accepted")
+		}
+	}
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 64, 64))); err != nil {
+		t.Fatal(err)
+	}
+	valid := "data:image/png;base64," + base64.StdEncoding.EncodeToString(data.Bytes())
+	if validatedIcon(valid) != valid {
+		t.Fatal("valid icon rejected")
+	}
+	data.Reset()
+	png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 129, 1)))
+	if validatedIcon("data:image/png;base64,"+base64.StdEncoding.EncodeToString(data.Bytes())) != "" {
+		t.Fatal("oversized icon accepted")
+	}
+}
+
+type searchOnlyBackend struct{ fakeBackend }
+
+func (f *searchOnlyBackend) Snapshot() kernel.Snapshot {
+	return kernel.Snapshot{Plugins: []kernel.PluginInfo{{ID: "system.test", Name: "Test", Kind: "process", Commands: []manifest.Command{{ID: "launch", Title: "Launch", SearchOnly: true}}}}}
+}
+func TestSearchOnlyCommandsHaveNoEmptyStaticAction(t *testing.T) {
+	c := Coordinator{Backend: &searchOnlyBackend{}}
+	c.Query(context.Background(), "1", "Launch", func(u Update) {
+		if len(u.Items) != 0 || !u.Done {
+			t.Fatal("search-only command exposed without target")
+		}
+	})
 }

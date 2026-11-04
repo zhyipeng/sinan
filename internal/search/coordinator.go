@@ -2,8 +2,11 @@
 package search
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"image/png"
 	"math"
 	"regexp"
 	"sort"
@@ -21,6 +24,7 @@ type Backend interface {
 }
 
 type Item struct {
+	Icon       string  `json:"icon,omitempty"`
 	Key        string  `json:"key"`
 	PluginID   string  `json:"pluginId"`
 	ProviderID string  `json:"providerId"`
@@ -62,6 +66,9 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 	providers := []provider{}
 	for _, plugin := range snapshot.Plugins {
 		for _, command := range plugin.Commands {
+			if command.SearchOnly {
+				continue
+			}
 			haystack := strings.ToLower(strings.Join(append([]string{plugin.Name, command.Title}, command.Keywords...), " "))
 			if !strings.Contains(haystack, strings.ToLower(query)) {
 				continue
@@ -137,10 +144,27 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 				}
 				seen[item.ID] = true
 				key := p.plugin.ID + "/" + p.id + "/" + item.ID
-				results[key] = Item{Key: key, PluginID: p.plugin.ID, ProviderID: p.id, CommandID: item.CommandID, Input: item.Input, Title: item.Title, Subtitle: item.Subtitle, Kind: p.plugin.Kind, Score: max(0, min(.8, item.Score))}
+				results[key] = Item{Icon: validatedIcon(item.Icon), Key: key, PluginID: p.plugin.ID, ProviderID: p.id, CommandID: item.CommandID, Input: item.Input, Title: item.Title, Subtitle: item.Subtitle, Kind: p.plugin.Kind, Score: max(0, min(.8, item.Score))}
 			}
 			publish()
 		})
 	}
 	wg.Wait()
+}
+
+// Icons cannot make network requests or load arbitrary plugin/host resources.
+func validatedIcon(value string) string {
+	const prefix = "data:image/png;base64,"
+	if !strings.HasPrefix(value, prefix) || len(value) > 24<<10 {
+		return ""
+	}
+	data, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, prefix))
+	if err != nil {
+		return ""
+	}
+	config, err := png.DecodeConfig(bytes.NewReader(data))
+	if err != nil || config.Width < 1 || config.Height < 1 || config.Width > 128 || config.Height > 128 {
+		return ""
+	}
+	return value
 }

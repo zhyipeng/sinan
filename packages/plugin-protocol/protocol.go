@@ -44,7 +44,8 @@ type CommandParams struct {
 }
 
 type CommandResult struct {
-	Text string `json:"text"`
+	Text    string `json:"text"`
+	Dismiss bool   `json:"dismiss,omitempty"`
 }
 
 type CancelParams struct {
@@ -58,6 +59,7 @@ type SearchParams struct {
 }
 
 type SearchItem struct {
+	Icon      string  `json:"icon,omitempty"`
 	ID        string  `json:"id"`
 	Title     string  `json:"title"`
 	Subtitle  string  `json:"subtitle,omitempty"`

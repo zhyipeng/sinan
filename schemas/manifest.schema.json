@@ -83,6 +83,17 @@
               },
               "message": {
                 "type": "string"
+              },
+              "execution": {
+                "enum": [
+                  "",
+                  "direct"
+                ],
+                "description": "省略时打开命令表单；direct 由用户选择结果后立即执行。"
+              },
+              "searchOnly": {
+                "type": "boolean",
+                "description": "仅由动态搜索结果提供入口，不加入静态命令列表。"
               }
             }
           }
@@ -117,7 +128,14 @@
     },
     "permissions": {
       "type": "array",
-      "maxItems": 0
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "applications.read",
+          "applications.launch"
+        ]
+      },
+      "description": "可信原生插件的用途声明；不是操作系统权限隔离或 Host API 授权。"
     },
     "activationEvents": {
       "type": "array",
@@ -189,6 +207,9 @@
                 "maxItems": 0
               }
             }
+          },
+          "permissions": {
+            "maxItems": 0
           }
         }
       }

@@ -29,6 +29,10 @@ export function Execute(pluginID: string, commandID: string, input: string): $Ca
     return $Call.ByID(2263823638, pluginID, commandID, input);
 }
 
+export function HideLauncher(): $CancellablePromise<void> {
+    return $Call.ByID(4294891803);
+}
+
 export function Install(directory: string, trustNative: boolean): $CancellablePromise<kernel$0.PluginInfo> {
     return $Call.ByID(3733150530, directory, trustNative);
 }
