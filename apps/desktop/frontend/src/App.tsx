@@ -20,7 +20,7 @@ export default function App() {
   const [searchFailures, setSearchFailures] = useState(0);
   const searchSequence = useRef(Date.now() * 1000);
   const activeSequence = useRef('');
-  const [selectedKey, setSelectedKey] = useState('');
+  const [selection, setSelection] = useState({ key: '', manual: false });
   const pointerPosition = useRef<{ x: number; y: number }>();
   const [active, setActive] = useState<{ plugin: Plugin; command: Command }>();
   const [input, setInput] = useState('');
@@ -50,7 +50,7 @@ export default function App() {
     LauncherStatus().then(setShortcutError).catch(() => {});
     const reset = () => {
       generation.current++;
-      setManage(false); setActive(undefined); setQuery(''); setSelectedKey('');
+      setManage(false); setActive(undefined); setQuery(''); setSelection({ key: '', manual: false });
       setInput(''); setOutput(''); setError(''); setBusy(false);
       void LauncherStatus().then(setShortcutError).catch(() => {});
       void reload().catch(() => setError('无法读取插件，请重试。'));
@@ -79,8 +79,10 @@ export default function App() {
     if (update.queryId !== activeSequence.current) return;
     const next = update.items ?? [];
     setCommands(next);
-    // Functional updates see keyboard changes queued in the same React batch.
-    setSelectedKey(current => next.some(item => item.key === current) ? current : next[0]?.key ?? '');
+    // Follow ranking until the user chooses a row. Keep key and intent in one
+    // state update so keyboard events and provider results can safely share a batch.
+    setSelection(current => current.manual && next.some(item => item.key === current.key)
+      ? current : { key: next[0]?.key ?? '', manual: false });
     setSearching(!update.done);
     setSearchFailures(update.failures?.length ?? 0);
   }), []);
@@ -88,7 +90,7 @@ export default function App() {
   useEffect(() => {
     const sequence = ++searchSequence.current;
     activeSequence.current = String(sequence);
-    setSelectedKey('');
+    setSelection({ key: '', manual: false });
     setCommands([]); setSearchFailures(0);
     if (!connected || !hasQuery || manage || active) { setSearching(false); return; }
     setSearching(true);
@@ -98,15 +100,16 @@ export default function App() {
     return () => { activeSequence.current = ''; void CancelSearch(sequence).catch(() => {}); };
   }, [query, connected, manage, active, data]);
 
-  const selected = Math.max(0, commands.findIndex(item => item.key === selectedKey));
+  const selected = Math.max(0, commands.findIndex(item => item.key === selection.key));
   useEffect(() => {
     commandRefs.current[selected]?.scrollIntoView({ block: 'nearest' });
   }, [selected, commands]);
 
   function moveSelection(direction: number) {
-    setSelectedKey(current => {
-      const index = Math.max(0, commands.findIndex(item => item.key === current));
-      return commands[Math.max(0, Math.min(commands.length - 1, index + direction))]?.key ?? '';
+    setSelection(current => {
+      if (!commands.length) return current;
+      const index = Math.max(0, commands.findIndex(item => item.key === current.key));
+      return { key: commands[Math.max(0, Math.min(commands.length - 1, index + direction))].key, manual: true };
     });
   }
 
@@ -151,7 +154,7 @@ export default function App() {
       // Layout changes can move rows beneath a stationary pointer. Only actual
       // pointer movement should take selection back from keyboard navigation.
       const row = (event.target as Element).closest<HTMLButtonElement>('[data-search-key]');
-      if (row?.dataset.searchKey) setSelectedKey(row.dataset.searchKey);
+      if (row?.dataset.searchKey) setSelection({ key: row.dataset.searchKey, manual: true });
     }}>
     {manage ? <section className="management">
       <div className="view-header"><button className="back" onClick={() => setManage(false)} aria-label="返回搜索">←</button><h1>本地插件</h1><button disabled={busy || !connected} onClick={() => perform(reload)}>刷新</button></div>
@@ -191,7 +194,7 @@ export default function App() {
     </section> : <section className="launcher">
       <div className="search">
         <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>
-        <input ref={searchRef} autoFocus aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelectedKey(''); setOutput(''); setError(''); }} onKeyDown={event => {
+        <input ref={searchRef} autoFocus aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelection({ key: '', manual: false }); setOutput(''); setError(''); }} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1); }
           if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1); }

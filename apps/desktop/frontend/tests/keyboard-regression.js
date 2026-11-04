@@ -1,8 +1,9 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan search and application launch regression');
+const task = await taskSpace('Sinan default selection regression');
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
 async function selected(expected, label) {
+  await page.waitForFunction(title => document.querySelector('.command.selected strong')?.textContent === title, expected, {timeout:2000});
   const actual = await page.evaluate(() => document.querySelector('.command.selected strong')?.textContent);
   if (actual !== expected) throw new Error(`${label}: selected ${actual}, expected ${expected}`);
 }
@@ -12,6 +13,23 @@ async function reset() {
   await page.waitForSelector('.command');
   await page.click(query);
 }
+await reset();
+await selected('Alpha', 'first batch defaults to first result');
+await page.evaluate(() => window.navigationFixture.advance());
+await selected('Late', 'untouched selection follows new top-ranked result');
+await page.keyboard.press('Enter');
+await page.waitForSelector('h1');
+if (await page.evaluate(() => document.querySelector('h1')?.textContent) !== 'Late') throw new Error('Enter opened an earlier result instead of the new top result');
+
+await reset();
+await page.keyboard.press('ArrowUp');
+await page.evaluate(() => window.navigationFixture.advance());
+await selected('Alpha', 'manual choice at first-row boundary remains pinned');
+await page.fill(query, 'another query');
+await page.waitForFunction(() => document.querySelectorAll('.command').length === 3);
+await page.evaluate(() => window.navigationFixture.advance());
+await selected('Late', 'new query restores automatic selection');
+
 await reset();
 await page.keyboard.press('ArrowDown');
 await selected('Beta', 'navigation while provider pending');
