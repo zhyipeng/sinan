@@ -18,6 +18,7 @@ type launcher struct {
 	window        *application.WebviewWindow
 	mu            sync.Mutex
 	shortcutError string
+	screenID      string
 }
 
 func (l *launcher) show() {
@@ -38,16 +39,16 @@ func (l *launcher) toggle() {
 
 func (l *launcher) showLocked() {
 	l.window.SetSize(launcherWidth, launcherMinHeight)
-	var screen *application.Screen
-	if id, ok := platform.CursorScreenID(); ok {
-		screen = application.GetScreenByID(id)
+	id, ok := platform.CursorScreenID()
+	if !ok {
+		if screen, _ := l.window.GetScreen(); screen != nil {
+			id = screen.ID
+		}
 	}
-	if screen == nil {
-		screen, _ = l.window.GetScreen()
-	}
-	if screen != nil {
-		area := screen.WorkArea
-		l.window.SetPosition(area.X+(area.Width-launcherWidth)/2, area.Y+min(160, area.Height/5))
+	l.screenID = id
+	if area, ok := screenWorkArea(id); ok {
+		x, y := launcherPosition(area)
+		l.window.SetPosition(x, y)
 	} else {
 		l.window.Center()
 	}
@@ -61,13 +62,29 @@ func (l *launcher) resize(height int) {
 	defer l.mu.Unlock()
 	height = max(launcherMinHeight, min(launcherMaxHeight, height))
 	x, y := l.window.Position()
-	if screen, err := l.window.GetScreen(); err == nil && screen != nil {
-		area := screen.WorkArea
+	if area, ok := screenWorkArea(l.screenID); ok {
 		height = min(height, max(launcherMinHeight, area.Y+area.Height-y-16))
 	}
 	// macOS changes the origin when resizing; restore the top-left anchor.
 	l.window.SetSize(launcherWidth, height)
 	l.window.SetPosition(x, y)
+}
+
+func launcherPosition(area application.Rect) (int, int) {
+	return area.X + (area.Width-launcherWidth)/2, area.Y + area.Height/5
+}
+
+func screenWorkArea(id string) (application.Rect, bool) {
+	var native platform.WorkArea
+	var ok bool
+	application.InvokeSync(func() { native, ok = platform.ScreenWorkArea(id) })
+	if ok {
+		return application.Rect{X: native.X, Y: native.Y, Width: native.Width, Height: native.Height}, true
+	}
+	if screen := application.GetScreenByID(id); screen != nil {
+		return screen.WorkArea, true
+	}
+	return application.Rect{}, false
 }
 
 func (l *launcher) setShortcutError(message string) {

@@ -10,7 +10,7 @@
 - 全局快捷键采用 Wails `GlobalShortcut`，macOS 为 Command + Space，其他平台按 `CmdOrCtrl` 映射为 Control + Space。应用启动后注册，以便捕获操作系统注册错误；失败不会退出进程，插件入口显示提示。
 - 失焦或按 Escape 隐藏窗口，关闭请求也转为隐藏。隐藏最后一个窗口不退出应用；通过托盘菜单显式退出。
 - 保留最小文字托盘“司南”，菜单提供“显示司南”和“退出司南”。热键在可见时隐藏、隐藏时呼出；托盘和 Dock 始终显示窗口，不切换为隐藏。不依赖任何插件可用。
-- macOS 每次呼出通过 CoreGraphics 获取鼠标所在显示器 ID，映射到 Wails 的显示器工作区。水平居中；纵向保留原公式 `workArea.Y + min(160, workArea.Height / 5)`。按显示器 ID 匹配，避免多屏缩放比例和负坐标混用。
+- macOS 每次呼出通过 CoreGraphics 获取鼠标所在显示器 ID，在主线程读取对应 `NSScreen.visibleFrame`，转换为与原生 `SetPosition` 一致的逻辑坐标（以主屏顶部为 Y 原点、向下为正）。不使用经过 Wails 多屏布局算法重排后的工作区。水平居中；纵向统一使用 `workArea.Y + workArea.Height / 5`，即距可用区域顶部 20%，不再设置 160 点上限。窗口伸缩的底部边界也读取同一原生工作区。
 - 修正全屏应用上的呼出方式：macOS Shell 使用非激活 `NSPanel`（`MacWindowClassPanel` + `NonActivating`），显式设置 floating 层级，保留 `CanJoinAllSpaces` 和 `FullScreenAuxiliary`。普通 `NSWindow` 的 `Show` / `Focus` 会激活宿主，不能仅依靠跨 Space 标志实现聚焦式覆盖；非激活面板在获得键盘焦点时不激活宿主应用。保留现有 Dock 和托盘恢复入口。
 - 每次重新呼出，恢复空查询、搜索视图和输入焦点。正在执行的插件命令不因此取消，但旧命令的迟到结果不得写入重新呼出的视图。
 - 托盘、热键、窗口生命周期及恢复入口属于宿主机制；插件业务边界和原有权限模型不变。
@@ -22,6 +22,8 @@
 当前自动化工具不能可靠合成系统级 Command 组合键，也未完成托盘菜单的自动点击验收。仍需使用实际键盘检查 Command + Space 从其他应用呼出，并手动检查托盘显示与退出。未验证 Windows / Linux；Linux 某些焦点跟随鼠标的窗口管理器中，Wails 会禁用自动失焦隐藏。
 
 50 DIP 高度与热键切换逻辑已完成；本机原生鼠标显示器查询可返回有效 ID。跨显示器实际呼出仍需多屏实测。鼠标屏幕定位当前仅实现 macOS，其他平台或查询失败时回退到窗口所在屏幕。
+
+三屏定位回归：本机 Built-in Retina、DELL P2723D 竖屏和 DELL U2719D 的原生布局已读取。复现 Wails `LayoutScreens` 后，U2719D 的工作区 X 从原生 -1048 被重排为 -1804，导致原先的横向定位向左偏移 756 点。现使用原生工作区，并以这三块屏的实际布局作为定位回归测试数据，覆盖负原点和竖屏上的 20% 纵向比例。实际各屏呼出效果仍需实机确认。
 
 非激活面板配置参考当前锁定的 Wails v3.0.0 `examples/spotlight`，并核对了 `windowShow` / `windowFocus` 的原生分支。构建验证不能替代全屏应用、输入法、失焦隐藏及热键切换的实机回归。
 
