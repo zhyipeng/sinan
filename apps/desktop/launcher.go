@@ -4,11 +4,12 @@ import (
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"sinan/internal/platform"
 )
 
 const (
 	launcherWidth     = 680
-	launcherMinHeight = 72
+	launcherMinHeight = 50
 	launcherMaxHeight = 560
 )
 
@@ -22,8 +23,29 @@ type launcher struct {
 func (l *launcher) show() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	l.showLocked()
+}
+
+func (l *launcher) toggle() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.window.IsVisible() {
+		l.window.Hide()
+		return
+	}
+	l.showLocked()
+}
+
+func (l *launcher) showLocked() {
 	l.window.SetSize(launcherWidth, launcherMinHeight)
-	if screen, err := l.window.GetScreen(); err == nil && screen != nil {
+	var screen *application.Screen
+	if id, ok := platform.CursorScreenID(); ok {
+		screen = application.GetScreenByID(id)
+	}
+	if screen == nil {
+		screen, _ = l.window.GetScreen()
+	}
+	if screen != nil {
 		area := screen.WorkArea
 		l.window.SetPosition(area.X+(area.Width-launcherWidth)/2, area.Y+min(160, area.Height/5))
 	} else {

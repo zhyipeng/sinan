@@ -18,10 +18,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 input, textarea { min-width: 0; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .shell { width: 100%; height: auto; max-height: 560px; overflow: hidden; }
-.search { height: 72px; display: flex; align-items: center; gap: 16px; padding: 0 20px; }
-.compass { width: 26px; height: 28px; flex-shrink: 0; color: var(--accent); }
+.search { height: 50px; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
+.compass { width: 22px; height: 24px; flex-shrink: 0; color: var(--accent); }
 .compass path + path { fill: var(--accent); stroke: none; }
-.search input { flex: 1; border: 0; outline: none; background: none; font-size: 22px; color: inherit; height: 100%; }
+.search input { flex: 1; border: 0; outline: none; background: none; font-size: 19px; color: inherit; height: 100%; }
 .search input:focus-visible { outline: none; }
 .search input::placeholder { color: #929caf; }
 .manage-button { position: relative; font-size: 24px; line-height: 24px; color: var(--muted); padding: 3px 8px 8px; }

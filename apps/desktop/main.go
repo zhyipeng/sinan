@@ -60,7 +60,7 @@ func main() {
 	configureTray(app, host.launcher)
 	// Register after startup so OS conflicts are returned to us rather than only logged.
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
-		if err := app.GlobalShortcut.Register("CmdOrCtrl+Space", host.launcher.show); err != nil {
+		if err := app.GlobalShortcut.Register("CmdOrCtrl+Space", host.launcher.toggle); err != nil {
 			log.Print("全局快捷键注册失败，仍可通过托盘显示司南")
 			host.launcher.setShortcutError("Command + Space 注册失败，请检查系统聚焦或其他应用的快捷键占用。可从托盘打开司南。")
 		}

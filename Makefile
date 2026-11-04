@@ -29,7 +29,8 @@ run: build
 package: build
 	test "$$(go env GOOS)" = darwin
 	mkdir -p bin/Sinan.app/Contents/MacOS
-	cp bin/sinan bin/Sinan.app/Contents/MacOS/sinan
+	cp bin/sinan bin/Sinan.app/Contents/MacOS/sinan.next
+	mv -f bin/Sinan.app/Contents/MacOS/sinan.next bin/Sinan.app/Contents/MacOS/sinan
 	cp apps/desktop/Info.plist bin/Sinan.app/Contents/Info.plist
 
 demo: build
