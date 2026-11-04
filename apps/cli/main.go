@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"sinan/internal/kernel"
+	"sinan/internal/search"
 )
 
 func run() error {
@@ -22,7 +23,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -47,6 +48,18 @@ func run() error {
 		}
 		err = m.Uninstall(args[1])
 		result = "插件已卸载"
+	case "search":
+		if len(args) != 2 {
+			return errors.New("search 需要查询文字")
+		}
+		var outputErr error
+		coordinator := search.Coordinator{Backend: m}
+		coordinator.Query(context.Background(), "cli", args[1], func(update search.Update) {
+			if outputErr == nil {
+				outputErr = json.NewEncoder(os.Stdout).Encode(update)
+			}
+		})
+		return outputErr
 	case "run":
 		if len(args) < 3 || len(args) > 4 {
 			return errors.New("run 需要插件 ID、命令 ID 和可选输入")

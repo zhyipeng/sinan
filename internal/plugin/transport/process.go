@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	protocol "sinan/packages/plugin-protocol"
 )
@@ -86,6 +87,15 @@ func (p *Process) Alive() bool {
 }
 
 func (p *Process) Call(ctx context.Context, method string, params, result any) error {
+	return p.call(ctx, method, params, result, false)
+}
+
+// CallSearch cancels one request without terminating cooperating plugins.
+func (p *Process) CallSearch(ctx context.Context, params protocol.SearchParams, result *protocol.SearchResult) error {
+	return p.call(ctx, "search.query", params, result, true)
+}
+
+func (p *Process) call(ctx context.Context, method string, params, result any, cooperative bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -103,12 +113,31 @@ func (p *Process) Call(ctx context.Context, method string, params, result any) e
 	}
 	ch := make(chan protocol.Response, 1)
 	p.mu.Lock()
+	if len(p.pending) >= 64 {
+		p.mu.Unlock()
+		return errors.New("插件请求数量超过限制")
+	}
 	p.pending[id] = ch
 	p.mu.Unlock()
-	defer func() { p.mu.Lock(); delete(p.pending, id); p.mu.Unlock() }()
+	writeFinished := make(chan struct{})
+	cleanup := true
+	defer func() {
+		if cleanup {
+			p.remove(id)
+		}
+	}()
+	cancelRequest := func() {
+		if cooperative {
+			cleanup = false
+			go p.cancelSearch(id, ch, writeFinished)
+		} else {
+			p.Stop()
+		}
+	}
 	// A plugin may stop reading stdin; killing it on cancellation unblocks Write.
 	writeDone := make(chan error, 1)
 	go func() {
+		defer close(writeFinished)
 		p.writeMu.Lock()
 		defer p.writeMu.Unlock()
 		_, err := p.stdin.Write(append(message, '\n'))
@@ -120,7 +149,7 @@ func (p *Process) Call(ctx context.Context, method string, params, result any) e
 			return errors.New("插件通信写入失败")
 		}
 	case <-ctx.Done():
-		p.Stop()
+		cancelRequest()
 		return ctx.Err()
 	case <-p.done:
 		return errors.New("插件进程已退出")
@@ -135,7 +164,7 @@ func (p *Process) Call(ctx context.Context, method string, params, result any) e
 		}
 		return nil
 	case <-ctx.Done():
-		p.Stop()
+		cancelRequest()
 		return ctx.Err()
 	case <-p.done:
 		return errors.New("插件进程已退出")
@@ -144,3 +173,33 @@ func (p *Process) Call(ctx context.Context, method string, params, result any) e
 
 // Stop forcibly terminates the v1 process and reaps it. Graceful shutdown is deferred.
 func (p *Process) Stop() { p.finish(); _ = p.cmd.Process.Kill(); <-p.exited }
+
+func (p *Process) remove(id uint64) { p.mu.Lock(); delete(p.pending, id); p.mu.Unlock() }
+
+// A response acknowledges cancellation. Kill only plugins that ignore the
+// bounded grace period (including a pipe that stopped consuming messages).
+func (p *Process) cancelSearch(id uint64, response <-chan protocol.Response, written <-chan struct{}) {
+	defer p.remove(id)
+	params, _ := json.Marshal(protocol.CancelParams{ID: id})
+	message, _ := json.Marshal(protocol.Request{JSONRPC: "2.0", Method: "$/cancelRequest", Params: params})
+	go func() {
+		select {
+		case <-written:
+		case <-p.done:
+			return
+		}
+		p.writeMu.Lock()
+		defer p.writeMu.Unlock()
+		if p.Alive() {
+			_, _ = p.stdin.Write(append(message, '\n'))
+		}
+	}()
+	timer := time.NewTimer(500 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-response:
+	case <-p.done:
+	case <-timer.C:
+		p.Stop()
+	}
+}

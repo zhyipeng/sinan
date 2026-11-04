@@ -17,6 +17,14 @@ import * as kernel$0 from "../../internal/kernel/models.js";
 // @ts-ignore: Unused imports
 import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
+export function CancelSearch(sequence: number): $CancellablePromise<void> {
+    return $Call.ByID(640499065, sequence);
+}
+
 export function Execute(pluginID: string, commandID: string, input: string): $CancellablePromise<protocol$0.CommandResult> {
     return $Call.ByID(2263823638, pluginID, commandID, input);
 }
@@ -29,6 +37,13 @@ export function LauncherStatus(): $CancellablePromise<string> {
     return $Call.ByID(1864886877);
 }
 
+/**
+ * Diagnostic output contains booleans only; no guest data or filesystem paths.
+ */
+export function RecordIsolationProbe(report: $models.IsolationReport, rejected: boolean): $CancellablePromise<void> {
+    return $Call.ByID(795929968, report, rejected);
+}
+
 export function Refresh(): $CancellablePromise<kernel$0.Snapshot> {
     return $Call.ByID(2382139382);
 }
@@ -39,6 +54,14 @@ export function ResizeLauncher(height: number): $CancellablePromise<void> {
 
 export function Snapshot(): $CancellablePromise<kernel$0.Snapshot> {
     return $Call.ByID(2914360659);
+}
+
+/**
+ * StartSearch belongs to the trusted Shell. Sequence numbers also reject
+ * out-of-order Wails invocations before they can supersede a newer query.
+ */
+export function StartSearch(sequence: number, query: string): $CancellablePromise<void> {
+    return $Call.ByID(1083380061, sequence, query);
 }
 
 export function Stop(pluginID: string): $CancellablePromise<void> {

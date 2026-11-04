@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -19,12 +20,13 @@ import (
 )
 
 type PluginInfo struct {
-	ID       string             `json:"id"`
-	Name     string             `json:"name"`
-	Version  string             `json:"version"`
-	Kind     string             `json:"kind"`
-	State    string             `json:"state"`
-	Commands []manifest.Command `json:"commands"`
+	ID              string                    `json:"id"`
+	Name            string                    `json:"name"`
+	Version         string                    `json:"version"`
+	Kind            string                    `json:"kind"`
+	State           string                    `json:"state"`
+	Commands        []manifest.Command        `json:"commands"`
+	SearchProviders []manifest.SearchProvider `json:"searchProviders"`
 }
 
 type Snapshot struct {
@@ -33,13 +35,18 @@ type Snapshot struct {
 }
 
 type plugin struct {
-	manifest manifest.Manifest
-	dir      string
-	state    string
-	process  *transport.Process
+	mu           sync.Mutex
+	removed      bool
+	capabilities []string
+	manifest     manifest.Manifest
+	dir          string
+	state        string
+	process      *transport.Process
 }
 
 type Manager struct {
+	mutationMu  sync.Mutex
+	closed      bool
 	mu          sync.Mutex
 	root        string
 	plugins     map[string]*plugin
@@ -64,15 +71,22 @@ func New(root string) (*Manager, error) {
 }
 
 func (m *Manager) Refresh() Snapshot {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	if m.closed {
+		m.mu.Unlock()
+		return Snapshot{Plugins: []PluginInfo{}, Diagnostics: []string{}}
+	}
 	m.diagnostics = []string{}
 	entries, err := os.ReadDir(m.root)
 	if err != nil {
 		m.diagnostics = append(m.diagnostics, "无法读取插件目录")
-		return m.snapshot()
+		m.mu.Unlock()
+		return m.Snapshot()
 	}
 	found := map[string]bool{}
+	retired := []*plugin{}
 	for _, entry := range entries {
 		if !manifest.ValidID(entry.Name()) {
 			continue
@@ -92,43 +106,61 @@ func (m *Manager) Refresh() Snapshot {
 			if reflect.DeepEqual(old.manifest, mf) {
 				continue
 			}
-			if old.process != nil {
-				old.process.Stop()
-			}
+			retired = append(retired, old)
 		}
 		m.plugins[mf.ID] = &plugin{manifest: mf, dir: dir, state: "installed"}
 	}
 	for id, p := range m.plugins {
 		if !found[id] {
-			if p.process != nil {
-				p.process.Stop()
-			}
+			retired = append(retired, p)
 			delete(m.plugins, id)
 		}
 	}
-	return m.snapshot()
+	m.mu.Unlock()
+	for _, p := range retired {
+		p.stop(true)
+	}
+	return m.Snapshot()
 }
 
-func (m *Manager) Snapshot() Snapshot { m.mu.Lock(); defer m.mu.Unlock(); return m.snapshot() }
-
-func (m *Manager) snapshot() Snapshot {
+func (m *Manager) Snapshot() Snapshot {
+	m.mu.Lock()
 	result := Snapshot{Plugins: []PluginInfo{}, Diagnostics: append([]string{}, m.diagnostics...)}
+	entries := make([]*plugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
+		entries = append(entries, p)
+	}
+	m.mu.Unlock()
+	for _, p := range entries {
+		p.mu.Lock()
 		if p.process != nil && !p.process.Alive() {
 			p.process.Stop()
 			p.process = nil
 			p.state = "failed"
 		}
-		result.Plugins = append(result.Plugins, PluginInfo{ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands})
+		if !p.removed {
+			result.Plugins = append(result.Plugins, p.info())
+		}
+		p.mu.Unlock()
 	}
 	sort.Slice(result.Plugins, func(i, j int) bool { return result.Plugins[i].ID < result.Plugins[j].ID })
 	return result
 }
 
+func (p *plugin) info() PluginInfo {
+	return PluginInfo{ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+}
+
 // Install imports a local directory. Native code requires an explicit trust decision.
 func (m *Manager) Install(source string, trustNative bool) (PluginInfo, error) {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	closed := m.closed
+	m.mu.Unlock()
+	if closed {
+		return PluginInfo{}, errors.New("运行时已关闭")
+	}
 	abs, err := filepath.Abs(source)
 	if err != nil {
 		return PluginInfo{}, errors.New("插件目录无效")
@@ -179,8 +211,11 @@ func (m *Manager) Install(source string, trustNative bool) (PluginInfo, error) {
 	if err := os.Rename(temp, dest); err != nil {
 		return PluginInfo{}, errors.New("无法完成插件安装")
 	}
-	m.plugins[mf.ID] = &plugin{manifest: copied, dir: dest, state: "installed"}
-	return PluginInfo{ID: copied.ID, Name: copied.Name, Version: copied.Version, Kind: copied.Runtime.Kind, State: "installed", Commands: copied.Contributes.Commands}, nil
+	p := &plugin{manifest: copied, dir: dest, state: "installed"}
+	m.mu.Lock()
+	m.plugins[mf.ID] = p
+	m.mu.Unlock()
+	return p.info(), nil
 }
 
 func copyDirectory(source, dest string) error {
@@ -234,15 +269,86 @@ func copyDirectory(source, dest string) error {
 	})
 }
 
-func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string) (protocol.CommandResult, error) {
+func (m *Manager) lookup(id string) (*plugin, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if len(input) > 64<<10 {
-		return protocol.CommandResult{}, errors.New("命令输入超过 64 KiB 限制")
+	p := m.plugins[id]
+	if p == nil || m.closed {
+		return nil, errors.New("插件不存在或运行时已关闭")
 	}
-	p := m.plugins[pluginID]
-	if p == nil {
-		return protocol.CommandResult{}, errors.New("插件不存在")
+	return p, nil
+}
+
+func (m *Manager) current(id string, p *plugin) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return !m.closed && m.plugins[id] == p
+}
+
+func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Process, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.removed {
+		return nil, errors.New("插件已移除")
+	}
+	if p.process != nil && p.process.Alive() {
+		return p.process, nil
+	}
+	if p.process != nil {
+		p.process.Stop()
+		p.process = nil
+	}
+	approval, err := os.ReadFile(filepath.Join(root, ".trusted", p.manifest.ID))
+	if err != nil || string(approval) != "trusted-native-v1\n" {
+		return nil, errors.New("此原生插件未经信任确认，请重新安装")
+	}
+	path, err := manifest.Executable(p.dir, p.manifest)
+	if err != nil {
+		p.state = "failed"
+		return nil, err
+	}
+	p.state = "activating"
+	process, err := transport.Start(path, p.dir)
+	if err != nil {
+		p.state = "failed"
+		return nil, err
+	}
+	var init protocol.InitializeResult
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID}, &init)
+	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
+		process.Stop()
+		p.state = "failed"
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, errors.New("插件握手失败或版本不兼容")
+	}
+	p.process = process
+	p.capabilities = init.Capabilities
+	p.state = "running"
+	return process, nil
+}
+
+func (p *plugin) failed(process *transport.Process) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.process == process {
+		process.Stop()
+		p.process = nil
+		p.state = "failed"
+	}
+}
+
+func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string) (protocol.CommandResult, error) {
+	if len(input) > 64<<10 {
+		return protocol.CommandResult{}, errors.New("命令输入超过限制")
+	}
+	if err := ctx.Err(); err != nil {
+		return protocol.CommandResult{}, err
+	}
+	p, err := m.lookup(pluginID)
+	if err != nil {
+		return protocol.CommandResult{}, err
 	}
 	var command *manifest.Command
 	for _, c := range p.manifest.Contributes.Commands {
@@ -255,94 +361,126 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 		return protocol.CommandResult{}, errors.New("命令不存在")
 	}
 	if p.manifest.Runtime.Kind == "declarative" {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if p.removed {
+			return protocol.CommandResult{}, errors.New("插件已移除")
+		}
 		p.state = "activated"
 		return protocol.CommandResult{Text: command.Message}, nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if p.process == nil || !p.process.Alive() {
-		if p.process != nil {
-			p.process.Stop()
-			p.process = nil
-		}
-		approval, err := os.ReadFile(filepath.Join(m.root, ".trusted", pluginID))
-		if err != nil || string(approval) != "trusted-native-v1\n" {
-			return protocol.CommandResult{}, errors.New("此原生插件未经信任确认，请通过安装入口重新安装")
-		}
-		path, err := manifest.Executable(p.dir, p.manifest)
-		if err != nil {
-			p.state = "failed"
-			return protocol.CommandResult{}, err
-		}
-		p.state = "activating"
-		p.process, err = transport.Start(path, p.dir)
-		if err != nil {
-			p.state = "failed"
-			return protocol.CommandResult{}, err
-		}
-		var init protocol.InitializeResult
-		err = p.process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: pluginID}, &init)
-		if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != pluginID {
-			p.process.Stop()
-			p.process = nil
-			p.state = "failed"
-			return protocol.CommandResult{}, errors.New("插件握手失败或版本不兼容")
-		}
-	}
-	p.state = "running"
-	var result protocol.CommandResult
-	if err := p.process.Call(ctx, "command.execute", protocol.CommandParams{CommandID: commandID, Input: input}, &result); err != nil {
-		p.process.Stop()
-		p.process = nil
-		p.state = "failed"
+	process, err := p.ensureProcess(ctx, m.root)
+	if err != nil {
 		return protocol.CommandResult{}, err
+	}
+	var result protocol.CommandResult
+	if err := process.Call(ctx, "command.execute", protocol.CommandParams{CommandID: commandID, Input: input}, &result); err != nil {
+		p.failed(process)
+		return result, err
+	}
+	if !m.current(pluginID, p) {
+		return protocol.CommandResult{}, errors.New("插件已移除")
 	}
 	return result, nil
 }
 
-func (m *Manager) Stop(id string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	p := m.plugins[id]
-	if p == nil {
-		return errors.New("插件不存在")
+func (m *Manager) QueryProvider(ctx context.Context, pluginID string, params protocol.SearchParams) (protocol.SearchResult, error) {
+	p, err := m.lookup(pluginID)
+	if err != nil {
+		return protocol.SearchResult{}, err
 	}
+	valid := false
+	for _, provider := range p.manifest.Contributes.SearchProviders {
+		if provider.ID == params.ProviderID {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return protocol.SearchResult{}, errors.New("搜索提供者未声明")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	process, err := p.ensureProcess(ctx, m.root)
+	if err != nil {
+		return protocol.SearchResult{}, err
+	}
+	p.mu.Lock()
+	capable := slices.Contains(p.capabilities, "search.query") && slices.Contains(p.capabilities, "$/cancelRequest")
+	p.mu.Unlock()
+	if !capable {
+		return protocol.SearchResult{}, errors.New("插件未协商搜索与取消能力")
+	}
+	var result protocol.SearchResult
+	err = process.CallSearch(ctx, params, &result)
+	if err != nil {
+		if !process.Alive() {
+			p.failed(process)
+		}
+		return protocol.SearchResult{}, err
+	}
+	if !m.current(pluginID, p) {
+		return protocol.SearchResult{}, errors.New("插件已移除")
+	}
+	p.mu.Lock()
+	current := p.process == process && !p.removed
+	p.mu.Unlock()
+	if !current {
+		return protocol.SearchResult{}, errors.New("插件已停止")
+	}
+	return result, nil
+}
+
+func (p *plugin) stop(removed bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.removed = p.removed || removed
 	if p.process != nil {
 		p.process.Stop()
 		p.process = nil
 	}
 	p.state = "deactivated"
+}
+
+func (m *Manager) Stop(id string) error {
+	p, err := m.lookup(id)
+	if err != nil {
+		return err
+	}
+	p.stop(false)
 	return nil
 }
 
 func (m *Manager) Uninstall(id string) error {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	p := m.plugins[id]
 	if p == nil || !manifest.ValidID(id) {
+		m.mu.Unlock()
 		return errors.New("插件不存在")
 	}
-	if p.process != nil {
-		p.process.Stop()
-		p.process = nil
-		p.state = "deactivated"
-	}
+	delete(m.plugins, id)
+	m.mu.Unlock()
+	p.stop(true)
 	if err := os.RemoveAll(p.dir); err != nil {
 		return errors.New("无法移除插件文件")
 	}
 	_ = os.Remove(filepath.Join(m.root, ".trusted", id))
-	delete(m.plugins, id)
 	return nil
 }
 
 func (m *Manager) Close() {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, p := range m.plugins {
-		if p.process != nil {
-			p.process.Stop()
-			p.process = nil
-			p.state = "deactivated"
-		}
+	m.closed = true
+	entries := m.plugins
+	m.plugins = map[string]*plugin{}
+	m.mu.Unlock()
+	for _, p := range entries {
+		p.stop(true)
 	}
 }

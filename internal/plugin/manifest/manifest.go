@@ -35,7 +35,14 @@ type Runtime struct {
 }
 
 type Contributions struct {
-	Commands []Command `json:"commands"`
+	Commands        []Command        `json:"commands"`
+	SearchProviders []SearchProvider `json:"searchProviders,omitempty"`
+}
+
+type SearchProvider struct {
+	ID        string `json:"id"`
+	Prefix    string `json:"prefix,omitempty"`
+	MinLength int    `json:"minLength,omitempty"`
 }
 
 type Command struct {
@@ -96,9 +103,22 @@ func (m Manifest) Validate() error {
 		}
 	}
 	for _, event := range m.ActivationEvents {
-		if !strings.HasPrefix(event, "onCommand:") || !seen[strings.TrimPrefix(event, "onCommand:")] {
-			return errors.New("当前原型仅支持已声明命令的 onCommand 激活事件")
+		if event == "onSearch" && len(m.Contributes.SearchProviders) > 0 {
+			continue
 		}
+		if !strings.HasPrefix(event, "onCommand:") || !seen[strings.TrimPrefix(event, "onCommand:")] {
+			return errors.New("不支持的激活事件或未声明对应贡献")
+		}
+	}
+	providers := map[string]bool{}
+	if len(m.Contributes.SearchProviders) > 8 {
+		return errors.New("搜索提供者数量超过限制")
+	}
+	for _, p := range m.Contributes.SearchProviders {
+		if m.Runtime.Kind != "process" || !commandPattern.MatchString(p.ID) || providers[p.ID] || p.MinLength < 0 || p.MinLength > 256 || len(p.Prefix) > 64 {
+			return errors.New("搜索提供者声明无效或重复")
+		}
+		providers[p.ID] = true
 	}
 	switch m.Runtime.Kind {
 	case "declarative":

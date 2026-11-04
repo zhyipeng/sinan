@@ -8,7 +8,7 @@ const MaxMessageBytes = 1 << 20
 
 type Request struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      uint64          `json:"id"`
+	ID      uint64          `json:"id,omitempty"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 }
@@ -33,8 +33,9 @@ type InitializeParams struct {
 }
 
 type InitializeResult struct {
-	APIVersion string `json:"apiVersion"`
-	PluginID   string `json:"pluginId"`
+	APIVersion   string   `json:"apiVersion"`
+	PluginID     string   `json:"pluginId"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 type CommandParams struct {
@@ -44,4 +45,27 @@ type CommandParams struct {
 
 type CommandResult struct {
 	Text string `json:"text"`
+}
+
+type CancelParams struct {
+	ID uint64 `json:"id"`
+}
+
+type SearchParams struct {
+	ProviderID string `json:"providerId"`
+	Query      string `json:"query"`
+	Limit      int    `json:"limit"`
+}
+
+type SearchItem struct {
+	ID        string  `json:"id"`
+	Title     string  `json:"title"`
+	Subtitle  string  `json:"subtitle,omitempty"`
+	CommandID string  `json:"commandId"`
+	Input     string  `json:"input,omitempty"`
+	Score     float64 `json:"score"`
+}
+
+type SearchResult struct {
+	Items []SearchItem `json:"items"`
 }

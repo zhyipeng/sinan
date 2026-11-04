@@ -22,6 +22,7 @@ var appIcon []byte
 var trayIcon []byte
 
 func main() {
+	uiProbe := flag.Bool("ui-probe", false, "运行开发用 UI 隔离验证")
 	root := flag.String("plugins", "", "插件安装目录")
 	flag.Parse()
 	if *root == "" {
@@ -36,7 +37,11 @@ func main() {
 		log.Fatal("无法初始化插件运行时")
 	}
 	defer manager.Close()
-	host := &HostService{manager: manager}
+	host := &HostService{manager: manager, probeEnabled: *uiProbe}
+	appURL := "/"
+	if *uiProbe {
+		appURL = "/?isolation=1"
+	}
 	app := application.New(application.Options{
 		Name:        "Sinan",
 		Description: "插件驱动的桌面效率工具",
@@ -44,7 +49,7 @@ func main() {
 		Services:    []application.Service{application.NewService(host)},
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
-		OnShutdown:  manager.Close,
+		OnShutdown:  func() { host.cancelSearch(); manager.Close() },
 	})
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "launcher", Title: "司南", Width: launcherWidth, Height: launcherMinHeight,
@@ -64,24 +69,27 @@ func main() {
 				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
 			TitleBar: application.MacTitleBar{Hide: true},
 		},
-		BackgroundColour: application.NewRGB(246, 247, 251), URL: "/",
+		BackgroundColour: application.NewRGB(246, 247, 251), URL: appURL,
 	})
 	host.launcher = &launcher{window: window}
 	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		event.Cancel()
 		window.Hide()
 	})
-	configureTray(app, host.launcher)
-	// Register after startup so OS conflicts are returned to us rather than only logged.
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
-		if err := app.GlobalShortcut.Register("CmdOrCtrl+Space", host.launcher.toggle); err != nil {
-			log.Print("全局快捷键注册失败，仍可通过托盘显示司南")
-			host.launcher.setShortcutError("Command + Space 注册失败，请检查系统聚焦或其他应用的快捷键占用。可从托盘打开司南。")
-		}
-	})
-	app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
-		go host.launcher.show()
-	})
+	window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) { host.cancelSearch() })
+	if !*uiProbe {
+		configureTray(app, host.launcher)
+		// Register after startup so OS conflicts are returned to us rather than only logged.
+		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
+			if err := app.GlobalShortcut.Register("CmdOrCtrl+Space", host.launcher.toggle); err != nil {
+				log.Print("全局快捷键注册失败，仍可通过托盘显示司南")
+				host.launcher.setShortcutError("Command + Space 注册失败，请检查系统聚焦或其他应用的快捷键占用。可从托盘打开司南。")
+			}
+		})
+		app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
+			go host.launcher.show()
+		})
+	}
 	if err := app.Run(); err != nil {
 		log.Fatal("桌面宿主运行失败")
 	}

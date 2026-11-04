@@ -19,7 +19,9 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 - Manifest 校验、目录发现、本地目录安装、停止和卸载。
 - 声明式插件与按需激活的 Go 独立进程插件。
 - JSON-RPC 2.0 stdio 握手、命令调用、超时终止和失败隔离。
-- 宿主 CLI、协议类型、最小 Go 插件 SDK 和两个示例插件。
+- 宿主 CLI、协议类型、Go 插件 SDK，以及两个命令示例和两个独立搜索 Provider。
+- 宿主搜索协调、静态命令索引、动态来源并行合并、请求取消及来源失败隔离。
+- 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；尚未开放第三方 UI 加载。
 
 应用检索、设置、SQLite、第三方插件 UI 和完整插件管理系统插件尚未实现。当前“插件”入口是宿主启动期的本地恢复与验证入口。
 
@@ -32,7 +34,7 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 - 点击菜单栏 / 托盘中的司南图标，选择“显示司南”找回窗口，选择“退出司南”结束应用。
 - 搜索框右侧 `···` 打开本地插件入口。快捷键注册失败时，该入口会提示占用错误。
 
-当前仅验证了 macOS 上的窗口伸缩及快捷键注册，物理热键和托盘菜单需实机检查，详见 [ADR 0002](docs/adr/0002-launcher-interaction.md)。
+三屏定位、20% 纵向位置和全屏呼出已获用户确认。搜索与 UI 原型的实现及验证边界见 [ADR 0003](docs/adr/0003-search-and-ui-prototype.md)。
 
 ## 本地启动
 
@@ -44,7 +46,9 @@ make setup
 make demo
 ```
 
-`make demo` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备两个示例插件并打开窗口。脚本只对仓库自带的 Go 示例使用信任安装。重复执行保留已有示例；修改示例后需先卸载再安装。
+`make demo` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备四个示例插件并打开窗口。脚本只对仓库自带的 Go 示例使用信任安装。重复执行保留已有示例；修改示例后需先卸载再安装。
+
+搜索 `demo` 可看到静态命令和快慢两个动态来源；搜索包含 `fail` 的文字可观察慢来源失败，其他结果仍可使用。以 `slow:` 开头的查询用于验证取消。
 
 普通启动使用 `make run`，默认插件目录为 `os.UserConfigDir()/Sinan/plugins`；在 macOS 中即 `~/Library/Application Support/Sinan/plugins`。可通过窗口内 `···` 的本地插件入口填入插件目录安装；原生插件需勾选信任。
 
@@ -62,6 +66,7 @@ make test        # 包含真实子进程的竞态测试
 
 ```sh
 ./bin/sinanctl -plugins .sinan-dev/plugins list
+./bin/sinanctl -plugins .sinan-dev/plugins search demo
 ./bin/sinanctl -plugins .sinan-dev/plugins run example.hello hello
 ./bin/sinanctl -plugins .sinan-dev/plugins run example.echo echo '你好，司南'
 ./bin/sinanctl -plugins .sinan-dev/plugins uninstall example.echo
@@ -71,3 +76,11 @@ make test        # 包含真实子进程的竞态测试
 CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通过“停止”终止。不要让 CLI 与桌面同时修改同一个安装目录，当前无跨进程安装锁。
 
 更多细节见 [当前插件接口](docs/plugin-protocol.md) 和 [ADR 0001](docs/adr/0001-phase-one-runtime.md)。独立进程提供故障隔离，原生插件仍以当前用户权限运行。
+
+## UI 隔离原型
+
+```sh
+./bin/sinan -ui-probe -plugins .sinan-dev/probe-plugins
+```
+
+此开发模式展示固定隔离页并输出 `ISOLATION_PROBE` 布尔报告，不注册热键或托盘。原型验证逻辑隔离与受限消息桥，不提供任意插件 HTML 加载、完整导航防护或渲染进程隔离。

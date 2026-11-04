@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Events } from '@wailsio/runtime';
-import { Execute, Install, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, Install, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall, StartSearch, CancelSearch } from '../bindings/sinan/apps/desktop/hostservice';
 
 type Command = { id: string; title: string; keywords?: string[] | null };
 type Plugin = { id: string; name: string; version: string; kind: string; state: string; commands: Command[] };
+type SearchItem = { key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
+type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
 type Data = { plugins: Plugin[]; diagnostics: string[] };
 function normalize(snapshot: { plugins: (Omit<Plugin, 'commands'> & { commands: Command[] | null })[] | null; diagnostics: string[] | null }): Data {
   return { plugins: (snapshot.plugins ?? []).map(plugin => ({ ...plugin, commands: plugin.commands ?? [] })), diagnostics: snapshot.diagnostics ?? [] };
@@ -13,6 +15,12 @@ const states: Record<string, string> = { installed: '已安装', activating: '�
 export default function App() {
   const [data, setData] = useState<Data>({ plugins: [], diagnostics: [] });
   const [query, setQuery] = useState('');
+  const [commands, setCommands] = useState<SearchItem[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchFailures, setSearchFailures] = useState(0);
+  const searchSequence = useRef(Date.now() * 1000);
+  const activeSequence = useRef('');
+  const selectedKey = useRef('');
   const [selected, setSelected] = useState(0);
   const [active, setActive] = useState<{ plugin: Plugin; command: Command }>();
   const [input, setInput] = useState('');
@@ -66,11 +74,34 @@ export default function App() {
   }, []);
 
   const hasQuery = query.trim().length > 0;
-  const commands = useMemo(() => data.plugins.flatMap(plugin => plugin.commands.map(command => ({ plugin, command })))
-    .filter(({ plugin, command }) => [plugin.name, command.title, ...(command.keywords ?? [])].join(' ').toLowerCase().includes(query.trim().toLowerCase())), [data, query]);
+  useEffect(() => Events.On('search:update', event => {
+    const update = event.data as SearchUpdate;
+    if (update.queryId !== activeSequence.current) return;
+    const next = update.items ?? [];
+    const index = next.findIndex(item => item.key === selectedKey.current);
+    setCommands(next);
+    setSelected(index < 0 ? 0 : index);
+    setSearching(!update.done);
+    setSearchFailures(update.failures?.length ?? 0);
+  }), []);
 
-  useEffect(() => { setSelected(value => Math.max(0, Math.min(value, commands.length - 1))); }, [commands.length]);
-  useEffect(() => { commandRefs.current[selected]?.scrollIntoView({ block: 'nearest' }); }, [selected]);
+  useEffect(() => {
+    const sequence = ++searchSequence.current;
+    activeSequence.current = String(sequence);
+    selectedKey.current = '';
+    setCommands([]); setSelected(0); setSearchFailures(0);
+    if (!connected || !hasQuery || manage || active) { setSearching(false); return; }
+    setSearching(true);
+    void StartSearch(sequence, query).catch(() => {
+      if (activeSequence.current === String(sequence)) { setSearching(false); setError('搜索请求失败，请重试。'); }
+    });
+    return () => { activeSequence.current = ''; void CancelSearch(sequence).catch(() => {}); };
+  }, [query, connected, manage, active, data]);
+
+  useEffect(() => {
+    selectedKey.current = commands[selected]?.key ?? '';
+    commandRefs.current[selected]?.scrollIntoView({ block: 'nearest' });
+  }, [selected, commands]);
 
   async function perform(action: () => Promise<unknown>) {
     const current = generation.current;
@@ -87,7 +118,10 @@ export default function App() {
 
   function choose(index: number) {
     const item = commands[index];
-    if (item) { setActive(item); setInput(''); setOutput(''); setError(''); }
+    if (!item) return;
+    const plugin = data.plugins.find(plugin => plugin.id === item.pluginId);
+    const command = plugin?.commands.find(command => command.id === item.commandId);
+    if (plugin && command) { setActive({ plugin, command }); setInput(item.input); setOutput(''); setError(''); }
   }
 
   return <main ref={shellRef} className="shell">
@@ -139,12 +173,12 @@ export default function App() {
       </div>
       {hasQuery && <>
         <div className="command-list" aria-label="搜索结果">
-          {commands.map(({ plugin, command }, index) => <button ref={element => { commandRefs.current[index] = element; }} className={`command ${index === selected ? 'selected' : ''}`} key={`${plugin.id}:${command.id}`} onMouseEnter={() => setSelected(index)} onClick={() => choose(index)}>
-            <span className="command-icon">{plugin.kind === 'process' ? '↔' : '✧'}</span><span><strong>{command.title}</strong><small>{plugin.name}</small></span><span className="open">↵</span>
+          {commands.map((item, index) => <button ref={element => { commandRefs.current[index] = element; }} className={`command ${index === selected ? 'selected' : ''}`} key={item.key} onMouseEnter={() => setSelected(index)} onClick={() => choose(index)}>
+            <span className="command-icon">{item.kind === 'process' ? '↔' : '✧'}</span><span><strong>{item.title}</strong><small>{item.subtitle}</small></span><span className="open">↵</span>
           </button>)}
-          {!commands.length && <div className="empty">没有匹配的命令</div>}
+          {!commands.length && <div className="empty">{searching ? '搜索中…' : '没有匹配的命令'}</div>}
         </div>
-        <footer><span>{commands.length} 个结果</span><span>↑ ↓ 选择　↵ 打开　esc 隐藏</span></footer>
+        <footer><span>{commands.length} 个结果{searching ? ' · 搜索中…' : searchFailures ? ` · ${searchFailures} 个来源暂不可用` : ''}</span><span>↑ ↓ 选择　↵ 打开　esc 隐藏</span></footer>
       </>}
     </section>}
     {error && <p className="error" role="alert">{error}</p>}

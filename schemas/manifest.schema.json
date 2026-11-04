@@ -1,55 +1,197 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sinan.local/schemas/manifest-v1.json",
-  "title": "Sinan Phase 1 Plugin Manifest",
+  "title": "Sinan Plugin Manifest v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "name", "version", "apiVersion", "runtime", "contributes"],
+  "required": [
+    "id",
+    "name",
+    "version",
+    "apiVersion",
+    "runtime",
+    "contributes"
+  ],
   "properties": {
-    "id": { "type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$" },
-    "name": { "type": "string", "pattern": "\\S" },
-    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-    "apiVersion": { "const": "1" },
+    "id": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "apiVersion": {
+      "const": "1"
+    },
     "runtime": {
-      "type": "object", "additionalProperties": false, "required": ["kind"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
       "properties": {
-        "kind": { "enum": ["declarative", "process"] },
-        "entry": { "type": "string", "minLength": 1, "description": "进程入口：插件内相对路径；宿主额外检查路径及符号链接。" }
+        "kind": {
+          "enum": [
+            "declarative",
+            "process"
+          ]
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "进程入口：插件内相对路径；宿主额外检查路径及符号链接。"
+        }
       }
     },
     "contributes": {
-      "type": "object", "additionalProperties": false, "required": ["commands"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commands"
+      ],
       "properties": {
         "commands": {
-          "type": "array", "minItems": 1,
+          "type": "array",
+          "minItems": 1,
           "items": {
-            "type": "object", "additionalProperties": false, "required": ["id", "title"],
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title"
+            ],
             "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "title": { "type": "string", "pattern": "\\S" },
-              "keywords": { "type": "array", "items": { "type": "string" } },
-              "message": { "type": "string" }
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "title": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "keywords": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "searchProviders": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "prefix": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "minLength": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 256
+              }
             }
           }
         }
       }
     },
-    "permissions": { "type": "array", "maxItems": 0 },
-    "activationEvents": { "type": "array", "items": { "type": "string", "pattern": "^onCommand:[a-z][a-z0-9-]*$" } }
-  },
-  "allOf": [{
-    "if": { "properties": { "runtime": { "properties": { "kind": { "const": "process" } } } } },
-    "then": {
-      "properties": {
-        "runtime": { "required": ["entry"] },
-        "contributes": { "properties": { "commands": { "items": { "properties": { "message": { "const": "" } } } } } }
-      }
+    "permissions": {
+      "type": "array",
+      "maxItems": 0
     },
-    "else": {
-      "properties": {
-        "runtime": { "properties": { "entry": { "const": "" } } },
-        "contributes": { "properties": { "commands": { "items": { "required": ["message"], "properties": { "message": { "minLength": 1 } } } } } }
+    "activationEvents": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(onSearch|onCommand:[a-z][a-z0-9-]*)$"
       }
     }
-  }]
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "runtime": {
+            "properties": {
+              "kind": {
+                "const": "process"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "required": [
+              "entry"
+            ]
+          },
+          "contributes": {
+            "properties": {
+              "commands": {
+                "items": {
+                  "properties": {
+                    "message": {
+                      "const": ""
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "runtime": {
+            "properties": {
+              "entry": {
+                "const": ""
+              }
+            }
+          },
+          "contributes": {
+            "properties": {
+              "commands": {
+                "items": {
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "searchProviders": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

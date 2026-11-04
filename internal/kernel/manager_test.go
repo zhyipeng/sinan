@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"sinan/internal/plugin/manifest"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 var helper []byte
@@ -42,6 +43,7 @@ func source(t *testing.T, native bool) string {
 	mf := manifest.Manifest{ID: "example.hello", Name: "Hello", Version: "0.1.0", APIVersion: "1", Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{Commands: []manifest.Command{{ID: "hello", Title: "Hello", Message: "你好"}}}}
 	if native {
 		mf.ID = "example.native"
+		mf.Contributes.SearchProviders = []manifest.SearchProvider{{ID: "demo"}}
 		mf.Runtime = manifest.Runtime{Kind: "process", Entry: "plugin"}
 		mf.Contributes.Commands = []manifest.Command{{ID: "echo", Title: "Echo"}, {ID: "hang", Title: "Hang"}, {ID: "crash", Title: "Crash"}, {ID: "invalid", Title: "Invalid"}}
 		if err := os.WriteFile(filepath.Join(dir, "plugin"), helper, 0700); err != nil {
@@ -142,6 +144,10 @@ func TestNativeFailuresDoNotBreakHost(t *testing.T) {
 			if _, err := m.Install(source(t, false), false); err != nil {
 				t.Fatal(err)
 			}
+			// This case tests a running handler, not macOS cold-start/signature latency.
+			if _, err := m.Execute(context.Background(), "example.native", "echo", "warm"); err != nil {
+				t.Fatal(err)
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 			defer cancel()
 			if _, err := m.Execute(ctx, "example.native", command, ""); err == nil {
@@ -225,4 +231,199 @@ func TestConcurrentSnapshotAndCommands(t *testing.T) {
 		})
 	}
 	wg.Wait()
+}
+
+func awaitSearch(t *testing.T, m *Manager, id string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		result, err := m.Execute(context.Background(), id, "echo", "active")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Text != "0" {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("search did not start")
+}
+
+func TestCooperativeSearchCancellationPreservesCommandAndProcess(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(source(t, true), true); err != nil {
+		t.Fatal(err)
+	}
+	before, err := m.Execute(context.Background(), "example.native", "echo", "pid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	queryDone := make(chan error, 1)
+	go func() {
+		_, err := m.QueryProvider(ctx, "example.native", protocol.SearchParams{ProviderID: "demo", Query: "slow", Limit: 20})
+		queryDone <- err
+	}()
+	awaitSearch(t, m, "example.native")
+	commandDone := make(chan error, 1)
+	go func() {
+		_, err := m.Execute(context.Background(), "example.native", "echo", "delay")
+		commandDone <- err
+	}()
+	cancel()
+	if err := <-queryDone; !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if err := <-commandDone; err != nil {
+		t.Fatal("unrelated command interrupted", err)
+	}
+	// A second search proves the server continues dispatching after cancellation.
+	if _, err := m.QueryProvider(context.Background(), "example.native", protocol.SearchParams{ProviderID: "demo", Query: "after", Limit: 20}); err != nil {
+		t.Fatal(err)
+	}
+	// Wait past the cancellation grace to detect a wrongly retained watchdog.
+	time.Sleep(550 * time.Millisecond)
+	after, err := m.Execute(context.Background(), "example.native", "echo", "pid")
+	if err != nil || after.Text != before.Text {
+		t.Fatalf("cooperating process was killed: %v", err)
+	}
+}
+
+func TestOtherPluginAndSnapshotRemainResponsiveDuringSearch(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(source(t, true), true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Install(source(t, false), false); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.QueryProvider(ctx, "example.native", protocol.SearchParams{ProviderID: "demo", Query: "block", Limit: 20})
+		done <- err
+	}()
+	awaitSearch(t, m, "example.native")
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		_ = m.Snapshot()
+		if _, err := m.Execute(context.Background(), "example.hello", "hello", ""); err != nil {
+			t.Error(err)
+		}
+	}()
+	select {
+	case <-finished:
+	case <-time.After(400 * time.Millisecond):
+		t.Fatal("global registry blocked by search")
+	}
+	cancel()
+	<-done
+}
+
+func TestUninstallInvalidatesPendingSearch(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(source(t, true), true); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.QueryProvider(context.Background(), "example.native", protocol.SearchParams{ProviderID: "demo", Query: "block", Limit: 20})
+		done <- err
+	}()
+	awaitSearch(t, m, "example.native")
+	if err := m.Uninstall("example.native"); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err == nil {
+		t.Fatal("removed provider returned results")
+	}
+	if len(m.Snapshot().Plugins) != 0 {
+		t.Fatal("removed plugin revived")
+	}
+}
+
+func TestNonCooperatingSearchIsReaped(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(source(t, true), true); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.QueryProvider(ctx, "example.native", protocol.SearchParams{ProviderID: "demo", Query: "ignore", Limit: 20})
+		done <- err
+	}()
+	awaitSearch(t, m, "example.native")
+	cancel()
+	<-done
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if m.Snapshot().Plugins[0].State == "failed" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("non-cooperating process was not stopped")
+}
+
+func TestIndependentNativeProvidersRunInParallel(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(source(t, true), true); err != nil {
+		t.Fatal(err)
+	}
+	second := source(t, true)
+	mf, err := manifest.Load(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf.ID = "example.second"
+	encoded, _ := json.Marshal(mf)
+	if err := os.WriteFile(filepath.Join(second, "manifest.json"), encoded, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Install(second, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"example.native", "example.second"} {
+		if _, err := m.Execute(context.Background(), id, "echo", "warm"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	slowCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.QueryProvider(slowCtx, "example.native", protocol.SearchParams{ProviderID: "demo", Query: "block", Limit: 20})
+		done <- err
+	}()
+	awaitSearch(t, m, "example.native")
+	fastCtx, fastCancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer fastCancel()
+	result, err := m.QueryProvider(fastCtx, "example.second", protocol.SearchParams{ProviderID: "demo", Query: "fast", Limit: 20})
+	if err != nil || len(result.Items) != 1 {
+		t.Fatal("independent provider blocked", err)
+	}
+	cancel()
+	<-done
+}
+
+func TestActivationTimeoutPreservesContextError(t *testing.T) {
+	m := manager(t)
+	dir := source(t, true)
+	if err := os.WriteFile(filepath.Join(dir, "slow-start"), []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Install(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	_, err := m.QueryProvider(ctx, "example.native", protocol.SearchParams{ProviderID: "demo", Query: "query", Limit: 20})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("activation timeout was misclassified: %v", err)
+	}
 }

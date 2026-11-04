@@ -5,3 +5,7 @@ import * as HostService from "./hostservice.js";
 export {
     HostService
 };
+
+export type {
+    IsolationReport
+} from "./models.js";

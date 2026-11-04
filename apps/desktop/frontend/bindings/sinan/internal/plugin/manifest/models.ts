@@ -7,3 +7,9 @@ export interface Command {
     "keywords"?: string[] | null;
     "message"?: string;
 }
+
+export interface SearchProvider {
+    "id": string;
+    "prefix"?: string;
+    "minLength"?: number;
+}

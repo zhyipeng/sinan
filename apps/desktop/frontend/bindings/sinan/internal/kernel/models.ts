@@ -12,6 +12,7 @@ export interface PluginInfo {
     "kind": string;
     "state": string;
     "commands": manifest$0.Command[] | null;
+    "searchProviders": manifest$0.SearchProvider[] | null;
 }
 
 export interface Snapshot {
