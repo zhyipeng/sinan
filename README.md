@@ -9,6 +9,7 @@
 - [架构指导方案](docs/architecture.md)：项目定位、边界、技术选型、实施路线与验收标准。
 - [原始规划存档](docs/references/plugin-architecture-planning.md)：来源会话的规划正文，供追溯。
 - [开发约定](AGENTS.md)：后续开发及 AI 协作需要遵守的规则。
+- [下一轮开发计划](docs/next-iteration.md)：多 Provider 搜索、运行时并行与取消、插件 UI 隔离验证。
 
 ## 当前进度
 
