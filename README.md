@@ -58,6 +58,8 @@ make package     # macOS: bin/Sinan.app（本地未签名应用包）
 make test        # 包含真实子进程的竞态测试
 ```
 
+键盘导航的浏览器回归需要本机 `ego-browser` CLI：先运行 `npm --prefix apps/desktop/frontend run dev`，再在另一终端运行 `npm --prefix apps/desktop/frontend run test:keyboard`。固定测试页控制慢结果到达时机，覆盖搜索未结束时的上下键、同批次增量更新、鼠标静止、结果插入和回车打开选中项；不会连接真实插件。
+
 前端资源嵌入宿主，修改后用 `make build` 或 `make demo` 重新构建。当前尚未配置 Wails 热重载工作流；仅打开前端 Vite 页面无法调用桌面宿主。
 
 ## 独立插件验证
