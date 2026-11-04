@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Events } from '@wailsio/runtime';
+import { pluginViews, settingsBridge } from './pluginViews';
+import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
 import { Execute, Install, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall, StartSearch, CancelSearch, HideLauncher } from '../bindings/sinan/apps/desktop/hostservice';
 
-type Command = { id: string; title: string; keywords?: string[] | null; execution?: string };
-type Plugin = { id: string; name: string; version: string; kind: string; state: string; commands: Command[] };
+type Command = { view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
+type Plugin = { id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
 type SearchItem = { icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
 type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
 type Data = { plugins: Plugin[]; diagnostics: string[] };
@@ -100,6 +102,8 @@ export default function App() {
     return () => { activeSequence.current = ''; void CancelSearch(sequence).catch(() => {}); };
   }, [query, connected, manage, active, data]);
 
+  const ActiveView = active?.command.view ? pluginViews[`${active.plugin.id}/${active.command.view}`] : undefined;
+
   const selected = Math.max(0, commands.findIndex(item => item.key === selection.key));
   useEffect(() => {
     commandRefs.current[selected]?.scrollIntoView({ block: 'nearest' });
@@ -131,6 +135,7 @@ export default function App() {
     if (!item || busy) return;
     const plugin = data.plugins.find(plugin => plugin.id === item.pluginId);
     const command = plugin?.commands.find(command => command.id === item.commandId);
+    if (plugin && command?.view && !pluginViews[`${plugin.id}/${command.view}`]) { setError('此视图尚未在桌面宿主中注册。'); return; }
     if (plugin && command?.execution === 'direct') {
       const current = generation.current;
       void perform(async () => {
@@ -175,8 +180,8 @@ export default function App() {
         {shortcutError && <p className="error">{shortcutError}</p>}
       </div>
     </section> : active ? <section className="tool">
-      <div className="view-header"><button className="back" aria-label="返回搜索" onClick={() => { generation.current++; setBusy(false); setActive(undefined); setOutput(''); setError(''); }}>←</button><h1>{active.command.title}</h1><span className="source">{active.plugin.name}</span></div>
-      <div className="tool-body">
+      <div className="view-header"><button className="back" aria-label="返回搜索" onClick={() => { generation.current++; setBusy(false); setActive(undefined); setOutput(''); setError(''); }}>←</button><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}</div>
+      <>{ActiveView ? <ActiveView plugins={data.plugins} bridge={settingsBridge} /> : <div className="tool-body">
         <form onSubmit={event => {
           event.preventDefault();
           const current = generation.current;
@@ -190,7 +195,7 @@ export default function App() {
           <button className="primary" disabled={busy || !connected}>{busy ? '执行中…' : '执行'}</button>
         </form>
         {output && <output aria-live="polite">{output}</output>}
-      </div>
+      </div>}</>
     </section> : <section className="launcher">
       <div className="search">
         <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>

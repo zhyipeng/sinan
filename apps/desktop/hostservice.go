@@ -7,6 +7,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"sinan/internal/kernel"
 	"sinan/internal/search"
+	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
 	"strconv"
 	"sync"
@@ -112,3 +113,17 @@ func (h *HostService) RecordIsolationProbe(report IsolationReport, rejected bool
 	}{report, rejected})
 	fmt.Printf("ISOLATION_PROBE %s\n", data)
 }
+
+// Configuration methods are exposed only to the trusted Shell and bundled views.
+func (h *HostService) PluginSettings(pluginID string) (storage.SettingsSnapshot, error) {
+	return h.manager.PluginSettings(pluginID)
+}
+func (h *HostService) SavePluginSettings(pluginID string, revision uint64, values map[string][]string) (storage.SettingsSnapshot, error) {
+	h.cancelSearch()
+	result, err := h.manager.SavePluginSettings(pluginID, revision, values)
+	if err == nil && h.launcher != nil {
+		h.launcher.window.DispatchWailsEvent(&application.CustomEvent{Name: "settings:changed", Data: map[string]any{"pluginId": pluginID, "revision": result.Revision}, Sender: "kernel.settings"})
+	}
+	return result, err
+}
+func (h *HostService) ClearHistory() error { h.cancelSearch(); return h.manager.ClearUsage() }

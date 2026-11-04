@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -19,10 +20,16 @@ func main() {
 		time.Sleep(time.Second)
 	}
 	var active atomic.Int32
+	var settings map[string][]string
 	_ = sdk.ServeWithHandlers(os.Stdin, os.Stdout, filepath.Base(cwd), sdk.Handlers{
+		Initialize: func(p protocol.InitializeParams) error { settings = p.Settings; return nil },
 		Command: func(ctx context.Context, p protocol.CommandParams) (protocol.CommandResult, error) {
 			switch p.CommandID {
 			case "echo":
+				if p.Input == "settings" {
+					data, _ := json.Marshal(settings)
+					return protocol.CommandResult{Text: string(data)}, nil
+				}
 				if p.Input == "pid" {
 					return protocol.CommandResult{Text: strconv.Itoa(os.Getpid())}, nil
 				}

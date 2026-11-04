@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"sinan/internal/kernel"
 	"sinan/internal/search"
@@ -23,7 +24,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -75,6 +76,21 @@ func run() error {
 		}
 		err = m.ClearUsage()
 		result = "使用历史已清除"
+	case "settings":
+		if len(args) != 2 {
+			return errors.New("settings 需要插件 ID")
+		}
+		result, err = m.PluginSettings(args[1])
+	case "set-settings":
+		if len(args) != 4 {
+			return errors.New("set-settings 需要插件 ID、当前 revision 和 JSON 对象")
+		}
+		revision, parseErr := strconv.ParseUint(args[2], 10, 64)
+		var values map[string][]string
+		if parseErr != nil || json.Unmarshal([]byte(args[3]), &values) != nil {
+			return errors.New("设置参数格式无效")
+		}
+		result, err = m.SavePluginSettings(args[1], revision, values)
 	default:
 		return errors.New("未知操作")
 	}

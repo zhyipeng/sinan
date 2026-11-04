@@ -21,6 +21,7 @@ import (
 )
 
 type PluginInfo struct {
+	Settings        []manifest.Setting        `json:"settings,omitempty"`
 	ID              string                    `json:"id"`
 	Name            string                    `json:"name"`
 	Version         string                    `json:"version"`
@@ -36,6 +37,7 @@ type Snapshot struct {
 }
 
 type plugin struct {
+	settings     map[string][]string
 	mu           sync.Mutex
 	removed      bool
 	capabilities []string
@@ -46,6 +48,7 @@ type plugin struct {
 }
 
 type Manager struct {
+	settings    *storage.Settings
 	usage       *storage.Usage
 	mutationMu  sync.Mutex
 	closed      bool
@@ -67,7 +70,7 @@ func New(root string) (*Manager, error) {
 	if err != nil {
 		return nil, errors.New("插件目录无效")
 	}
-	m := &Manager{root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json"))}
+	m := &Manager{root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
 	m.Refresh()
 	return m, nil
 }
@@ -81,6 +84,9 @@ func (m *Manager) Refresh() Snapshot {
 		return Snapshot{Plugins: []PluginInfo{}, Diagnostics: []string{}}
 	}
 	m.diagnostics = []string{}
+	if err := m.settings.Error(); err != nil {
+		m.diagnostics = append(m.diagnostics, err.Error())
+	}
 	entries, err := os.ReadDir(m.root)
 	if err != nil {
 		m.diagnostics = append(m.diagnostics, "无法读取插件目录")
@@ -110,7 +116,7 @@ func (m *Manager) Refresh() Snapshot {
 			}
 			retired = append(retired, old)
 		}
-		m.plugins[mf.ID] = &plugin{manifest: mf, dir: dir, state: "installed"}
+		m.plugins[mf.ID] = &plugin{manifest: mf, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
 	}
 	for id, p := range m.plugins {
 		if !found[id] {
@@ -150,7 +156,7 @@ func (m *Manager) Snapshot() Snapshot {
 }
 
 func (p *plugin) info() PluginInfo {
-	return PluginInfo{ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	return PluginInfo{Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.
@@ -213,7 +219,7 @@ func (m *Manager) Install(source string, trustNative bool) (PluginInfo, error) {
 	if err := os.Rename(temp, dest); err != nil {
 		return PluginInfo{}, errors.New("无法完成插件安装")
 	}
-	p := &plugin{manifest: copied, dir: dest, state: "installed"}
+	p := &plugin{manifest: copied, dir: dest, state: "installed", settings: settingsValues(copied, m.settings.Get(copied.ID).Values)}
 	m.mu.Lock()
 	m.plugins[mf.ID] = p
 	m.mu.Unlock()
@@ -316,7 +322,7 @@ func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Pro
 		return nil, err
 	}
 	var init protocol.InitializeResult
-	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID}, &init)
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings}, &init)
 	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
 		process.Stop()
 		p.state = "failed"
@@ -364,6 +370,9 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 			break
 		}
 	}
+	if command != nil && command.View != "" {
+		return protocol.CommandResult{}, errors.New("此命令需要在桌面视图中打开")
+	}
 	if command == nil {
 		return protocol.CommandResult{}, errors.New("命令不存在")
 	}
@@ -388,6 +397,12 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 	}
 	if !m.current(pluginID, p) {
 		return protocol.CommandResult{}, errors.New("插件已移除")
+	}
+	p.mu.Lock()
+	current := p.process == process && !p.removed
+	p.mu.Unlock()
+	if !current {
+		return protocol.CommandResult{}, errors.New("插件已停止")
 	}
 	return result, nil
 }

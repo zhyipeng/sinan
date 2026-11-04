@@ -1,0 +1,74 @@
+import { useEffect, useState } from 'react';
+
+export type SettingsSchema = { id: string; title: string; type: string };
+export type ConfigurablePlugin = { id: string; name: string; settings?: SettingsSchema[] | null };
+export type SettingsSnapshot = { revision: number; values: Record<string, string[]> };
+export type SettingsBridge = {
+  load(pluginID: string): Promise<SettingsSnapshot>;
+  save(pluginID: string, revision: number, values: Record<string, string[]>): Promise<SettingsSnapshot>;
+  clearHistory(): Promise<void>;
+};
+
+type Draft = { revision: number; values: Record<string, string>; saved: Record<string, string> };
+export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlugin[]; bridge: SettingsBridge }) {
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState('');
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let current = true;
+    setLoading(true);
+    Promise.all(plugins.filter(plugin => plugin.settings?.length).map(async plugin => {
+      const value = await bridge.load(plugin.id);
+      const fields = Object.fromEntries((plugin.settings ?? []).map(field => [field.id, (value.values[field.id] ?? []).join('\n')]));
+      return [plugin.id, { revision: value.revision, values: fields, saved: fields }] as const;
+    })).then(entries => { if (current) setDrafts(Object.fromEntries(entries)); })
+      .catch(() => { if (current) setError('无法读取设置，请返回后重试。'); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [plugins, bridge]);
+
+  async function save(plugin: ConfigurablePlugin) {
+    const draft = drafts[plugin.id];
+    if (!draft || pending) return;
+    setPending(plugin.id); setNotice(''); setError('');
+    try {
+      const values = Object.fromEntries(Object.entries(draft.values).map(([key, value]) => [key, value.split('\n').map(path => path.trim()).filter(Boolean)]));
+      const result = await bridge.save(plugin.id, draft.revision, values);
+      const saved = Object.fromEntries(Object.entries(result.values).map(([key, value]) => [key, value.join('\n')]));
+      setDrafts(current => ({ ...current, [plugin.id]: { revision: result.revision, values: saved, saved } }));
+      setNotice('已保存，下次搜索生效。');
+    } catch (error) { setError(error instanceof Error ? error.message : '保存失败，请重试。'); }
+    finally { setPending(''); }
+  }
+  async function clear() {
+    if (pending) return;
+    setPending('history'); setError(''); setNotice('');
+    try { await bridge.clearHistory(); setNotice('使用历史已清除。'); }
+    catch { setError('清除失败，请检查本地存储后重试。'); }
+    finally { setPending(''); }
+  }
+
+  return <div className="settings-body">
+    {loading && <p className="settings-note">正在读取设置…</p>}
+    {plugins.filter(plugin => plugin.settings?.length).map(plugin => {
+      const draft = drafts[plugin.id];
+      return <form className="settings-section" key={plugin.id} onSubmit={event => { event.preventDefault(); void save(plugin); }}>
+        <h2>{plugin.name}</h2>
+        {(plugin.settings ?? []).map(field => <div className="settings-field" key={field.id}>
+          <label htmlFor={`${plugin.id}-${field.id}`}>{field.title}</label>
+          <textarea id={`${plugin.id}-${field.id}`} rows={3} maxLength={16400} spellCheck={false} disabled={!draft || !!pending} placeholder="每行一个目录绝对路径" value={draft?.values[field.id] ?? ''} onChange={event => {
+            const value = event.target.value;
+            setDrafts(current => ({ ...current, [plugin.id]: { ...current[plugin.id], values: { ...current[plugin.id].values, [field.id]: value } } }));
+            setNotice(''); setError('');
+          }} />
+        </div>)}
+        <div className="settings-save"><span className="settings-note">{plugin.id === 'system.app-search' ? '标准应用目录始终保留' : ''}</span><button className="primary" disabled={!draft || !!pending || !Object.keys(draft.values).some(key => draft.values[key] !== draft.saved[key])}>{pending === plugin.id ? '保存中…' : '保存'}</button></div>
+      </form>;
+    })}
+    <section className="settings-history"><div><h2>使用历史</h2><p className="settings-note">用于调整搜索结果顺序</p></div><button disabled={!!pending} onClick={() => void clear()}>{pending === 'history' ? '清除中…' : '清除使用历史'}</button></section>
+    {notice && <p className="settings-notice" role="status">{notice}</p>}
+    {error && <p className="error" role="alert">{error}</p>}
+  </div>;
+}

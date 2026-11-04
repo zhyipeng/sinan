@@ -62,3 +62,17 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .trust input { accent-color: var(--accent); }
 
 .command-icon img { width: 32px; height: 32px; object-fit: contain; }
+
+.settings-body { padding: 20px; max-height: 470px; overflow-y: auto; }
+.settings-section { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.settings-section + .settings-section { padding-top: 20px; }
+.settings-body h2 { font-size: 14px; font-weight: 550; margin: 0 0 14px; }
+.settings-field label { display: block; font-size: 12px; margin: 0 0 8px; }
+.settings-field textarea { min-height: 88px; margin-bottom: 10px; font-size: 13px; padding: 10px 12px; }
+.settings-save, .settings-history { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.settings-save .primary { padding: 7px 20px; font-size: 12px; }
+.settings-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.settings-history { padding-top: 20px; }
+.settings-history h2 { margin-bottom: 6px; }
+.settings-history button { border: 1px solid var(--line); background: white; font-size: 12px; }
+.settings-notice { margin: 16px 0 0; color: var(--accent); font-size: 12px; }

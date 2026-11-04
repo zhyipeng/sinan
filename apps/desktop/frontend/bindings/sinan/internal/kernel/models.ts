@@ -6,6 +6,7 @@
 import * as manifest$0 from "../plugin/manifest/models.js";
 
 export interface PluginInfo {
+    "settings"?: manifest$0.Setting[] | null;
     "id": string;
     "name": string;
     "version": string;

@@ -83,3 +83,11 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 ## 宿主使用历史
 
 成功的命令调用按 `(pluginId, commandId, input)` 的摘要记录使用次数和时间，原始输入及查询不落盘。搜索协调器对已返回候选最多增加 0.025 的历史权重；Provider 基础分仍限制为 0.8，最终动态分上限为 0.825。插件不能自行提供此权重。`sinanctl clear-history` 可清除指定插件根目录的历史；当前须先退出使用同一根目录的桌面实例。详见 [ADR 0005](adr/0005-search-refinement.md)。
+
+## 配置与可信视图
+
+应用检索 0.3.0 通过 `contributes.settings` 声明 `[{"id":"directories","title":"额外应用目录","type":"directory-list"}]`。当前每插件最多 16 项，每项最多 16 个目录，写入时验证存在的目录绝对路径。宿主通过 `initialize.params.settings` 提供当前插件的配置，缺失项为空列表；SDK 的 `Handlers.Initialize` 在开始处理命令前读取快照。保存后只停止受影响的进程，下次调用重新激活，无插件侧热更新通知。
+
+声明式命令可使用 `view` 替代 `message`，与 `execution` 互斥。Shell 只显示构建时注册的可信组件，未知键报错；不会将视图键作为文件路径或 URL 加载。`system.settings/settings` 是首个注册组件。此能力不开放第三方 JS/HTML，详见 [ADR 0006](adr/0006-settings-service-and-view.md)。
+
+可信 Shell 的配置保存调用携带 `revision`，过期写入会失败。成功后定向发送 `settings:changed`，只含 `pluginId`、`revision`。CLI 可用 `settings ID` 查看、`set-settings ID revision JSON` 修改；仍不支持同一根目录多个宿主并发写入。

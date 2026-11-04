@@ -28,3 +28,7 @@ if [ "$(go env GOOS)" = darwin ]; then
     ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install .sinan-dev/packages/app-search
   fi
 fi
+
+if [ ! -d .sinan-dev/plugins/system.settings ]; then
+  ./bin/sinanctl -plugins .sinan-dev/plugins install plugins/system-settings
+fi

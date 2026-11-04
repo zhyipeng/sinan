@@ -1,16 +1,51 @@
 {
   "id": "system.app-search",
   "name": "应用检索",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "apiVersion": "1",
-  "runtime": { "kind": "process", "entry": "backend/plugin" },
+  "runtime": {
+    "kind": "process",
+    "entry": "backend/plugin"
+  },
   "contributes": {
     "commands": [
-      { "id": "launch", "title": "打开应用", "execution": "direct", "searchOnly": true },
-      { "id": "refresh", "title": "刷新应用索引", "keywords": ["reindex", "刷新应用"], "execution": "direct" }
+      {
+        "id": "launch",
+        "title": "打开应用",
+        "execution": "direct",
+        "searchOnly": true
+      },
+      {
+        "id": "refresh",
+        "title": "刷新应用索引",
+        "keywords": [
+          "reindex",
+          "刷新应用"
+        ],
+        "execution": "direct"
+      }
     ],
-    "searchProviders": [{ "id": "applications", "minLength": 1 }]
+    "searchProviders": [
+      {
+        "id": "applications",
+        "minLength": 1
+      }
+    ],
+    "settings": [
+      {
+        "id": "directories",
+        "title": "额外应用目录",
+        "type": "directory-list"
+      }
+    ]
   },
-  "permissions": ["applications.read", "applications.launch"],
-  "activationEvents": ["onSearch", "onCommand:launch", "onCommand:refresh"]
+  "permissions": [
+    "applications.read",
+    "applications.launch"
+  ],
+  "activationEvents": [
+    "onSearch",
+    "onCommand:launch",
+    "onCommand:refresh"
+  ]
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -458,5 +459,100 @@ func TestOnlySuccessfulCommandsRecordUsage(t *testing.T) {
 	}
 	if m.UsageBoost("example.hello", "hello", "input") != 0 {
 		t.Fatal("history did not clear")
+	}
+}
+
+func TestSettingsReinitializeOnlyAffectedPlugin(t *testing.T) {
+	m := manager(t)
+	dir := source(t, true)
+	mf, err := manifest.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf.Contributes.Settings = []manifest.Setting{{ID: "directories", Title: "Directories", Type: "directory-list"}}
+	data, _ := json.Marshal(mf)
+	os.WriteFile(filepath.Join(dir, "manifest.json"), data, 0600)
+	if _, err = m.Install(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	otherDir := source(t, true)
+	otherManifest, _ := manifest.Load(otherDir)
+	otherManifest.ID = "example.other"
+	otherData, _ := json.Marshal(otherManifest)
+	os.WriteFile(filepath.Join(otherDir, "manifest.json"), otherData, 0600)
+	if _, err := m.Install(otherDir, true); err != nil {
+		t.Fatal(err)
+	}
+	unrelatedBefore, err := m.Execute(context.Background(), "example.other", "echo", "pid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := m.Execute(context.Background(), mf.ID, "echo", "pid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending := make(chan error, 1)
+	go func() {
+		_, err := m.QueryProvider(context.Background(), mf.ID, protocol.SearchParams{ProviderID: "demo", Query: "block", Limit: 20})
+		pending <- err
+	}()
+	awaitSearch(t, m, mf.ID)
+	target := t.TempDir()
+	saved, err := m.SavePluginSettings(mf.ID, 0, map[string][]string{"directories": {target, target}})
+	if err != nil || saved.Revision != 1 || len(saved.Values["directories"]) != 1 {
+		t.Fatal("settings not normalized", err)
+	}
+	select {
+	case pendingErr := <-pending:
+		if pendingErr == nil {
+			t.Fatal("retired process search succeeded")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("settings change left pending search hanging")
+	}
+	unrelatedAfter, err := m.Execute(context.Background(), "example.other", "echo", "pid")
+	if err != nil || unrelatedBefore.Text != unrelatedAfter.Text {
+		t.Fatal("unrelated plugin was restarted")
+	}
+	after, err := m.Execute(context.Background(), mf.ID, "echo", "pid")
+	if err != nil || after.Text == before.Text {
+		t.Fatal("plugin process not refreshed", err)
+	}
+	result, err := m.Execute(context.Background(), mf.ID, "echo", "settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values map[string][]string
+	json.Unmarshal([]byte(result.Text), &values)
+	if len(values["directories"]) != 1 || values["directories"][0] != target {
+		t.Fatal("initialize did not receive own settings")
+	}
+	for _, invalid := range []map[string][]string{{"unknown": {}}, {"directories": {"relative/path"}}, {"directories": {filepath.Join(target, "missing")}}} {
+		if _, err := m.SavePluginSettings(mf.ID, 1, invalid); err == nil {
+			t.Fatal("invalid settings accepted")
+		}
+	}
+	if _, err := m.SavePluginSettings(mf.ID, 0, map[string][]string{}); err == nil {
+		t.Fatal("stale writer accepted")
+	}
+	other, err := New(m.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	loaded, err := other.PluginSettings(mf.ID)
+	if err != nil || loaded.Revision != 1 {
+		t.Fatal("settings lost across restart", err)
+	}
+	// Removing the plugin does not delete the host's configuration service.
+	if err := m.Uninstall(mf.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Install(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	result, err = m.Execute(context.Background(), mf.ID, "echo", "settings")
+	if err != nil || !strings.Contains(result.Text, target) {
+		t.Fatal("reinstalled plugin lost settings", err)
 	}
 }

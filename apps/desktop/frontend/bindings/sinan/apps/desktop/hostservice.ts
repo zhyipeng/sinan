@@ -15,6 +15,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as kernel$0 from "../../internal/kernel/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as storage$0 from "../../internal/storage/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -23,6 +26,10 @@ import * as $models from "./models.js";
 
 export function CancelSearch(sequence: number): $CancellablePromise<void> {
     return $Call.ByID(640499065, sequence);
+}
+
+export function ClearHistory(): $CancellablePromise<void> {
+    return $Call.ByID(2575679692);
 }
 
 export function Execute(pluginID: string, commandID: string, input: string): $CancellablePromise<protocol$0.CommandResult> {
@@ -42,6 +49,13 @@ export function LauncherStatus(): $CancellablePromise<string> {
 }
 
 /**
+ * Configuration methods are exposed only to the trusted Shell and bundled views.
+ */
+export function PluginSettings(pluginID: string): $CancellablePromise<storage$0.SettingsSnapshot> {
+    return $Call.ByID(2611427045, pluginID);
+}
+
+/**
  * Diagnostic output contains booleans only; no guest data or filesystem paths.
  */
 export function RecordIsolationProbe(report: $models.IsolationReport, rejected: boolean): $CancellablePromise<void> {
@@ -54,6 +68,10 @@ export function Refresh(): $CancellablePromise<kernel$0.Snapshot> {
 
 export function ResizeLauncher(height: number): $CancellablePromise<void> {
     return $Call.ByID(2198789619, height);
+}
+
+export function SavePluginSettings(pluginID: string, revision: number, values: { [_ in string]?: string[] | null } | null): $CancellablePromise<storage$0.SettingsSnapshot> {
+    return $Call.ByID(2776673060, pluginID, revision, values);
 }
 
 export function Snapshot(): $CancellablePromise<kernel$0.Snapshot> {

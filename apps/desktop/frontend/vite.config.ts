@@ -1,3 +1,3 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig({ plugins: [react()], server: { host: '127.0.0.1', port: 9245, strictPort: true } });
+export default defineConfig({ plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] }, server: { host: '127.0.0.1', port: 9245, strictPort: true, fs: { allow: [new URL('./', import.meta.url).pathname, new URL('../../../plugins/system-settings/', import.meta.url).pathname] } } });

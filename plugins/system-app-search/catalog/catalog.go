@@ -78,7 +78,15 @@ func (c *Catalog) refreshLocked(ctx context.Context, force bool) error {
 		if err != nil {
 			continue
 		}
-		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		walkRoot, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		err = filepath.WalkDir(walkRoot, func(path string, d fs.DirEntry, walkErr error) error {
+			// Follow an explicitly configured directory link while preserving
+			// its logical entry paths and stable result IDs.
+			relative, _ := filepath.Rel(walkRoot, path)
+			path = filepath.Join(root, relative)
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}

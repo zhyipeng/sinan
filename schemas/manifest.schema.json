@@ -94,6 +94,11 @@
               "searchOnly": {
                 "type": "boolean",
                 "description": "仅由动态搜索结果提供入口，不加入静态命令列表。"
+              },
+              "view": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "description": "仅请求打开宿主构建时注册的可信组件，不是脚本或页面路径。"
               }
             }
           }
@@ -120,6 +125,33 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 256
+              }
+            }
+          }
+        },
+        "settings": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "type"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "type": {
+                "const": "directory-list"
               }
             }
           }
@@ -172,6 +204,9 @@
                   "properties": {
                     "message": {
                       "const": ""
+                    },
+                    "view": {
+                      "const": ""
                     }
                   }
                 }
@@ -193,14 +228,23 @@
             "properties": {
               "commands": {
                 "items": {
-                  "required": [
-                    "message"
-                  ],
                   "properties": {
                     "message": {
                       "minLength": 1
                     }
-                  }
+                  },
+                  "anyOf": [
+                    {
+                      "required": [
+                        "message"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "view"
+                      ]
+                    }
+                  ]
                 }
               },
               "searchProviders": {

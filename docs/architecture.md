@@ -18,6 +18,8 @@ macOS Shell 采用非激活 NSPanel，并配置 floating 层级及跨 Space / �
 
 拼音与增量索引保留在应用插件；宿主使用历史和有界本地持久化的实现边界见 [ADR 0005](adr/0005-search-refinement.md)。这不是完整的 SQLite / 通用插件存储服务。
 
+配置存储、目录设置 Schema、初始化快照及随宿主构建的设置插件见 [ADR 0006](adr/0006-settings-service-and-view.md)。公共第三方 UI、SQLite 与通用插件数据服务仍未实现。
+
 ## 1. 定位与原则
 
 构建对标 uTools 的插件驱动桌面效率平台，目标覆盖 Windows、macOS、Linux。

@@ -28,8 +28,9 @@ type Error struct {
 func (e *Error) Error() string { return e.Message }
 
 type InitializeParams struct {
-	APIVersion string `json:"apiVersion"`
-	PluginID   string `json:"pluginId"`
+	Settings   map[string][]string `json:"settings,omitempty"`
+	APIVersion string              `json:"apiVersion"`
+	PluginID   string              `json:"pluginId"`
 }
 
 type InitializeResult struct {

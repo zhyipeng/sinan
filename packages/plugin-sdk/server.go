@@ -14,8 +14,9 @@ import (
 
 type CommandHandler func(protocol.CommandParams) (protocol.CommandResult, error)
 type Handlers struct {
-	Command func(context.Context, protocol.CommandParams) (protocol.CommandResult, error)
-	Search  func(context.Context, protocol.SearchParams) (protocol.SearchResult, error)
+	Initialize func(protocol.InitializeParams) error
+	Command    func(context.Context, protocol.CommandParams) (protocol.CommandResult, error)
+	Search     func(context.Context, protocol.SearchParams) (protocol.SearchResult, error)
 }
 
 // Serve preserves the original command-only SDK interface.
@@ -82,6 +83,12 @@ func ServeWithHandlers(in io.Reader, out io.Writer, pluginID string, handlers Ha
 			if initialized || json.Unmarshal(req.Params, &p) != nil || p.APIVersion != protocol.APIVersion || p.PluginID != pluginID {
 				send(req, nil, &protocol.Error{Code: -32602, Message: "incompatible plugin"})
 				continue
+			}
+			if handlers.Initialize != nil {
+				if err := handlers.Initialize(p); err != nil {
+					send(req, nil, &protocol.Error{Code: -32602, Message: "invalid settings"})
+					continue
+				}
 			}
 			initialized = true
 			caps := []string{}

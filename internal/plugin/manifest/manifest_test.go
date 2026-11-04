@@ -51,3 +51,25 @@ func TestApplicationPermissionsAndExecutionModes(t *testing.T) {
 		t.Fatal("unknown execution mode accepted")
 	}
 }
+
+func TestBundledViewAndSettingsDeclarations(t *testing.T) {
+	m, err := Load("../../../plugins/system-settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Contributes.Commands[0].View != "settings" {
+		t.Fatal("missing view key")
+	}
+	m.Contributes.Commands[0].Message = "mixed"
+	if m.Validate() == nil {
+		t.Fatal("view and message mixed")
+	}
+	m, err = Load("../../../plugins/system-app-search")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Contributes.Settings = append(m.Contributes.Settings, m.Contributes.Settings[0])
+	if m.Validate() == nil {
+		t.Fatal("duplicate settings key accepted")
+	}
+}

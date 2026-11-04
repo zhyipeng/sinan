@@ -137,3 +137,16 @@ func TestIncrementalRefreshReusesMetadataAndInvalidatesChangedBundles(t *testing
 		t.Fatal("removed application remained indexed")
 	}
 }
+
+func TestConfiguredDirectorySymlinkIsTraversed(t *testing.T) {
+	c, root := fixture(t)
+	alias := filepath.Join(t.TempDir(), "Applications")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	c.roots = []string{alias}
+	result, err := c.Search(context.Background(), protocol.SearchParams{ProviderID: "applications", Query: "vsc", Limit: 20})
+	if err != nil || len(result.Items) != 1 {
+		t.Fatal("configured directory link was not scanned", err)
+	}
+}
