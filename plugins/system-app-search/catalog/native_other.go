@@ -9,3 +9,5 @@ func readMetadata(string) (metadata, error) {
 }
 
 func readIcon(string) string { return "" }
+
+func transliterate(string) string { return "" }

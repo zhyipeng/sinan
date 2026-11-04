@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -28,7 +29,13 @@ type Application struct {
 	ID, Path, Title string
 	names           []string
 }
+type cachedApplication struct {
+	app   Application
+	stamp string
+	at    time.Time
+}
 type Catalog struct {
+	cache     map[string]cachedApplication
 	roots     []string
 	mu        sync.Mutex
 	apps      []Application
@@ -61,7 +68,9 @@ func DefaultRoots() []string {
 }
 
 // refreshLocked builds a replacement snapshot. Cancellation leaves the old index intact.
-func (c *Catalog) refreshLocked(ctx context.Context) error {
+func (c *Catalog) refreshLocked(ctx context.Context, force bool) error {
+	cache := map[string]cachedApplication{}
+	icons := map[string]string{}
 	apps := []Application{}
 	seen := map[string]bool{}
 	for _, root := range c.roots {
@@ -87,7 +96,17 @@ func (c *Catalog) refreshLocked(ctx context.Context) error {
 				resolved, resolveErr := filepath.EvalSymlinks(path)
 				info, statErr := os.Stat(path)
 				if resolveErr == nil && statErr == nil && info.IsDir() && !seen[resolved] && len(apps) < 4096 {
-					if meta, err := c.read(path); err == nil {
+					seen[resolved] = true
+					stamp := applicationStamp(path, resolved)
+					old, exists := c.cache[path]
+					if !force && exists && old.stamp == stamp && time.Since(old.at) < 5*time.Minute {
+						apps = append(apps, old.app)
+						cache[path] = old
+						if icon, ok := c.icons[path]; ok {
+							icons[path] = icon
+						}
+						seen[resolved] = true
+					} else if meta, err := c.read(path); err == nil {
 						title := meta.DisplayName
 						if title == "" {
 							title = meta.Name
@@ -98,7 +117,9 @@ func (c *Catalog) refreshLocked(ctx context.Context) error {
 						}
 						if len(title) <= 256 && len(path) <= 512 {
 							hash := sha256.Sum256([]byte(path))
-							apps = append(apps, Application{ID: hex.EncodeToString(hash[:16]), Path: path, Title: title, names: []string{title, meta.Name, filename}})
+							app := Application{ID: hex.EncodeToString(hash[:16]), Path: path, Title: title, names: searchNames(title, meta.Name, filename)}
+							apps = append(apps, app)
+							cache[path] = cachedApplication{app: app, stamp: stamp, at: time.Now()}
 							seen[resolved] = true
 						}
 					}
@@ -125,7 +146,7 @@ func (c *Catalog) refreshLocked(ctx context.Context) error {
 	}
 	sort.Slice(apps, func(i, j int) bool { return apps[i].Path < apps[j].Path })
 	c.apps, c.indexed, c.refreshed = apps, true, time.Now()
-	c.icons = map[string]string{}
+	c.icons, c.cache = icons, cache
 	return nil
 }
 
@@ -164,7 +185,7 @@ func (c *Catalog) Search(ctx context.Context, p protocol.SearchParams) (protocol
 		return protocol.SearchResult{}, ctx.Err()
 	}
 	if !c.indexed || time.Since(c.refreshed) > time.Minute {
-		if err := c.refreshLocked(ctx); err != nil {
+		if err := c.refreshLocked(ctx, false); err != nil {
 			return protocol.SearchResult{}, err
 		}
 	}
@@ -221,7 +242,7 @@ func (c *Catalog) Search(ctx context.Context, p protocol.SearchParams) (protocol
 func (c *Catalog) Execute(ctx context.Context, p protocol.CommandParams) (protocol.CommandResult, error) {
 	c.mu.Lock()
 	if p.CommandID == "refresh" {
-		err := c.refreshLocked(ctx)
+		err := c.refreshLocked(ctx, true)
 		c.mu.Unlock()
 		return protocol.CommandResult{Text: "应用索引已刷新"}, err
 	}
@@ -230,7 +251,7 @@ func (c *Catalog) Execute(ctx context.Context, p protocol.CommandParams) (protoc
 		return protocol.CommandResult{}, errors.New("unknown command")
 	}
 	if !c.indexed {
-		if err := c.refreshLocked(ctx); err != nil {
+		if err := c.refreshLocked(ctx, false); err != nil {
 			c.mu.Unlock()
 			return protocol.CommandResult{}, err
 		}
@@ -258,4 +279,15 @@ func (c *Catalog) Execute(ctx context.Context, p protocol.CommandParams) (protoc
 		return protocol.CommandResult{}, errors.New("application launch failed")
 	}
 	return protocol.CommandResult{Dismiss: true}, nil
+}
+
+// Bundle and plist changes invalidate metadata; forced refresh also bypasses this cache.
+func applicationStamp(path, target string) string {
+	value := target
+	for _, entry := range []string{path, filepath.Join(path, "Contents", "Info.plist"), filepath.Join(path, "Contents", "Resources")} {
+		if info, err := os.Stat(entry); err == nil {
+			value += fmt.Sprintf("/%d/%d", info.ModTime().UnixNano(), info.Size())
+		}
+	}
+	return value
 }

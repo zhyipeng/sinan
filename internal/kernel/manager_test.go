@@ -427,3 +427,36 @@ func TestActivationTimeoutPreservesContextError(t *testing.T) {
 		t.Fatalf("activation timeout was misclassified: %v", err)
 	}
 }
+
+func TestOnlySuccessfulCommandsRecordUsage(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(source(t, false), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Execute(context.Background(), "example.hello", "missing", "input"); err == nil {
+		t.Fatal("expected failure")
+	}
+	if m.UsageBoost("example.hello", "missing", "input") != 0 {
+		t.Fatal("failed action affected ranking")
+	}
+	if _, err := m.Execute(context.Background(), "example.hello", "hello", "input"); err != nil {
+		t.Fatal(err)
+	}
+	if m.UsageBoost("example.hello", "hello", "input") <= 0 {
+		t.Fatal("successful action not recorded")
+	}
+	other, err := New(m.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	if other.UsageBoost("example.hello", "hello", "input") <= 0 {
+		t.Fatal("history did not survive manager restart")
+	}
+	if err := m.ClearUsage(); err != nil {
+		t.Fatal(err)
+	}
+	if m.UsageBoost("example.hello", "hello", "input") != 0 {
+		t.Fatal("history did not clear")
+	}
+}

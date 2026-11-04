@@ -103,3 +103,37 @@ func TestCancellationPreservesSnapshotAndRefresh(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestIncrementalRefreshReusesMetadataAndInvalidatesChangedBundles(t *testing.T) {
+	c, root := fixture(t)
+	reads := 0
+	original := c.read
+	c.read = func(path string) (metadata, error) { reads++; return original(path) }
+	p := protocol.SearchParams{ProviderID: "applications", Query: "vsc", Limit: 20}
+	c.Search(context.Background(), p)
+	baseline := reads
+	path := filepath.Join(root, "Visual Studio Code.app")
+	c.icons[path] = "cached-icon"
+	c.refreshed = time.Time{}
+	c.Search(context.Background(), p)
+	// Broken bundles are retried, while the two valid applications reuse metadata.
+	if reads != baseline+1 || c.icons[path] != "cached-icon" {
+		t.Fatal("unchanged metadata or icon not reused")
+	}
+	os.Chtimes(path, time.Now().Add(time.Hour), time.Now().Add(time.Hour))
+	c.refreshed = time.Time{}
+	c.Search(context.Background(), p)
+	if reads != baseline+3 || c.icons[path] == "cached-icon" {
+		t.Fatal("changed application not invalidated")
+	}
+	reads = 0
+	if _, err := c.Execute(context.Background(), protocol.CommandParams{CommandID: "refresh"}); err != nil || reads != 3 {
+		t.Fatal("manual refresh did not bypass cache")
+	}
+	os.RemoveAll(path)
+	c.refreshed = time.Time{}
+	result, err := c.Search(context.Background(), p)
+	if err != nil || len(result.Items) != 0 {
+		t.Fatal("removed application remained indexed")
+	}
+}

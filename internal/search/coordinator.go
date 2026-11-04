@@ -45,6 +45,9 @@ type Update struct {
 }
 
 type Coordinator struct{ Backend Backend }
+type usageRanker interface {
+	UsageBoost(pluginID, commandID, input string) float64
+}
 
 var itemID = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,128}$`)
 
@@ -98,6 +101,9 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 		}
 		items := make([]Item, 0, len(results))
 		for _, item := range results {
+			if ranker, ok := c.Backend.(usageRanker); ok {
+				item.Score = min(1, item.Score+max(0, min(.025, ranker.UsageBoost(item.PluginID, item.CommandID, item.Input))))
+			}
 			items = append(items, item)
 		}
 		sort.Slice(items, func(i, j int) bool {

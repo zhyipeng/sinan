@@ -3,8 +3,10 @@
 package catalog
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	protocol "sinan/packages/plugin-protocol"
 	"testing"
 )
 
@@ -44,5 +46,24 @@ func TestNativeLocalizedLoctableAndSymlink(t *testing.T) {
 	// The actual name follows the user's system language, never the RPC LANG variable.
 	if meta.DisplayName != "Example" && meta.DisplayName != "本地化示例" {
 		t.Fatal("unexpected localized title")
+	}
+}
+
+func TestPinyinAndInitialsMatching(t *testing.T) {
+	c, _ := fixture(t)
+	for _, query := range []string{"jisuanqi", "JSQ", "jisuan", "ji suan qi"} {
+		result, err := c.Search(context.Background(), protocol.SearchParams{ProviderID: "applications", Query: query, Limit: 20})
+		if err != nil || len(result.Items) != 1 {
+			t.Fatalf("pinyin %s: %v (%d results)", query, err, len(result.Items))
+		}
+	}
+	for _, query := range []string{"weixin", "wx"} {
+		matched := false
+		for _, name := range searchNames("微信") {
+			matched = matched || match(name, query) > 0
+		}
+		if !matched {
+			t.Fatalf("pinyin alias %s missing", query)
+		}
 	}
 }

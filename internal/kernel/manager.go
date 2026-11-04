@@ -16,6 +16,7 @@ import (
 
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/transport"
+	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -45,6 +46,7 @@ type plugin struct {
 }
 
 type Manager struct {
+	usage       *storage.Usage
 	mutationMu  sync.Mutex
 	closed      bool
 	mu          sync.Mutex
@@ -65,7 +67,7 @@ func New(root string) (*Manager, error) {
 	if err != nil {
 		return nil, errors.New("插件目录无效")
 	}
-	m := &Manager{root: abs, plugins: make(map[string]*plugin)}
+	m := &Manager{root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json"))}
 	m.Refresh()
 	return m, nil
 }
@@ -339,7 +341,12 @@ func (p *plugin) failed(process *transport.Process) {
 	}
 }
 
-func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string) (protocol.CommandResult, error) {
+func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string) (result protocol.CommandResult, err error) {
+	defer func() {
+		if err == nil {
+			m.usage.Record(pluginID, commandID, input)
+		}
+	}()
 	if len(input) > 64<<10 {
 		return protocol.CommandResult{}, errors.New("命令输入超过限制")
 	}
@@ -375,7 +382,6 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 	if err != nil {
 		return protocol.CommandResult{}, err
 	}
-	var result protocol.CommandResult
 	if err := process.Call(ctx, "command.execute", protocol.CommandParams{CommandID: commandID, Input: input}, &result); err != nil {
 		p.failed(process)
 		return result, err
@@ -484,3 +490,9 @@ func (m *Manager) Close() {
 		p.stop(true)
 	}
 }
+
+// UsageBoost is host-owned ranking metadata; plugins cannot supply history weights.
+func (m *Manager) UsageBoost(pluginID, commandID, input string) float64 {
+	return m.usage.Boost(pluginID, commandID, input)
+}
+func (m *Manager) ClearUsage() error { return m.usage.Clear() }

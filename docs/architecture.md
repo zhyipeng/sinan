@@ -16,6 +16,8 @@ macOS Shell 采用非激活 NSPanel，并配置 floating 层级及跨 Space / �
 
 可信原生应用检索、直接动作及用途声明的阶段性边界见 [ADR 0004](adr/0004-application-search.md)。当前应用平台调用位于可信插件内，未来受控 Host API 尚未实现；用途声明不构成授权隔离。
 
+拼音与增量索引保留在应用插件；宿主使用历史和有界本地持久化的实现边界见 [ADR 0005](adr/0005-search-refinement.md)。这不是完整的 SQLite / 通用插件存储服务。
+
 ## 1. 定位与原则
 
 构建对标 uTools 的插件驱动桌面效率平台，目标覆盖 Windows、macOS、Linux。

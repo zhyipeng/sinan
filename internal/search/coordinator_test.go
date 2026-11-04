@@ -161,3 +161,22 @@ func TestSearchOnlyCommandsHaveNoEmptyStaticAction(t *testing.T) {
 		}
 	})
 }
+
+type rankedBackend struct{ fakeBackend }
+
+func (f *rankedBackend) UsageBoost(pluginID, commandID, input string) float64 {
+	if pluginID == "example.slow" {
+		return .025
+	}
+	return 0
+}
+func TestHostHistoryReordersEquivalentMatches(t *testing.T) {
+	slow := make(chan struct{})
+	close(slow)
+	c := Coordinator{Backend: &rankedBackend{fakeBackend: fakeBackend{slow: slow}}}
+	var final Update
+	c.Query(context.Background(), "1", "query", func(u Update) { final = u })
+	if len(final.Items) != 2 || final.Items[0].PluginID != "example.slow" || final.Items[0].Score > .82500001 {
+		t.Fatal("host history did not break relevance tie")
+	}
+}

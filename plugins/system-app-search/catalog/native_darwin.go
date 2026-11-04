@@ -11,7 +11,7 @@ package catalog
 static char *sinanBundleMetadata(const char *path) {
     @autoreleasepool {
         NSBundle *bundle = [NSBundle bundleWithPath:[NSString stringWithUTF8String:path]];
-        NSDictionary *info = bundle.infoDictionary;
+        NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[[NSString stringWithUTF8String:path] stringByAppendingPathComponent:@"Contents/Info.plist"]];
         if (!info || ![info[@"CFBundlePackageType"] isEqual:@"APPL"]) return NULL;
         NSArray *languages = [[NSUserDefaults standardUserDefaults] objectForKey:@"AppleLanguages"];
         NSArray *preferred = [NSBundle preferredLocalizationsFromArray:bundle.localizations forPreferences:languages];
@@ -35,6 +35,14 @@ static char *sinanBundleMetadata(const char *path) {
         NSData *data = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
         if (!data) return NULL;
         return strdup([[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease].UTF8String);
+    }
+}
+static char *sinanTransliterate(const char *text) {
+    @autoreleasepool {
+        NSString *value = [NSString stringWithUTF8String:text];
+        value = [value stringByApplyingTransform:NSStringTransformMandarinToLatin reverse:NO];
+        value = [value stringByApplyingTransform:NSStringTransformStripCombiningMarks reverse:NO];
+        return value ? strdup(value.UTF8String) : NULL;
     }
 }
 static char *sinanApplicationIcon(const char *path) {
@@ -86,4 +94,15 @@ func readIcon(path string) string {
 	}
 	defer C.free(unsafe.Pointer(result))
 	return "data:image/png;base64," + C.GoString(result)
+}
+
+func transliterate(text string) string {
+	value := C.CString(text)
+	defer C.free(unsafe.Pointer(value))
+	result := C.sinanTransliterate(value)
+	if result == nil {
+		return ""
+	}
+	defer C.free(unsafe.Pointer(result))
+	return C.GoString(result)
 }

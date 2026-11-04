@@ -23,7 +23,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -69,6 +69,12 @@ func run() error {
 			input = args[3]
 		}
 		result, err = m.Execute(context.Background(), args[1], args[2], input)
+	case "clear-history":
+		if len(args) != 1 {
+			return errors.New("clear-history 不接受其他参数")
+		}
+		err = m.ClearUsage()
+		result = "使用历史已清除"
 	default:
 		return errors.New("未知操作")
 	}

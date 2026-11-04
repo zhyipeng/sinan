@@ -79,3 +79,7 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 动态结果可带 `icon`，仅支持尺寸不超过 128×128、整个字段不超过 24 KiB 的 PNG base64 data URL；外链、SVG、本地文件地址及非法图片头会被丢弃，结果本身仍保留。
 
 这些字段仍属 API 1 的增量扩展，但旧宿主严格校验 manifest，安装含新字段的插件前需更新宿主。实现取舍与权限用途边界见 [ADR 0004](adr/0004-application-search.md)。
+
+## 宿主使用历史
+
+成功的命令调用按 `(pluginId, commandId, input)` 的摘要记录使用次数和时间，原始输入及查询不落盘。搜索协调器对已返回候选最多增加 0.025 的历史权重；Provider 基础分仍限制为 0.8，最终动态分上限为 0.825。插件不能自行提供此权重。`sinanctl clear-history` 可清除指定插件根目录的历史；当前须先退出使用同一根目录的桌面实例。详见 [ADR 0005](adr/0005-search-refinement.md)。
