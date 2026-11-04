@@ -10,6 +10,8 @@
 
 按用户后续要求，Shell 已改为聚焦式交互：Command + Space 切换显示与隐藏，空输入框高 50 DIP，按结果调整高度，失焦隐藏，并提供托盘恢复与退出入口。macOS 呼出时选择鼠标所在显示器，水平居中并保留原纵向定位规则。当前搜索仍限于插件声明的命令。实现与验证边界见 [ADR 0002](adr/0002-launcher-interaction.md)。
 
+macOS Shell 采用非激活 NSPanel，并配置 floating 层级及跨 Space / 全屏辅助窗口行为，避免呼出时激活宿主而切离全屏应用。该机制及实机验证边界同样记录在 ADR 0002。
+
 ## 1. 定位与原则
 
 构建对标 uTools 的插件驱动桌面效率平台，目标覆盖 Windows、macOS、Linux。

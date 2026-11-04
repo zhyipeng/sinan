@@ -46,6 +46,13 @@ func main() {
 		HideOnFocusLost: true, HideOnEscape: true,
 		InitialPosition: application.WindowCentered,
 		Mac: application.MacWindow{
+			// A non-activating panel can take keyboard focus over another app's
+			// fullscreen Space without activating Sinan and switching desktops.
+			WindowClass: application.MacWindowClassPanel,
+			PanelPreferences: application.MacPanelPreferences{
+				NonActivating: true,
+			},
+			WindowLevel: application.MacWindowLevelFloating,
 			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
 				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
 			TitleBar: application.MacTitleBar{Hide: true},
