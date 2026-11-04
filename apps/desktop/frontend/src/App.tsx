@@ -128,7 +128,7 @@ export default function App() {
       </div>
     </section> : <section className="launcher">
       <div className="search">
-        <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 7 10-7 10-7-10Z"/><path d="m12 7 3 5-3 5-3-5Z"/></svg>
+        <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>
         <input ref={searchRef} autoFocus aria-label="搜索命令" placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelected(0); }} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'ArrowDown') { event.preventDefault(); setSelected(value => Math.min(value + 1, Math.max(0, commands.length - 1))); }

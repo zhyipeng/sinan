@@ -28,10 +28,11 @@ run: build
 
 package: build
 	test "$$(go env GOOS)" = darwin
-	mkdir -p bin/Sinan.app/Contents/MacOS
+	mkdir -p bin/Sinan.app/Contents/MacOS bin/Sinan.app/Contents/Resources
 	cp bin/sinan bin/Sinan.app/Contents/MacOS/sinan.next
 	mv -f bin/Sinan.app/Contents/MacOS/sinan.next bin/Sinan.app/Contents/MacOS/sinan
 	cp apps/desktop/Info.plist bin/Sinan.app/Contents/Info.plist
+	cp apps/desktop/assets/AppIcon.icns bin/Sinan.app/Contents/Resources/AppIcon.icns
 
 demo: build
 	sh scripts/prepare-demo.sh

@@ -9,7 +9,7 @@
 - 前端通过 `ResizeObserver` 测量实际内容高度，可信 Shell 使用 `ResizeLauncher` 请求调整窗口。宿主限制宽高并根据屏幕可用区域约束高度，缩放后恢复顶部位置，避免搜索框随结果数量上下移动。
 - 全局快捷键采用 Wails `GlobalShortcut`，macOS 为 Command + Space，其他平台按 `CmdOrCtrl` 映射为 Control + Space。应用启动后注册，以便捕获操作系统注册错误；失败不会退出进程，插件入口显示提示。
 - 失焦或按 Escape 隐藏窗口，关闭请求也转为隐藏。隐藏最后一个窗口不退出应用；通过托盘菜单显式退出。
-- 保留最小文字托盘“司南”，菜单提供“显示司南”和“退出司南”。热键在可见时隐藏、隐藏时呼出；托盘和 Dock 始终显示窗口，不切换为隐藏。不依赖任何插件可用。
+- 托盘由最初的“司南”文字更新为单色模板图标，菜单保留“显示司南”和“退出司南”。热键在可见时隐藏、隐藏时呼出；托盘和 Dock 始终显示窗口，不切换为隐藏。不依赖任何插件可用。
 - macOS 每次呼出通过 CoreGraphics 获取鼠标所在显示器 ID，在主线程读取对应 `NSScreen.visibleFrame`，转换为与原生 `SetPosition` 一致的逻辑坐标（以主屏顶部为 Y 原点、向下为正）。不使用经过 Wails 多屏布局算法重排后的工作区。水平居中；纵向统一使用 `workArea.Y + workArea.Height / 5`，即距可用区域顶部 20%，不再设置 160 点上限。窗口伸缩的底部边界也读取同一原生工作区。
 - 修正全屏应用上的呼出方式：macOS Shell 使用非激活 `NSPanel`（`MacWindowClassPanel` + `NonActivating`），显式设置 floating 层级，保留 `CanJoinAllSpaces` 和 `FullScreenAuxiliary`。普通 `NSWindow` 的 `Show` / `Focus` 会激活宿主，不能仅依靠跨 Space 标志实现聚焦式覆盖；非激活面板在获得键盘焦点时不激活宿主应用。保留现有 Dock 和托盘恢复入口。
 - 每次重新呼出，恢复空查询、搜索视图和输入焦点。正在执行的插件命令不因此取消，但旧命令的迟到结果不得写入重新呼出的视图。

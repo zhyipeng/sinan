@@ -96,8 +96,7 @@ func (l *launcher) status() string { l.mu.Lock(); defer l.mu.Unlock(); return l.
 
 func configureTray(app *application.App, l *launcher) {
 	tray := app.SystemTray.New()
-	// A text label is deliberately used as a dependable first tray entry.
-	tray.SetLabel("司南")
+	tray.SetTemplateIcon(trayIcon)
 	tray.SetTooltip("司南 · Command + Space")
 	menu := app.NewMenu()
 	menu.Add("显示司南").OnClick(func(_ *application.Context) { go l.show() })

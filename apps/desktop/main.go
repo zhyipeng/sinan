@@ -15,6 +15,12 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed assets/icon.png
+var appIcon []byte
+
+//go:embed assets/tray-template.png
+var trayIcon []byte
+
 func main() {
 	root := flag.String("plugins", "", "插件安装目录")
 	flag.Parse()
@@ -34,6 +40,7 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "Sinan",
 		Description: "插件驱动的桌面效率工具",
+		Icon:        appIcon,
 		Services:    []application.Service{application.NewService(host)},
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
