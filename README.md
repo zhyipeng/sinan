@@ -17,6 +17,7 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 
 - Wails 3 + React / TypeScript 命令 Shell。
 - Manifest 校验、目录发现、本地目录安装、停止和卸载。
+- 包内容变更检测、显式重载、保留配置的升级与初始化失败回退。
 - 声明式插件与按需激活的 Go 独立进程插件。
 - JSON-RPC 2.0 stdio 握手、命令调用、超时终止和失败隔离。
 - 宿主 CLI、协议类型、Go 插件 SDK，以及两个命令示例和两个独立搜索 Provider。
@@ -47,7 +48,7 @@ make setup
 make demo
 ```
 
-`make demo` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备四个示例插件，在 macOS 上追加应用检索插件，再安装设置插件并打开窗口。脚本只对仓库自带的 Go 示例和仓库自带的应用检索插件使用信任安装。重复执行保留已有示例；修改示例后需先卸载再安装。
+再次运行前先从托盘退出当前实例。`make demo` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备四个示例插件，在 macOS 上追加应用检索插件，再安装设置插件并打开窗口。脚本只对仓库自带的 Go 示例和仓库自带的应用检索插件使用信任安装。重复执行会升级已有示例；相同内容不重启，无需手动卸载。
 
 搜索 `demo` 可看到静态命令和快慢两个动态来源；搜索包含 `fail` 的文字可观察慢来源失败，其他结果仍可使用。以 `slow:` 开头的查询用于验证取消。
 
@@ -65,7 +66,7 @@ make test        # 包含真实子进程的竞态测试
 
 ## 独立插件验证
 
-完成一次 `make demo` 构建后，也可退出窗口后使用 CLI：
+完成一次 `make demo` 构建后，从托盘退出司南，再使用 CLI：
 
 ```sh
 ./bin/sinanctl -plugins .sinan-dev/plugins list
@@ -76,7 +77,7 @@ make test        # 包含真实子进程的竞态测试
 ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install .sinan-dev/packages/echo
 ```
 
-CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通过“停止”终止。不要让 CLI 与桌面同时修改同一个安装目录，当前无跨进程安装锁。
+CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通过“停止”终止。CLI 与桌面不能同时打开同一个插件根目录；宿主生命周期内持有目录独占锁，即使只读 CLI 命令也需先退出桌面。
 
 更多细节见 [当前插件接口](docs/plugin-protocol.md) 和 [ADR 0001](docs/adr/0001-phase-one-runtime.md)。独立进程提供故障隔离，原生插件仍以当前用户权限运行。
 
@@ -116,3 +117,17 @@ CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通�
 ```
 
 第二个命令中的 `0` 需替换为当前读取到的 revision；空列表清空额外目录。当前仅支持目录列表配置，不支持凭据存储。
+
+## 插件升级与重载
+
+打开搜索框右侧 `···`，刷新可发现“文件有变更”，点击对应插件的“重载”应用安装目录中的修改。替换为外部插件包时，填写包目录并点击“检查”，查看版本变化后再安装或升级；原生包需重新勾选信任。配置和使用历史保留，候选初始化失败时恢复旧包。
+
+退出桌面后也可使用 CLI：
+
+```sh
+./bin/sinanctl -plugins .sinan-dev/plugins inspect .sinan-dev/packages/app-search
+./bin/sinanctl -plugins .sinan-dev/plugins -trust-native upgrade .sinan-dev/packages/app-search
+./bin/sinanctl -plugins .sinan-dev/plugins reload system.app-search
+```
+
+升级回退只覆盖当前升级事务；重载不会撤销直接编辑过的文件，设置等可信组件代码修改仍需重建宿主。完整边界与中断恢复见 [ADR 0007](docs/adr/0007-plugin-upgrade-and-reload.md)。

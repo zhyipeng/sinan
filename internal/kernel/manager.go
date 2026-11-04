@@ -21,6 +21,7 @@ import (
 )
 
 type PluginInfo struct {
+	Changed         bool                      `json:"changed"`
 	Settings        []manifest.Setting        `json:"settings,omitempty"`
 	ID              string                    `json:"id"`
 	Name            string                    `json:"name"`
@@ -37,6 +38,8 @@ type Snapshot struct {
 }
 
 type plugin struct {
+	fingerprint  string
+	changed      bool
 	settings     map[string][]string
 	mu           sync.Mutex
 	removed      bool
@@ -48,14 +51,19 @@ type plugin struct {
 }
 
 type Manager struct {
-	settings    *storage.Settings
-	usage       *storage.Usage
-	mutationMu  sync.Mutex
-	closed      bool
-	mu          sync.Mutex
-	root        string
-	plugins     map[string]*plugin
-	diagnostics []string
+	blockedUpgrades    map[string]bool
+	recoveryBlocked    bool
+	active             sync.WaitGroup
+	lease              *storage.RootLease
+	settings           *storage.Settings
+	usage              *storage.Usage
+	mutationMu         sync.Mutex
+	closed             bool
+	mu                 sync.Mutex
+	root               string
+	plugins            map[string]*plugin
+	diagnostics        []string
+	startupDiagnostics []string
 }
 
 func New(root string) (*Manager, error) {
@@ -70,7 +78,12 @@ func New(root string) (*Manager, error) {
 	if err != nil {
 		return nil, errors.New("插件目录无效")
 	}
-	m := &Manager{root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
+	lease, err := storage.AcquireRootLease(filepath.Join(abs, ".sinan-state", "runtime.lock"))
+	if err != nil {
+		return nil, err
+	}
+	m := &Manager{blockedUpgrades: map[string]bool{}, lease: lease, root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
+	m.startupDiagnostics = m.recoverUpgrades()
 	m.Refresh()
 	return m, nil
 }
@@ -83,50 +96,64 @@ func (m *Manager) Refresh() Snapshot {
 		m.mu.Unlock()
 		return Snapshot{Plugins: []PluginInfo{}, Diagnostics: []string{}}
 	}
-	m.diagnostics = []string{}
+	oldPlugins := m.plugins
+	m.mu.Unlock()
+	diagnostics := append([]string{}, m.startupDiagnostics...)
 	if err := m.settings.Error(); err != nil {
-		m.diagnostics = append(m.diagnostics, err.Error())
+		diagnostics = append(diagnostics, err.Error())
 	}
 	entries, err := os.ReadDir(m.root)
 	if err != nil {
-		m.diagnostics = append(m.diagnostics, "无法读取插件目录")
+		m.mu.Lock()
+		m.diagnostics = append(diagnostics, "无法读取插件目录")
 		m.mu.Unlock()
 		return m.Snapshot()
 	}
-	found := map[string]bool{}
-	retired := []*plugin{}
+	found := map[string]*plugin{}
 	for _, entry := range entries {
-		if !manifest.ValidID(entry.Name()) {
+		id := entry.Name()
+		if m.upgradeBlocked(id) {
 			continue
 		}
+		if !manifest.ValidID(id) {
+			continue
+		}
+		dir := filepath.Join(m.root, id)
+		var mf manifest.Manifest
+		var digest string
+		var loadErr error
 		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
-			m.diagnostics = append(m.diagnostics, "已跳过非目录插件入口")
-			continue
-		}
-		dir := filepath.Join(m.root, entry.Name())
-		mf, err := manifest.Load(dir)
-		if err != nil || mf.ID != entry.Name() {
-			m.diagnostics = append(m.diagnostics, "已跳过无效插件清单")
-			continue
-		}
-		found[mf.ID] = true
-		if old := m.plugins[mf.ID]; old != nil {
-			if reflect.DeepEqual(old.manifest, mf) {
-				continue
+			loadErr = errors.New("插件目录无效")
+		} else {
+			mf, digest, loadErr = loadPackage(dir)
+			if loadErr == nil && mf.ID != id {
+				loadErr = errors.New("插件 ID 不匹配")
 			}
-			retired = append(retired, old)
 		}
-		m.plugins[mf.ID] = &plugin{manifest: mf, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
-	}
-	for id, p := range m.plugins {
-		if !found[id] {
-			retired = append(retired, p)
-			delete(m.plugins, id)
+		if old := oldPlugins[id]; old != nil {
+			old.mu.Lock()
+			old.changed = loadErr != nil || digest != old.fingerprint
+			old.mu.Unlock()
+			found[id] = old
+			if loadErr != nil {
+				diagnostics = append(diagnostics, "插件文件无效，已保留当前实例："+id)
+			}
+			continue
 		}
+		if loadErr != nil {
+			diagnostics = append(diagnostics, "已跳过无效插件包："+id)
+			continue
+		}
+		found[id] = &plugin{manifest: mf, dir: dir, state: "installed", fingerprint: digest, settings: settingsValues(mf, m.settings.Get(id).Values)}
 	}
+	m.mu.Lock()
+	m.plugins = found
+	m.diagnostics = diagnostics
 	m.mu.Unlock()
-	for _, p := range retired {
-		p.stop(true)
+	for id, p := range oldPlugins {
+		if found[id] == nil {
+			p.stop(true)
+		}
 	}
 	return m.Snapshot()
 }
@@ -156,13 +183,11 @@ func (m *Manager) Snapshot() Snapshot {
 }
 
 func (p *plugin) info() PluginInfo {
-	return PluginInfo{Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	return PluginInfo{Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.
-func (m *Manager) Install(source string, trustNative bool) (PluginInfo, error) {
-	m.mutationMu.Lock()
-	defer m.mutationMu.Unlock()
+func (m *Manager) installLocked(source string, trustNative bool, expected string) (PluginInfo, error) {
 	m.mu.Lock()
 	closed := m.closed
 	m.mu.Unlock()
@@ -184,6 +209,9 @@ func (m *Manager) Install(source string, trustNative bool) (PluginInfo, error) {
 	if err != nil {
 		return PluginInfo{}, err
 	}
+	if m.packageChangesBlocked(mf.ID) {
+		return PluginInfo{}, errors.New("存在未恢复的升级事务，请修复后重启")
+	}
 	if mf.Runtime.Kind == "process" && !trustNative {
 		return PluginInfo{}, errors.New("原生插件需要确认信任后才能安装")
 	}
@@ -201,29 +229,36 @@ func (m *Manager) Install(source string, trustNative bool) (PluginInfo, error) {
 	}
 	// Re-read the copied manifest so a concurrent source edit cannot bypass validation.
 	copied, err := manifest.Load(temp)
-	if err != nil || copied.ID != mf.ID || copied.Runtime.Kind != mf.Runtime.Kind {
+	if err != nil || !reflect.DeepEqual(copied, mf) {
 		return PluginInfo{}, errors.New("安装期间插件清单发生变化")
+	}
+	digest, err := packageFingerprint(temp)
+	if err != nil {
+		return PluginInfo{}, err
+	}
+	if expected != "" && digest != expected {
+		return PluginInfo{}, errors.New("插件包已变化，请重新检查后再安装")
 	}
 	if copied.Runtime.Kind == "process" {
 		if _, err := manifest.Executable(temp, copied); err != nil {
 			return PluginInfo{}, err
 		}
-		// Approval is host-owned metadata, never inferred from the manifest.
-		if err := os.MkdirAll(filepath.Join(m.root, ".trusted"), 0700); err != nil {
-			return PluginInfo{}, errors.New("无法保存插件信任记录")
-		}
-		if err := os.WriteFile(filepath.Join(m.root, ".trusted", mf.ID), []byte("trusted-native-v1\n"), 0600); err != nil {
-			return PluginInfo{}, errors.New("无法保存插件信任记录")
-		}
 	}
+	oldApproval := m.nativeApproved(mf.ID)
 	if err := os.Rename(temp, dest); err != nil {
 		return PluginInfo{}, errors.New("无法完成插件安装")
 	}
-	p := &plugin{manifest: copied, dir: dest, state: "installed", settings: settingsValues(copied, m.settings.Get(copied.ID).Values)}
+	if err := m.setNativeApproval(mf.ID, copied.Runtime.Kind == "process"); err != nil {
+		_ = os.Rename(dest, temp)
+		_ = m.setNativeApproval(mf.ID, oldApproval)
+		return PluginInfo{}, errors.New("无法保存插件信任记录，安装未完成")
+	}
+	p := &plugin{manifest: copied, fingerprint: digest, dir: dest, state: "installed", settings: settingsValues(copied, m.settings.Get(copied.ID).Values)}
+	info := p.info()
 	m.mu.Lock()
 	m.plugins[mf.ID] = p
 	m.mu.Unlock()
-	return p.info(), nil
+	return info, nil
 }
 
 func copyDirectory(source, dest string) error {
@@ -281,6 +316,9 @@ func (m *Manager) lookup(id string) (*plugin, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p := m.plugins[id]
+	if m.blockedUpgrades[id] {
+		return nil, errors.New("插件升级恢复未完成，请修复后重启")
+	}
 	if p == nil || m.closed {
 		return nil, errors.New("插件不存在或运行时已关闭")
 	}
@@ -305,6 +343,9 @@ func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Pro
 	if p.process != nil {
 		p.process.Stop()
 		p.process = nil
+	}
+	if p.changed {
+		return nil, errors.New("插件文件已变化，请先重载")
 	}
 	approval, err := os.ReadFile(filepath.Join(root, ".trusted", p.manifest.ID))
 	if err != nil || string(approval) != "trusted-native-v1\n" {
@@ -348,6 +389,10 @@ func (p *plugin) failed(process *transport.Process) {
 }
 
 func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string) (result protocol.CommandResult, err error) {
+	if err = m.beginOperation(); err != nil {
+		return protocol.CommandResult{}, err
+	}
+	defer m.active.Done()
 	defer func() {
 		if err == nil {
 			m.usage.Record(pluginID, commandID, input)
@@ -408,6 +453,10 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 }
 
 func (m *Manager) QueryProvider(ctx context.Context, pluginID string, params protocol.SearchParams) (protocol.SearchResult, error) {
+	if err := m.beginOperation(); err != nil {
+		return protocol.SearchResult{}, err
+	}
+	defer m.active.Done()
 	p, err := m.lookup(pluginID)
 	if err != nil {
 		return protocol.SearchResult{}, err
@@ -477,6 +526,9 @@ func (m *Manager) Stop(id string) error {
 func (m *Manager) Uninstall(id string) error {
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
+	if m.packageChangesBlocked(id) {
+		return errors.New("存在未恢复的升级事务，请修复后重启")
+	}
 	m.mu.Lock()
 	p := m.plugins[id]
 	if p == nil || !manifest.ValidID(id) {
@@ -504,10 +556,34 @@ func (m *Manager) Close() {
 	for _, p := range entries {
 		p.stop(true)
 	}
+	m.active.Wait()
+	if m.lease != nil {
+		m.lease.Close()
+		m.lease = nil
+	}
 }
 
 // UsageBoost is host-owned ranking metadata; plugins cannot supply history weights.
 func (m *Manager) UsageBoost(pluginID, commandID, input string) float64 {
 	return m.usage.Boost(pluginID, commandID, input)
 }
-func (m *Manager) ClearUsage() error { return m.usage.Clear() }
+func (m *Manager) ClearUsage() error {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
+	m.mu.Lock()
+	closed := m.closed
+	m.mu.Unlock()
+	if closed {
+		return errors.New("运行时已关闭")
+	}
+	return m.usage.Clear()
+}
+func (m *Manager) beginOperation() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return errors.New("运行时已关闭")
+	}
+	m.active.Add(1)
+	return nil
+}

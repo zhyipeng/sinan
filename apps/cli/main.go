@@ -24,7 +24,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -91,6 +91,21 @@ func run() error {
 			return errors.New("设置参数格式无效")
 		}
 		result, err = m.SavePluginSettings(args[1], revision, values)
+	case "inspect":
+		if len(args) != 2 {
+			return errors.New("inspect 需要插件目录")
+		}
+		result, err = m.PreviewPackage(args[1])
+	case "upgrade":
+		if len(args) != 2 {
+			return errors.New("upgrade 需要插件目录")
+		}
+		result, err = m.Upgrade(args[1], *trusted)
+	case "reload":
+		if len(args) != 2 {
+			return errors.New("reload 需要插件 ID")
+		}
+		result, err = m.Reload(args[1])
 	default:
 		return errors.New("未知操作")
 	}

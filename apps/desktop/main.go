@@ -34,7 +34,7 @@ func main() {
 	}
 	manager, err := kernel.New(*root)
 	if err != nil {
-		log.Fatal("无法初始化插件运行时")
+		log.Fatal("无法初始化插件运行时：", err)
 	}
 	defer manager.Close()
 	host := &HostService{manager: manager, probeEnabled: *uiProbe}

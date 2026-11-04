@@ -5,7 +5,19 @@
 // @ts-ignore: Unused imports
 import * as manifest$0 from "../plugin/manifest/models.js";
 
+export interface PackagePreview {
+    "installedFingerprint": string;
+    "id": string;
+    "name": string;
+    "version": string;
+    "kind": string;
+    "installedVersion": string;
+    "fingerprint": string;
+    "changed": boolean;
+}
+
 export interface PluginInfo {
+    "changed": boolean;
     "settings"?: manifest$0.Setting[] | null;
     "id": string;
     "name": string;

@@ -127,3 +127,17 @@ func (h *HostService) SavePluginSettings(pluginID string, revision uint64, value
 	return result, err
 }
 func (h *HostService) ClearHistory() error { h.cancelSearch(); return h.manager.ClearUsage() }
+
+func (h *HostService) PreviewPackage(directory string) (kernel.PackagePreview, error) {
+	return h.manager.PreviewPackage(directory)
+}
+func (h *HostService) ApplyPackage(directory string, trustNative bool, fingerprint, installedFingerprint string) (kernel.PluginInfo, error) {
+	h.cancelSearch()
+	defer h.cancelSearch()
+	return h.manager.ApplyPackage(directory, trustNative, fingerprint, installedFingerprint)
+}
+func (h *HostService) Reload(pluginID string) (kernel.PluginInfo, error) {
+	h.cancelSearch()
+	defer h.cancelSearch()
+	return h.manager.Reload(pluginID)
+}

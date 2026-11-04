@@ -119,6 +119,7 @@ func TestNativeLifecycleAndRediscovery(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	m.Close()
 	other, err := New(m.root)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +131,7 @@ func TestNativeLifecycleAndRediscovery(t *testing.T) {
 	if err := other.Uninstall("example.native"); err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Refresh().Plugins) != 0 {
+	if len(other.Refresh().Plugins) != 0 {
 		t.Fatal("removed plugin survived refresh")
 	}
 }
@@ -446,6 +447,7 @@ func TestOnlySuccessfulCommandsRecordUsage(t *testing.T) {
 	if m.UsageBoost("example.hello", "hello", "input") <= 0 {
 		t.Fatal("successful action not recorded")
 	}
+	m.Close()
 	other, err := New(m.root)
 	if err != nil {
 		t.Fatal(err)
@@ -454,10 +456,10 @@ func TestOnlySuccessfulCommandsRecordUsage(t *testing.T) {
 	if other.UsageBoost("example.hello", "hello", "input") <= 0 {
 		t.Fatal("history did not survive manager restart")
 	}
-	if err := m.ClearUsage(); err != nil {
+	if err := other.ClearUsage(); err != nil {
 		t.Fatal(err)
 	}
-	if m.UsageBoost("example.hello", "hello", "input") != 0 {
+	if other.UsageBoost("example.hello", "hello", "input") != 0 {
 		t.Fatal("history did not clear")
 	}
 }
@@ -535,6 +537,7 @@ func TestSettingsReinitializeOnlyAffectedPlugin(t *testing.T) {
 	if _, err := m.SavePluginSettings(mf.ID, 0, map[string][]string{}); err == nil {
 		t.Fatal("stale writer accepted")
 	}
+	m.Close()
 	other, err := New(m.root)
 	if err != nil {
 		t.Fatal(err)
@@ -545,13 +548,13 @@ func TestSettingsReinitializeOnlyAffectedPlugin(t *testing.T) {
 		t.Fatal("settings lost across restart", err)
 	}
 	// Removing the plugin does not delete the host's configuration service.
-	if err := m.Uninstall(mf.ID); err != nil {
+	if err := other.Uninstall(mf.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.Install(dir, true); err != nil {
+	if _, err := other.Install(dir, true); err != nil {
 		t.Fatal(err)
 	}
-	result, err = m.Execute(context.Background(), mf.ID, "echo", "settings")
+	result, err = other.Execute(context.Background(), mf.ID, "echo", "settings")
 	if err != nil || !strings.Contains(result.Text, target) {
 		t.Fatal("reinstalled plugin lost settings", err)
 	}

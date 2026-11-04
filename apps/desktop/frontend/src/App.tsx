@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Events } from '@wailsio/runtime';
 import { pluginViews, settingsBridge } from './pluginViews';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
-import { Execute, Install, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall, StartSearch, CancelSearch, HideLauncher } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, PreviewPackage, ApplyPackage, Reload, LauncherStatus, Refresh, ResizeLauncher, Snapshot, Stop, Uninstall, StartSearch, CancelSearch, HideLauncher } from '../bindings/sinan/apps/desktop/hostservice';
 
 type Command = { view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
-type Plugin = { id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
+type PackagePreview = { id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean };
+type Plugin = { changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
 type SearchItem = { icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
 type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
 type Data = { plugins: Plugin[]; diagnostics: string[] };
@@ -32,6 +33,7 @@ export default function App() {
   const [manage, setManage] = useState(false);
   const [directory, setDirectory] = useState('');
   const [trust, setTrust] = useState(false);
+  const [preview, setPreview] = useState<PackagePreview>();
   const [connected, setConnected] = useState(false);
   const [shortcutError, setShortcutError] = useState('');
   const shellRef = useRef<HTMLElement>(null);
@@ -54,6 +56,7 @@ export default function App() {
       generation.current++;
       setManage(false); setActive(undefined); setQuery(''); setSelection({ key: '', manual: false });
       setInput(''); setOutput(''); setError(''); setBusy(false);
+      setDirectory(''); setTrust(false); setPreview(undefined);
       void LauncherStatus().then(setShortcutError).catch(() => {});
       void reload().catch(() => setError('无法读取插件，请重试。'));
       requestAnimationFrame(() => searchRef.current?.focus());
@@ -122,12 +125,18 @@ export default function App() {
     setBusy(true); setError('');
     try {
       await action();
-      await reload();
+      if (current === generation.current) await reload();
     } catch (e) {
       if (current === generation.current) setError(e instanceof Error ? e.message : '操作失败，请重试。');
     } finally {
       if (current === generation.current) setBusy(false);
     }
+  }
+
+  function inspectPackage() {
+    const current = generation.current;
+    setPreview(undefined); setTrust(false);
+    void perform(async () => { const result = await PreviewPackage(directory); if (current === generation.current) setPreview(result); });
   }
 
   function choose(index: number) {
@@ -166,15 +175,27 @@ export default function App() {
       <div className="management-body">
         <div className="plugins">
           {data.plugins.map(plugin => <div className="plugin" key={plugin.id}>
-            <div><strong>{plugin.name}</strong><small>{plugin.version} · {states[plugin.state] ?? plugin.state}</small></div>
-            <div className="plugin-actions"><button disabled={busy || !connected || !['running', 'activated', 'failed'].includes(plugin.state)} onClick={() => perform(() => Stop(plugin.id))}>停止</button><button className="danger" disabled={busy || !connected} onClick={() => perform(async () => { await Uninstall(plugin.id); if (active?.plugin.id === plugin.id) setActive(undefined); })}>卸载</button></div>
+            <div><strong>{plugin.name}</strong><small>{plugin.version} · {states[plugin.state] ?? plugin.state}{plugin.changed ? ' · 文件有变更' : ''}</small></div>
+            <div className="plugin-actions"><button disabled={busy || !connected || !['running', 'activated', 'failed'].includes(plugin.state)} onClick={() => perform(() => Stop(plugin.id))}>停止</button><button className="danger" disabled={busy || !connected} onClick={() => perform(async () => { await Uninstall(plugin.id); if (active?.plugin.id === plugin.id) setActive(undefined); })}>卸载</button><button disabled={busy || !connected} aria-label={`重载 ${plugin.name}`} onClick={() => perform(() => Reload(plugin.id))}>重载</button></div>
           </div>)}
           {!data.plugins.length && <p className="empty">还没有插件，从本地目录安装一个。</p>}
         </div>
-        <form className="install" onSubmit={event => { event.preventDefault(); void perform(async () => { await Install(directory, trust); setDirectory(''); setTrust(false); }); }}>
-          <label htmlFor="directory">安装插件</label>
-          <div className="install-row"><input id="directory" value={directory} onChange={event => setDirectory(event.target.value)} placeholder="插件目录的绝对路径" required /><button className="primary" disabled={busy || !connected || !directory.trim()}>安装</button></div>
-          <label className="trust"><input type="checkbox" checked={trust} onChange={event => setTrust(event.target.checked)} />信任原生插件，允许其以当前用户权限运行</label>
+        <form className="install" onSubmit={event => {
+          event.preventDefault();
+          const current = generation.current;
+          if (!preview) {
+            inspectPackage();
+          } else if (preview.changed && (preview.kind !== 'process' || trust)) {
+            void perform(async () => {
+              try { await ApplyPackage(directory, trust, preview.fingerprint, preview.installedFingerprint); if (current === generation.current) setDirectory(''); }
+              finally { if (current === generation.current) { setPreview(undefined); setTrust(false); } }
+            });
+          }
+        }}>
+          <label htmlFor="directory">安装 / 升级插件</label>
+          <div className="install-row"><input id="directory" value={directory} disabled={busy} onChange={event => { setDirectory(event.target.value); setPreview(undefined); setTrust(false); setError(''); }} placeholder="插件目录的绝对路径" required /><button className="primary" disabled={busy || !connected || !directory.trim() || !!preview && (!preview.changed || preview.kind === 'process' && !trust)}>{!preview ? '检查' : !preview.changed ? '无需升级' : preview.installedVersion ? '升级' : '安装'}</button></div>
+          {preview && <div className="package-preview" role="status"><strong>{preview.name}</strong><span>{preview.installedVersion ? `${preview.installedVersion} → ${preview.version}` : preview.version}</span><button type="button" disabled={busy} onClick={inspectPackage}>重新检查</button></div>}
+          {preview?.kind === 'process' && preview.changed && <label className="trust"><input type="checkbox" checked={trust} onChange={event => setTrust(event.target.checked)} />信任此原生插件，允许其以当前用户权限运行</label>}
         </form>
         {data.diagnostics.map((diagnostic, index) => <p className="error" key={index}>{diagnostic}</p>)}
         {shortcutError && <p className="error">{shortcutError}</p>}

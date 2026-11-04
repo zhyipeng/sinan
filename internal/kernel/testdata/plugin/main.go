@@ -22,7 +22,13 @@ func main() {
 	var active atomic.Int32
 	var settings map[string][]string
 	_ = sdk.ServeWithHandlers(os.Stdin, os.Stdout, filepath.Base(cwd), sdk.Handlers{
-		Initialize: func(p protocol.InitializeParams) error { settings = p.Settings; return nil },
+		Initialize: func(p protocol.InitializeParams) error {
+			if _, err := os.Stat("bad-init"); err == nil {
+				return errors.New("test initialization failure")
+			}
+			settings = p.Settings
+			return nil
+		},
 		Command: func(ctx context.Context, p protocol.CommandParams) (protocol.CommandResult, error) {
 			switch p.CommandID {
 			case "echo":

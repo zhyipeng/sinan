@@ -24,6 +24,10 @@ import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function ApplyPackage(directory: string, trustNative: boolean, fingerprint: string, installedFingerprint: string): $CancellablePromise<kernel$0.PluginInfo> {
+    return $Call.ByID(1907720315, directory, trustNative, fingerprint, installedFingerprint);
+}
+
 export function CancelSearch(sequence: number): $CancellablePromise<void> {
     return $Call.ByID(640499065, sequence);
 }
@@ -55,6 +59,10 @@ export function PluginSettings(pluginID: string): $CancellablePromise<storage$0.
     return $Call.ByID(2611427045, pluginID);
 }
 
+export function PreviewPackage(directory: string): $CancellablePromise<kernel$0.PackagePreview> {
+    return $Call.ByID(1301431035, directory);
+}
+
 /**
  * Diagnostic output contains booleans only; no guest data or filesystem paths.
  */
@@ -64,6 +72,10 @@ export function RecordIsolationProbe(report: $models.IsolationReport, rejected: 
 
 export function Refresh(): $CancellablePromise<kernel$0.Snapshot> {
     return $Call.ByID(2382139382);
+}
+
+export function Reload(pluginID: string): $CancellablePromise<kernel$0.PluginInfo> {
+    return $Call.ByID(3444025306, pluginID);
 }
 
 export function ResizeLauncher(height: number): $CancellablePromise<void> {

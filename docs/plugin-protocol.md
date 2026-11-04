@@ -68,9 +68,9 @@ UTF-8 JSON 对象按换行分帧，stdout 只能输出协议消息。请求使�
 
 Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandlers`，搜索处理函数接收 `context.Context`，必须响应取消。SDK 允许并行请求、序列化响应；可参考两个[搜索示例](../plugins/example-search-fast/manifest.json)。TypeScript 协议声明位于 `packages/plugin-protocol/index.ts`，尚无完整 TypeScript 运行时 SDK。
 
-`sinanctl search 查询` 按增量输出聚合 JSON，包含 `queryId`、`items`、`pending`、`failures` 和 `done`。CLI 退出时回收进程；桌面保持已激活进程。CLI 与桌面不要同时修改同一插件目录，当前无跨进程安装锁。
+`sinanctl search 查询` 按增量输出聚合 JSON，包含 `queryId`、`items`、`pending`、`failures` 和 `done`。CLI 退出时回收进程；桌面保持已激活进程。同一插件根目录由一个宿主独占；运行 CLI 前须先退出使用该目录的桌面实例。
 
-新插件导入后，从桌面 `··· → 刷新` 发现变化，无需重编译宿主。刷新会终止已移除或 manifest 改变的实例；升级请先卸载再安装。尚未实现心跳、优雅关闭、事件总线、跨插件 RPC 或插件侧逐条流式结果。
+新插件导入后，从桌面 `··· → 刷新` 发现变化，无需重编译宿主。刷新会结束已移除实例，包内容变化则标记待重载并保留当前实例。升级不再需要先卸载。尚未实现心跳、优雅关闭、事件总线、跨插件 RPC 或插件侧逐条流式结果。
 
 ## 应用检索阶段的可选扩展
 
@@ -91,3 +91,11 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 声明式命令可使用 `view` 替代 `message`，与 `execution` 互斥。Shell 只显示构建时注册的可信组件，未知键报错；不会将视图键作为文件路径或 URL 加载。`system.settings/settings` 是首个注册组件。此能力不开放第三方 JS/HTML，详见 [ADR 0006](adr/0006-settings-service-and-view.md)。
 
 可信 Shell 的配置保存调用携带 `revision`，过期写入会失败。成功后定向发送 `settings:changed`，只含 `pluginId`、`revision`。CLI 可用 `settings ID` 查看、`set-settings ID revision JSON` 修改；仍不支持同一根目录多个宿主并发写入。
+
+## 升级、重载与单实例目录
+
+`sinanctl inspect 目录` 查看版本和内容变化；`sinanctl [-trust-native] upgrade 目录` 升级，原生包必须确认信任；`sinanctl reload ID` 重载已安装文件。桌面“本地插件”入口支持相同机制。包或安装基线在检查后变化会拒绝应用，需要重新检查。
+
+升级过程中旧调用被退休，成功后保留配置和历史；初始化失败时恢复旧包和信任状态。显式重载不撤销外部磁盘编辑。首次安装仍按需激活，升级握手并不验证全部业务功能。
+
+宿主持有 `.sinan-state/runtime.lock` 目录独占锁，CLI 与桌面（包括只读命令）不能同时打开同一根目录。关闭后 OS 释放锁，文件保留；无须手动删除。详见 [ADR 0007](adr/0007-plugin-upgrade-and-reload.md)。

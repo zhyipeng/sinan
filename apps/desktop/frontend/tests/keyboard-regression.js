@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan settings and shell regression');
+const task = await taskSpace('Sinan plugin upgrade and shell regression');
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
 async function selected(expected, label) {
@@ -102,6 +102,26 @@ await page.click(query);
 await page.keyboard.press('Enter');
 await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent === '此视图尚未在桌面宿主中注册。');
 console.log('PASS: unregistered view key is rejected by the trusted component registry');
+await page.click('button[aria-label="管理插件"]');
+await page.waitForSelector('.management');
+await page.click('loc=role:button[name="重载 Fixture"]');
+await page.waitForFunction(() => window.navigationFixture.counts().reloads === 1);
+await page.fill('#directory', '/tmp/sinan-fixture-package');
+await page.click('loc=role:button[name="检查"]');
+await page.waitForSelector('.package-preview');
+if (!await page.evaluate(() => document.querySelector('.install-row button').disabled)) throw new Error('Native approval was not required');
+await page.click('.trust input');
+await page.evaluate(() => window.navigationFixture.mutatePackage());
+await page.click('loc=role:button[name="升级"]');
+await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('插件包已变化'));
+if (await page.evaluate(() => window.navigationFixture.counts().upgrades) !== 0) throw new Error('Changed package was applied');
+await page.click('loc=role:button[name="检查"]');
+await page.waitForSelector('.package-preview');
+await page.click('.trust input');
+await page.click('loc=role:button[name="升级"]');
+await page.waitForFunction(() => window.navigationFixture.counts().upgrades === 1 && document.querySelector('.plugin small')?.textContent.includes('0.2.0'));
+console.log('PASS: reload, package review, explicit native approval, changed package rejection and recheck upgrade');
+console.log({upgradeScreenshot:await page.screenshot({path:'/tmp/sinan-upgrade.png'})});
 console.log('PASS: direct action executes once and dismisses without opening a command form');
 console.log('PASS: pending navigation, same-batch update, stable keys, pointer intent, completion and Enter');
 console.log(await page.snapshot());
