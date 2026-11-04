@@ -7,7 +7,10 @@ import (
 )
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
-type HostService struct{ manager *kernel.Manager }
+type HostService struct {
+	manager  *kernel.Manager
+	launcher *launcher
+}
 
 func (h *HostService) Snapshot() kernel.Snapshot { return h.manager.Snapshot() }
 func (h *HostService) Refresh() kernel.Snapshot  { return h.manager.Refresh() }
@@ -19,3 +22,15 @@ func (h *HostService) Execute(pluginID, commandID, input string) (protocol.Comma
 }
 func (h *HostService) Stop(pluginID string) error      { return h.manager.Stop(pluginID) }
 func (h *HostService) Uninstall(pluginID string) error { return h.manager.Uninstall(pluginID) }
+
+func (h *HostService) ResizeLauncher(height int) {
+	if h.launcher != nil {
+		h.launcher.resize(height)
+	}
+}
+func (h *HostService) LauncherStatus() string {
+	if h.launcher != nil {
+		return h.launcher.status()
+	}
+	return ""
+}

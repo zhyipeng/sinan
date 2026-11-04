@@ -20,7 +20,17 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 - JSON-RPC 2.0 stdio 握手、命令调用、超时终止和失败隔离。
 - 宿主 CLI、协议类型、最小 Go 插件 SDK 和两个示例插件。
 
-应用检索、全局快捷键、设置、SQLite、第三方插件 UI 和完整插件管理系统插件尚未实现。当前“插件”入口是宿主启动期的本地恢复与验证入口。
+应用检索、设置、SQLite、第三方插件 UI 和完整插件管理系统插件尚未实现。当前“插件”入口是宿主启动期的本地恢复与验证入口。
+
+## 搜索交互
+
+- macOS 使用 **Command + Space** 呼出，其他平台映射为 Control + Space。
+- 空输入仅显示无边框搜索框；输入文字筛选插件命令，窗口随结果数量展开或收缩。
+- 上下键选择，回车打开命令，Escape 或失焦隐藏；应用继续驻留。
+- 点击菜单栏 / 托盘中的“司南”，选择“显示司南”找回窗口，选择“退出司南”结束应用。
+- 搜索框右侧 `···` 打开本地插件入口。快捷键注册失败时，该入口会提示占用错误。
+
+当前仅验证了 macOS 上的窗口伸缩及快捷键注册，物理热键和托盘菜单需实机检查，详见 [ADR 0002](docs/adr/0002-launcher-interaction.md)。
 
 ## 本地启动
 
@@ -34,7 +44,7 @@ make demo
 
 `make demo` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备两个示例插件并打开窗口。脚本只对仓库自带的 Go 示例使用信任安装。重复执行保留已有示例；修改示例后需先卸载再安装。
 
-普通启动使用 `make run`，默认插件目录为 `os.UserConfigDir()/Sinan/plugins`；在 macOS 中即 `~/Library/Application Support/Sinan/plugins`。可通过窗口内“插件”入口填入插件目录安装；原生插件需勾选信任。
+普通启动使用 `make run`，默认插件目录为 `os.UserConfigDir()/Sinan/plugins`；在 macOS 中即 `~/Library/Application Support/Sinan/plugins`。可通过窗口内 `···` 的本地插件入口填入插件目录安装；原生插件需勾选信任。
 
 ```sh
 make build       # bin/sinan、bin/sinanctl

@@ -25,8 +25,16 @@ export function Install(directory: string, trustNative: boolean): $CancellablePr
     return $Call.ByID(3733150530, directory, trustNative);
 }
 
+export function LauncherStatus(): $CancellablePromise<string> {
+    return $Call.ByID(1864886877);
+}
+
 export function Refresh(): $CancellablePromise<kernel$0.Snapshot> {
     return $Call.ByID(2382139382);
+}
+
+export function ResizeLauncher(height: number): $CancellablePromise<void> {
+    return $Call.ByID(2198789619, height);
 }
 
 export function Snapshot(): $CancellablePromise<kernel$0.Snapshot> {

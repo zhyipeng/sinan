@@ -8,6 +8,8 @@
 
 首轮已锁定 Wails 3.0.0、Go 1.26.0，完成 macOS arm64 最小宿主、本地插件目录安装与卸载、声明式和 Go 进程示例、按需激活及 stdio RPC。构建和真实进程测试已通过，桌面手动验证了筛选、执行与停止。详细范围及限制见 [ADR 0001](adr/0001-phase-one-runtime.md) 和[当前插件接口](plugin-protocol.md)。动态 UI 隔离、多 Provider 搜索、权限服务与其他后续能力仍待实现。
 
+按用户后续要求，Shell 已改为聚焦式交互：Command + Space 呼出无边框输入框、按结果调整高度、失焦隐藏，并提供托盘恢复与退出入口。当前搜索仍限于插件声明的命令。实现与验证边界见 [ADR 0002](adr/0002-launcher-interaction.md)。
+
 ## 1. 定位与原则
 
 构建对标 uTools 的插件驱动桌面效率平台，目标覆盖 Windows、macOS、Linux。
