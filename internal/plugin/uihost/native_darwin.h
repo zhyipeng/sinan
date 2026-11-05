@@ -7,7 +7,7 @@ typedef struct {
     int ready, bindingsAbsent, storageIsolated, ownResourceLoaded;
     int foreignResourceBlocked, navigationBlocked, networkBlocked;
     int invalidMessageRejected, closeReceived, budgetRevoked, lifecycleRevoked;
-    int failure, heartbeatCompleted;
+    int failure, heartbeatCompleted, eventLoopResponsive;
 } SinanUIProbeReport;
 typedef struct SinanUIControl SinanUIControl;
 SinanUIControl *sinanUIControlNew(void);

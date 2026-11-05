@@ -60,7 +60,7 @@ ui-probe:
 	./bin/sinan-ui-probe -fault script
 	./bin/sinan-ui-probe -fault hang
 	./bin/sinan-ui-probe -fault slow
-	SINAN_NATIVE_UI_TEST=1 go test -race ./internal/plugin/uiwindows -run TestNativeHost
+	SINAN_NATIVE_UI_TEST=1 go test -race -count=1 ./internal/plugin/uiwindows -run TestNativeHost
 
 # Disposable environment: never prepares or installs into .sinan-dev.
 ui-acceptance: build

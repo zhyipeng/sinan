@@ -1,6 +1,7 @@
 package uiwindows
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/manifest"
+	"sinan/internal/plugin/uiprocess"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -260,5 +262,35 @@ setTimeout(() => {
 	}
 	if m.Snapshot().Plugins[0].Disabled {
 		t.Fatal("probe action affected plugin")
+	}
+}
+
+func TestNativeHostDispatchesAppKitEvents(t *testing.T) {
+	if nativeGuest == "" {
+		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
+	}
+	m := installed(t, `
+const send = body => window.webkit.messageHandlers.sinan.postMessage(body);
+send({kind:'ready',version:1});
+setTimeout(()=>send({kind:'close'}),250);
+`)
+	session, err := m.OpenUIView(context.Background(), "example.ui", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	process, err := uiprocess.Start(context.Background(), session, uiprocess.Options{Executable: nativeGuest, Lifetime: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := process.Wait()
+	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	var report struct {
+		EventLoopResponsive bool `json:"eventLoopResponsive"`
+		CloseReceived       bool `json:"closeReceived"`
+	}
+	if json.Unmarshal(result.Report, &report) != nil || !report.EventLoopResponsive || !report.CloseReceived {
+		t.Fatal("script completed without dispatching the native AppKit queue")
 	}
 }

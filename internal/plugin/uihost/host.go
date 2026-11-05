@@ -25,6 +25,7 @@ type Config struct {
 }
 
 type Report struct {
+	EventLoopResponsive    bool   `json:"eventLoopResponsive"`
 	Failure                string `json:"failure,omitempty"`
 	HeartbeatCompleted     bool   `json:"heartbeatCompleted"`
 	Ready                  bool   `json:"ready"`

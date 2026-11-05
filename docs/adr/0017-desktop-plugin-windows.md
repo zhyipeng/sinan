@@ -22,7 +22,7 @@
 ## 验证
 
 - 真实子进程控制器测试覆盖同视图去重、声明缺失、禁用/停止撤销、异常退出后重新打开、启动中并发关闭、关闭后拒绝打开及 helper 路径/符号链接拒绝，运行 Go 竞态检查。
-- 可选真实原生测试 `SINAN_NATIVE_UI_TEST=1 go test -race ./internal/plugin/uiwindows -run TestNativeHost` 使用普通 `sinan-ui-host`。固定页面确认无 Wails Bridge、确认弹窗被拒绝、页面输入框获得焦点；发送探测 report / revoke 不影响插件启用状态，不调用 runProbe，运行超过 8 秒后通过 close 正常关闭。
+- 可选真实原生测试 `SINAN_NATIVE_UI_TEST=1 go test -race -count=1 ./internal/plugin/uiwindows -run TestNativeHost` 使用普通 `sinan-ui-host`。固定页面确认无 Wails Bridge、确认弹窗被拒绝、页面输入框获得焦点；发送探测 report / revoke 不影响插件启用状态，不调用 runProbe，运行超过 8 秒后通过 close 正常关闭。
 - `make ui-probe` 保留六种原生探测，并包含普通客体测试；原有脚本错误、卡死恢复等检查继续通过。
 - ego-browser 使用真实管理组件和模拟 IPC 检查默认关闭入口、开发开关显示、包变更/禁用防护、声明 ID 打开、窗口失败事件与窄窗口布局，并回归已有搜索、设置、快捷键、管理与恢复流程。这不替代真实桌面鼠标操作和输入法测试。
 

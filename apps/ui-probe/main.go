@@ -43,7 +43,7 @@ type report struct {
 }
 
 func (r report) passed(flood, revoke bool) bool {
-	return r.Failure == "" && r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.Ready && r.BindingsAbsent && r.StorageIsolated && r.OwnResourceLoaded && r.ForeignResourceBlocked && r.NavigationBlocked && r.NetworkBlocked && r.InvalidMessageRejected && r.HTTPControl && r.NoEscapeRequests && r.CloseReceived == (!flood && !revoke) && r.BudgetRevoked == flood && r.LifecycleRevoked == revoke && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied
+	return r.EventLoopResponsive && r.Failure == "" && r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.Ready && r.BindingsAbsent && r.StorageIsolated && r.OwnResourceLoaded && r.ForeignResourceBlocked && r.NavigationBlocked && r.NetworkBlocked && r.InvalidMessageRejected && r.HTTPControl && r.NoEscapeRequests && r.CloseReceived == (!flood && !revoke) && r.BudgetRevoked == flood && r.LifecycleRevoked == revoke && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied
 }
 
 func run(flood, revoke bool, fault string) bool {
@@ -147,7 +147,7 @@ func run(flood, revoke bool, fault string) bool {
 }
 
 func (r report) hostPassed() bool {
-	return r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied && r.HTTPControl && r.NoEscapeRequests
+	return r.EventLoopResponsive && r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied && r.HTTPControl && r.NoEscapeRequests
 }
 
 func launch(manager *kernel.Manager, viewID, target string) (report, error) {

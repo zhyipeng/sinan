@@ -215,10 +215,25 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         if (delegate.probe) [window orderFront:nil];
         else { [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES]; [window makeFirstResponder:view]; }
         [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:delegate.entry]]];
+        // A fixed, harmless event verifies that the AppKit queue is dispatched,
+        // rather than merely servicing CF/NSRunLoop sources (e.g. WebKit IPC).
+        const short marker = 0x534E;
+        [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil subtype:marker data1:0 data2:0] atStart:NO];
+        BOOL eventLoopResponsive = NO;
         NSTimeInterval seconds = [bundle[@"deadlineSeconds"] doubleValue];
         NSTimeInterval deadline = seconds > 0 ? NSProcessInfo.processInfo.systemUptime + seconds : INFINITY;
         while (!delegate.done && NSProcessInfo.processInfo.systemUptime < deadline) {
-            [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+            @autoreleasepool {
+                // AppKit input/window events must be dequeued and dispatched.
+                // NSRunLoop alone renders initial WebKit content but leaves the
+                // window unresponsive to WindowServer, keyboard and mouse input.
+                NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.02] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (event) {
+                    [NSApp sendEvent:event];
+                    if (event.type == NSEventTypeApplicationDefined && event.subtype == marker) eventLoopResponsive = YES;
+                }
+                [NSApp updateWindows];
+            }
             [delegate checkResponsiveness];
             if (delegate.revoked && !delegate.done) {
                 delegate.lifecycleRevoked = YES;
@@ -228,6 +243,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
             }
         }
         if (!delegate.done) [delegate fail:SinanUIFailureDeadline];
+        result.eventLoopResponsive = eventLoopResponsive;
         result.failure = delegate.failure;
         result.heartbeatCompleted = delegate.heartbeatCompleted;
         result.ready = delegate.ready;
