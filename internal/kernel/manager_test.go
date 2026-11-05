@@ -559,3 +559,25 @@ func TestSettingsReinitializeOnlyAffectedPlugin(t *testing.T) {
 		t.Fatal("reinstalled plugin lost settings", err)
 	}
 }
+
+func TestLauncherPreferencePersistsOutsidePluginNamespace(t *testing.T) {
+	m := manager(t)
+	root := m.root
+	saved, err := m.SaveLauncherPreferences(0, "Ctrl+Alt+K")
+	if err != nil || saved.Revision != 1 {
+		t.Fatal(err)
+	}
+	if _, err = m.PluginSettings(launcherPreferencesNamespace); err == nil {
+		t.Fatal("host namespace exposed as plugin settings")
+	}
+	m.Close()
+	other, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	loaded, err := other.LauncherPreferences()
+	if err != nil || loaded.Values["shortcut"][0] != "Ctrl+Alt+K" {
+		t.Fatal("shortcut not persisted", err)
+	}
+}

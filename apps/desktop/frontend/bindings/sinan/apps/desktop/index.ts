@@ -7,5 +7,6 @@ export {
 };
 
 export type {
-    IsolationReport
+    IsolationReport,
+    ShortcutState
 } from "./models.js";

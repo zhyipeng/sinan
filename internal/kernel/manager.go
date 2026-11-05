@@ -21,6 +21,7 @@ import (
 )
 
 type PluginInfo struct {
+	Disabled        bool                      `json:"disabled"`
 	Changed         bool                      `json:"changed"`
 	Settings        []manifest.Setting        `json:"settings,omitempty"`
 	ID              string                    `json:"id"`
@@ -38,6 +39,7 @@ type Snapshot struct {
 }
 
 type plugin struct {
+	disabled     bool
 	fingerprint  string
 	changed      bool
 	settings     map[string][]string
@@ -51,6 +53,8 @@ type plugin struct {
 }
 
 type Manager struct {
+	disabled           map[string]bool // Accessed under mutationMu.
+	enablementErr      error
 	blockedUpgrades    map[string]bool
 	recoveryBlocked    bool
 	active             sync.WaitGroup
@@ -83,6 +87,7 @@ func New(root string) (*Manager, error) {
 		return nil, err
 	}
 	m := &Manager{blockedUpgrades: map[string]bool{}, lease: lease, root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
+	m.loadEnablement()
 	m.startupDiagnostics = m.recoverUpgrades()
 	m.Refresh()
 	return m, nil
@@ -99,6 +104,9 @@ func (m *Manager) Refresh() Snapshot {
 	oldPlugins := m.plugins
 	m.mu.Unlock()
 	diagnostics := append([]string{}, m.startupDiagnostics...)
+	if m.enablementErr != nil {
+		diagnostics = append(diagnostics, m.enablementErr.Error())
+	}
 	if err := m.settings.Error(); err != nil {
 		diagnostics = append(diagnostics, err.Error())
 	}
@@ -144,7 +152,7 @@ func (m *Manager) Refresh() Snapshot {
 			diagnostics = append(diagnostics, "已跳过无效插件包："+id)
 			continue
 		}
-		found[id] = &plugin{manifest: mf, dir: dir, state: "installed", fingerprint: digest, settings: settingsValues(mf, m.settings.Get(id).Values)}
+		found[id] = m.packageInstance(mf, digest, dir)
 	}
 	m.mu.Lock()
 	m.plugins = found
@@ -183,7 +191,11 @@ func (m *Manager) Snapshot() Snapshot {
 }
 
 func (p *plugin) info() PluginInfo {
-	return PluginInfo{Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: p.state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	state := p.state
+	if p.disabled {
+		state = "disabled"
+	}
+	return PluginInfo{Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.
@@ -253,7 +265,7 @@ func (m *Manager) installLocked(source string, trustNative bool, expected string
 		_ = m.setNativeApproval(mf.ID, oldApproval)
 		return PluginInfo{}, errors.New("无法保存插件信任记录，安装未完成")
 	}
-	p := &plugin{manifest: copied, fingerprint: digest, dir: dest, state: "installed", settings: settingsValues(copied, m.settings.Get(copied.ID).Values)}
+	p := m.packageInstance(copied, digest, dest)
 	info := p.info()
 	m.mu.Lock()
 	m.plugins[mf.ID] = p
@@ -337,6 +349,9 @@ func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Pro
 	if p.removed {
 		return nil, errors.New("插件已移除")
 	}
+	if p.disabled {
+		return nil, errors.New("插件已禁用")
+	}
 	if p.process != nil && p.process.Alive() {
 		return p.process, nil
 	}
@@ -363,7 +378,12 @@ func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Pro
 		return nil, err
 	}
 	var init protocol.InitializeResult
-	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings}, &init)
+	// Disposable cache stays outside plugin packages so upgrades do not remove it.
+	cacheDir := filepath.Join(filepath.Dir(p.dir), ".sinan-state", "cache", p.manifest.ID)
+	if os.MkdirAll(cacheDir, 0700) != nil {
+		cacheDir = "" // Cache failure must not prevent plugin activation.
+	}
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir}, &init)
 	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
 		process.Stop()
 		p.state = "failed"
@@ -408,6 +428,12 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 	if err != nil {
 		return protocol.CommandResult{}, err
 	}
+	p.mu.Lock()
+	disabled := p.disabled
+	p.mu.Unlock()
+	if disabled {
+		return protocol.CommandResult{}, errors.New("插件已禁用")
+	}
 	var command *manifest.Command
 	for _, c := range p.manifest.Contributes.Commands {
 		if c.ID == commandID {
@@ -424,7 +450,7 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 	if p.manifest.Runtime.Kind == "declarative" {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		if p.removed {
+		if p.removed || p.disabled {
 			return protocol.CommandResult{}, errors.New("插件已移除")
 		}
 		p.state = "activated"
@@ -444,7 +470,7 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 		return protocol.CommandResult{}, errors.New("插件已移除")
 	}
 	p.mu.Lock()
-	current := p.process == process && !p.removed
+	current := p.process == process && !p.removed && !p.disabled
 	p.mu.Unlock()
 	if !current {
 		return protocol.CommandResult{}, errors.New("插件已停止")
@@ -495,7 +521,7 @@ func (m *Manager) QueryProvider(ctx context.Context, pluginID string, params pro
 		return protocol.SearchResult{}, errors.New("插件已移除")
 	}
 	p.mu.Lock()
-	current := p.process == process && !p.removed
+	current := p.process == process && !p.removed && !p.disabled
 	p.mu.Unlock()
 	if !current {
 		return protocol.SearchResult{}, errors.New("插件已停止")

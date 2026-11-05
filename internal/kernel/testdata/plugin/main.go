@@ -21,17 +21,22 @@ func main() {
 	}
 	var active atomic.Int32
 	var settings map[string][]string
+	var cacheDir string
 	_ = sdk.ServeWithHandlers(os.Stdin, os.Stdout, filepath.Base(cwd), sdk.Handlers{
 		Initialize: func(p protocol.InitializeParams) error {
 			if _, err := os.Stat("bad-init"); err == nil {
 				return errors.New("test initialization failure")
 			}
 			settings = p.Settings
+			cacheDir = p.CacheDir
 			return nil
 		},
 		Command: func(ctx context.Context, p protocol.CommandParams) (protocol.CommandResult, error) {
 			switch p.CommandID {
 			case "echo":
+				if p.Input == "cacheDir" {
+					return protocol.CommandResult{Text: cacheDir}, nil
+				}
 				if p.Input == "settings" {
 					data, _ := json.Marshal(settings)
 					return protocol.CommandResult{Text: string(data)}, nil

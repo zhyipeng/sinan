@@ -9,3 +9,12 @@ export interface IsolationReport {
     "resourceBlocked": boolean;
     "networkBlocked": boolean;
 }
+
+export interface ShortcutState {
+    "shortcut": string;
+    "active": string;
+    "default": string;
+    "revision": number;
+    "error": string;
+    "ready": boolean;
+}

@@ -33,6 +33,31 @@ func fixture(t *testing.T) (*Catalog, string) {
 	return c, root
 }
 
+func waitForRefresh(t *testing.T, c *Catalog) {
+	t.Helper()
+	c.mu.Lock()
+	done := c.refreshing
+	c.mu.Unlock()
+	if done != nil {
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Fatal("background refresh did not finish")
+		}
+	}
+}
+func expiredSearch(t *testing.T, c *Catalog, p protocol.SearchParams) (protocol.SearchResult, error) {
+	t.Helper()
+	c.mu.Lock()
+	c.refreshed, c.checked = time.Time{}, time.Time{}
+	c.mu.Unlock()
+	if _, err := c.Search(context.Background(), p); err != nil {
+		return protocol.SearchResult{}, err
+	}
+	waitForRefresh(t, c)
+	return c.Search(context.Background(), p)
+}
+
 func TestDiscoveryMatchingAndStableIdentity(t *testing.T) {
 	c, root := fixture(t)
 	result, err := c.Search(context.Background(), protocol.SearchParams{ProviderID: "applications", Query: "vsc", Limit: 20})
@@ -90,8 +115,7 @@ func TestCancellationPreservesSnapshotAndRefresh(t *testing.T) {
 	}
 	c.read = func(path string) (metadata, error) { return metadata{Name: filepath.Base(path)}, nil }
 	os.MkdirAll(filepath.Join(root, "New.app"), 0700)
-	c.refreshed = time.Time{}
-	result, err := c.Search(context.Background(), protocol.SearchParams{ProviderID: "applications", Query: "New", Limit: 20})
+	result, err := expiredSearch(t, c, protocol.SearchParams{ProviderID: "applications", Query: "New", Limit: 20})
 	if err != nil || len(result.Items) != 1 {
 		t.Fatal("expired index not refreshed")
 	}
@@ -114,15 +138,13 @@ func TestIncrementalRefreshReusesMetadataAndInvalidatesChangedBundles(t *testing
 	baseline := reads
 	path := filepath.Join(root, "Visual Studio Code.app")
 	c.icons[path] = "cached-icon"
-	c.refreshed = time.Time{}
-	c.Search(context.Background(), p)
+	expiredSearch(t, c, p)
 	// Broken bundles are retried, while the two valid applications reuse metadata.
 	if reads != baseline+1 || c.icons[path] != "cached-icon" {
 		t.Fatal("unchanged metadata or icon not reused")
 	}
 	os.Chtimes(path, time.Now().Add(time.Hour), time.Now().Add(time.Hour))
-	c.refreshed = time.Time{}
-	c.Search(context.Background(), p)
+	expiredSearch(t, c, p)
 	if reads != baseline+3 || c.icons[path] == "cached-icon" {
 		t.Fatal("changed application not invalidated")
 	}
@@ -131,8 +153,7 @@ func TestIncrementalRefreshReusesMetadataAndInvalidatesChangedBundles(t *testing
 		t.Fatal("manual refresh did not bypass cache")
 	}
 	os.RemoveAll(path)
-	c.refreshed = time.Time{}
-	result, err := c.Search(context.Background(), p)
+	result, err := expiredSearch(t, c, p)
 	if err != nil || len(result.Items) != 0 {
 		t.Fatal("removed application remained indexed")
 	}

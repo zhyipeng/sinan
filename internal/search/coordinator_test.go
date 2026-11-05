@@ -18,6 +18,7 @@ import (
 )
 
 type fakeBackend struct {
+	disabled map[string]bool
 	failSlow bool
 	slow     chan struct{}
 	started  chan string
@@ -26,11 +27,46 @@ type fakeBackend struct {
 }
 
 func (f *fakeBackend) Snapshot() kernel.Snapshot {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	plugins := []kernel.PluginInfo{}
 	for _, id := range []string{"example.fast", "example.slow"} {
-		plugins = append(plugins, kernel.PluginInfo{ID: id, Name: id, Kind: "process", Commands: []manifest.Command{{ID: "echo", Title: "Echo"}}, SearchProviders: []manifest.SearchProvider{{ID: "demo", Prefix: "q", MinLength: 2}}})
+		plugins = append(plugins, kernel.PluginInfo{Disabled: f.disabled[id], ID: id, Name: id, Kind: "process", Commands: []manifest.Command{{ID: "echo", Title: "Echo"}}, SearchProviders: []manifest.SearchProvider{{ID: "demo", Prefix: "q", MinLength: 2}}})
 	}
 	return kernel.Snapshot{Plugins: plugins}
+}
+
+func TestDisabledPluginsAreExcludedAndLateResultsDoNotReturn(t *testing.T) {
+	closed := make(chan struct{})
+	close(closed)
+	f := &fakeBackend{disabled: map[string]bool{"example.fast": true}, slow: closed}
+	c := Coordinator{Backend: f}
+	var final Update
+	c.Query(context.Background(), "static", "Echo", func(update Update) { final = update })
+	if len(final.Items) != 1 || final.Items[0].PluginID != "example.slow" || f.calls != 0 {
+		t.Fatal("disabled static command remained searchable")
+	}
+	c.Query(context.Background(), "dynamic", "query", func(update Update) { final = update })
+	if len(final.Items) != 1 || final.Items[0].PluginID != "example.slow" || f.calls != 1 {
+		t.Fatal("disabled provider was queried")
+	}
+	f.slow = make(chan struct{})
+	f.started = make(chan string, 1)
+	f.failSlow = true
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.Query(context.Background(), "late", "query", func(update Update) { final = update })
+	}()
+	<-f.started
+	f.mu.Lock()
+	f.disabled["example.slow"] = true
+	f.mu.Unlock()
+	close(f.slow)
+	<-done
+	if !final.Done || len(final.Items) != 0 || len(final.Failures) != 0 {
+		t.Fatal("disabled provider leaked late results or failure", final)
+	}
 }
 func (f *fakeBackend) QueryProvider(ctx context.Context, id string, p protocol.SearchParams) (protocol.SearchResult, error) {
 	f.mu.Lock()

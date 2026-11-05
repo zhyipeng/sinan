@@ -15,6 +15,7 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	shortcuts      *shortcutController
 	probeEnabled   bool
 	manager        *kernel.Manager
 	launcher       *launcher
@@ -140,4 +141,39 @@ func (h *HostService) Reload(pluginID string) (kernel.PluginInfo, error) {
 	h.cancelSearch()
 	defer h.cancelSearch()
 	return h.manager.Reload(pluginID)
+}
+
+func (h *HostService) ShortcutSettings() (ShortcutState, error) {
+	if h.shortcuts == nil {
+		return ShortcutState{}, fmt.Errorf("此运行模式不支持快捷键设置")
+	}
+	return h.shortcuts.State(), nil
+}
+func (h *HostService) SaveShortcut(value string, revision uint64) (ShortcutState, error) {
+	if h.shortcuts == nil {
+		return ShortcutState{}, fmt.Errorf("此运行模式不支持快捷键设置")
+	}
+	return h.shortcuts.Save(value, revision)
+}
+func (h *HostService) RecordShortcut(enabled bool) error {
+	if h.shortcuts == nil {
+		return fmt.Errorf("此运行模式不支持快捷键录入")
+	}
+	if enabled && h.launcher != nil && (!h.launcher.window.IsVisible() || !h.launcher.window.IsFocused()) {
+		return fmt.Errorf("窗口未聚焦，快捷键录入已取消")
+	}
+	if err := h.shortcuts.Record(enabled); err != nil {
+		return err
+	}
+	if enabled && h.launcher != nil && (!h.launcher.window.IsVisible() || !h.launcher.window.IsFocused()) {
+		_ = h.shortcuts.Record(false)
+		return fmt.Errorf("窗口未聚焦，快捷键录入已取消")
+	}
+	return nil
+}
+
+func (h *HostService) SetPluginEnabled(pluginID string, enabled bool) (kernel.PluginInfo, error) {
+	h.cancelSearch()
+	defer h.cancelSearch()
+	return h.manager.SetPluginEnabled(pluginID, enabled)
 }

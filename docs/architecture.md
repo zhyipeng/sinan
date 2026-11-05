@@ -20,7 +20,13 @@ macOS Shell 采用非激活 NSPanel，并配置 floating 层级及跨 Space / �
 
 配置存储、目录设置 Schema、初始化快照及随宿主构建的设置插件见 [ADR 0006](adr/0006-settings-service-and-view.md)。公共第三方 UI、SQLite 与通用插件数据服务仍未实现。
 
-开发期包指纹、重载、升级回退及宿主目录独占约定见 [ADR 0007](adr/0007-plugin-upgrade-and-reload.md)。完整插件管理 UI、签名与远程更新仍未实现。
+呼出快捷键支持在设置插件中按键录入、恢复默认和显式保存；宿主负责校验、运行时注册与核心配置持久化。使用保留的 `$launcher` 命名空间，不开放给插件配置接口。新组合先注册，冲突时保留原组合，存储失败时尝试回退注册。录入期间当前呼出热键转为定向录入事件。边界见 [ADR 0008](adr/0008-configurable-launcher-shortcut.md)。
+
+开发期包指纹、重载、升级回退及宿主目录独占约定见 [ADR 0007](adr/0007-plugin-upgrade-and-reload.md)。日常本地管理界面已由 `system.plugin-manager` 提供，宿主保留最小恢复入口及可信视图错误边界，见 [ADR 0010](adr/0010-plugin-management-view.md)。签名、插件市场与远程更新仍未实现。
+
+应用检索 0.4.0 在插件内实现可丢弃的索引快照与后台校验；宿主仅通过可选 `initialize.cacheDir` 提供包外缓存目录。扫描不持有搜索快照锁，无缓存时首查仍需建立索引；已有缓存的结果可能短暂过期，启动前检查应用。兼容性与验证边界见 [ADR 0009](adr/0009-application-index-cache.md)。
+
+插件启用策略由内核持久管理，界面仍在管理插件中。禁用后停止进程、拒绝激活与执行、排除所有搜索贡献，升级和重载保留状态；管理插件禁用自身后仍可通过宿主恢复入口重新启用。策略保存失败保留原状态，策略损坏时阻止激活而不覆盖原文件。见 [ADR 0011](adr/0011-plugin-enablement.md)。
 
 ## 1. 定位与原则
 

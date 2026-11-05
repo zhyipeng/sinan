@@ -68,6 +68,9 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 	results := map[string]Item{}
 	providers := []provider{}
 	for _, plugin := range snapshot.Plugins {
+		if plugin.Disabled {
+			continue
+		}
 		for _, command := range plugin.Commands {
 			if command.SearchOnly {
 				continue
@@ -100,7 +103,14 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 			return
 		}
 		items := make([]Item, 0, len(results))
+		available := map[string]bool{}
+		for _, plugin := range c.Backend.Snapshot().Plugins {
+			available[plugin.ID] = !plugin.Disabled
+		}
 		for _, item := range results {
+			if !available[item.PluginID] {
+				continue
+			}
 			if ranker, ok := c.Backend.(usageRanker); ok {
 				item.Score = min(1, item.Score+max(0, min(.025, ranker.UsageBoost(item.PluginID, item.CommandID, item.Input))))
 			}
@@ -129,6 +139,17 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 			defer mu.Unlock()
 			pending--
 			if ctx.Err() != nil {
+				return
+			}
+			available := false
+			for _, current := range c.Backend.Snapshot().Plugins {
+				if current.ID == p.plugin.ID && !current.Disabled {
+					available = true
+					break
+				}
+			}
+			if !available {
+				publish()
 				return
 			}
 			if err != nil {

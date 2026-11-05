@@ -35,19 +35,23 @@ type cachedApplication struct {
 	at    time.Time
 }
 type Catalog struct {
-	cache     map[string]cachedApplication
-	roots     []string
-	mu        sync.Mutex
-	apps      []Application
-	indexed   bool
-	refreshed time.Time
-	read      func(string) (metadata, error)
-	icons     map[string]string
-	launch    func(context.Context, string) error
+	cache      map[string]cachedApplication
+	roots      []string
+	mu         sync.Mutex
+	apps       []Application
+	indexed    bool
+	refreshed  time.Time
+	read       func(string) (metadata, error)
+	icons      map[string]string
+	launch     func(context.Context, string) error
+	refreshMu  sync.Mutex
+	refreshing chan struct{}
+	checked    time.Time
+	diskPath   string
 }
 
 func New(roots []string) *Catalog {
-	return &Catalog{roots: roots, read: readMetadata, icons: map[string]string{}, launch: func(ctx context.Context, path string) error {
+	return &Catalog{roots: append([]string(nil), roots...), read: readMetadata, icons: map[string]string{}, launch: func(ctx context.Context, path string) error {
 		// Pass a single absolute application path, never a shell command or a bundle ID.
 		return exec.CommandContext(ctx, "/usr/bin/open", "-a", path).Run()
 	}}
@@ -67,10 +71,22 @@ func DefaultRoots() []string {
 	return roots
 }
 
-// refreshLocked builds a replacement snapshot. Cancellation leaves the old index intact.
-func (c *Catalog) refreshLocked(ctx context.Context, force bool) error {
+// Scanning and persistence never hold the search snapshot lock.
+// Cancellation leaves the previous snapshot and disk cache intact.
+func (c *Catalog) refresh(ctx context.Context, force bool) error {
+	c.refreshMu.Lock()
+	defer c.refreshMu.Unlock()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	c.mu.Lock()
+	if !force && c.indexed && time.Since(c.refreshed) <= time.Minute {
+		c.mu.Unlock()
+		return nil
+	}
+	previous := c.cache
+	c.mu.Unlock()
 	cache := map[string]cachedApplication{}
-	icons := map[string]string{}
 	apps := []Application{}
 	seen := map[string]bool{}
 	for _, root := range c.roots {
@@ -106,13 +122,10 @@ func (c *Catalog) refreshLocked(ctx context.Context, force bool) error {
 				if resolveErr == nil && statErr == nil && info.IsDir() && !seen[resolved] && len(apps) < 4096 {
 					seen[resolved] = true
 					stamp := applicationStamp(path, resolved)
-					old, exists := c.cache[path]
+					old, exists := previous[path]
 					if !force && exists && old.stamp == stamp && time.Since(old.at) < 5*time.Minute {
 						apps = append(apps, old.app)
 						cache[path] = old
-						if icon, ok := c.icons[path]; ok {
-							icons[path] = icon
-						}
 						seen[resolved] = true
 					} else if meta, err := c.read(path); err == nil {
 						title := meta.DisplayName
@@ -153,9 +166,38 @@ func (c *Catalog) refreshLocked(ctx context.Context, force bool) error {
 		return ctx.Err()
 	}
 	sort.Slice(apps, func(i, j int) bool { return apps[i].Path < apps[j].Path })
+	c.mu.Lock()
+	icons := map[string]string{}
+	for path, app := range cache {
+		if old, ok := c.cache[path]; !force && ok && old.stamp == app.stamp {
+			if icon, exists := c.icons[path]; exists {
+				icons[path] = icon
+			}
+		}
+	}
 	c.apps, c.indexed, c.refreshed = apps, true, time.Now()
 	c.icons, c.cache = icons, cache
+	c.mu.Unlock()
+	c.saveSnapshot(cache)
 	return nil
+}
+
+// Refreshing a usable snapshot is independent of a short-lived search request.
+func (c *Catalog) refreshInBackgroundLocked() {
+	if c.refreshing != nil || time.Since(c.checked) < time.Minute {
+		return
+	}
+	done := make(chan struct{})
+	c.refreshing, c.checked = done, time.Now()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = c.refresh(ctx, false)
+		c.mu.Lock()
+		c.refreshing = nil
+		close(done)
+		c.mu.Unlock()
+	}()
 }
 
 func match(name, query string) float64 {
@@ -187,22 +229,29 @@ func (c *Catalog) Search(ctx context.Context, p protocol.SearchParams) (protocol
 	if p.ProviderID != "applications" {
 		return protocol.SearchResult{}, errors.New("unknown provider")
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if ctx.Err() != nil {
 		return protocol.SearchResult{}, ctx.Err()
 	}
-	if !c.indexed || time.Since(c.refreshed) > time.Minute {
-		if err := c.refreshLocked(ctx, false); err != nil {
+	c.mu.Lock()
+	indexed := c.indexed
+	c.mu.Unlock()
+	if !indexed {
+		if err := c.refresh(ctx, false); err != nil {
 			return protocol.SearchResult{}, err
 		}
 	}
+	c.mu.Lock()
+	if time.Since(c.refreshed) > time.Minute {
+		c.refreshInBackgroundLocked()
+	}
+	apps := c.apps
+	c.mu.Unlock()
 	result := protocol.SearchResult{Items: []protocol.SearchItem{}}
 	query := strings.TrimSpace(p.Query)
 	if query == "" || p.Limit < 1 {
 		return result, nil
 	}
-	for _, app := range c.apps {
+	for _, app := range apps {
 		if ctx.Err() != nil {
 			return result, ctx.Err()
 		}
@@ -231,14 +280,21 @@ func (c *Catalog) Search(ctx context.Context, p protocol.SearchParams) (protocol
 		if ctx.Err() != nil {
 			return protocol.SearchResult{}, ctx.Err()
 		}
-		for _, app := range c.apps {
+		for _, app := range apps {
 			if app.ID != result.Items[i].ID {
 				continue
 			}
+			c.mu.Lock()
+			cached := c.cache[app.Path]
 			icon, exists := c.icons[app.Path]
+			c.mu.Unlock()
 			if !exists {
 				icon = readIcon(app.Path)
-				c.icons[app.Path] = icon
+				c.mu.Lock()
+				if current, ok := c.cache[app.Path]; ok && current.stamp == cached.stamp {
+					c.icons[app.Path] = icon
+				}
+				c.mu.Unlock()
 			}
 			result.Items[i].Icon = icon
 			break
@@ -248,22 +304,22 @@ func (c *Catalog) Search(ctx context.Context, p protocol.SearchParams) (protocol
 }
 
 func (c *Catalog) Execute(ctx context.Context, p protocol.CommandParams) (protocol.CommandResult, error) {
-	c.mu.Lock()
 	if p.CommandID == "refresh" {
-		err := c.refreshLocked(ctx, true)
-		c.mu.Unlock()
+		err := c.refresh(ctx, true)
 		return protocol.CommandResult{Text: "应用索引已刷新"}, err
 	}
 	if p.CommandID != "launch" {
-		c.mu.Unlock()
 		return protocol.CommandResult{}, errors.New("unknown command")
 	}
-	if !c.indexed {
-		if err := c.refreshLocked(ctx, false); err != nil {
-			c.mu.Unlock()
+	c.mu.Lock()
+	indexed := c.indexed
+	c.mu.Unlock()
+	if !indexed {
+		if err := c.refresh(ctx, false); err != nil {
 			return protocol.CommandResult{}, err
 		}
 	}
+	c.mu.Lock()
 	path := ""
 	for _, app := range c.apps {
 		if app.ID == p.Input {

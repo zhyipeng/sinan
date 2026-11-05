@@ -177,7 +177,7 @@ func (m *Manager) applyPackage(source string, trustNative bool, expected string,
 	return info, nil
 }
 func (m *Manager) packageInstance(mf manifest.Manifest, digest, dir string) *plugin {
-	return &plugin{manifest: mf, fingerprint: digest, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
+	return &plugin{disabled: m.enablementErr != nil || m.disabled[mf.ID], manifest: mf, fingerprint: digest, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
 }
 func (m *Manager) publishReplacement(p *plugin) {
 	m.mu.Lock()
@@ -185,7 +185,7 @@ func (m *Manager) publishReplacement(p *plugin) {
 	m.mu.Unlock()
 }
 func (m *Manager) activateCandidate(p *plugin) error {
-	if p.manifest.Runtime.Kind != "process" {
+	if p.disabled || p.manifest.Runtime.Kind != "process" {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

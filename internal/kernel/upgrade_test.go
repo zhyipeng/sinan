@@ -83,6 +83,42 @@ func TestUpgradeKeepsSettingsHistoryAndRetiresSearch(t *testing.T) {
 		t.Fatal("native approval lost")
 	}
 }
+
+func TestPluginCacheDirectorySurvivesUpgradeAndFailedCacheCreation(t *testing.T) {
+	m := manager(t)
+	if _, err := m.Install(packageVersion(t, true, "0.1.0"), true); err != nil {
+		t.Fatal(err)
+	}
+	cache, err := m.Execute(context.Background(), "example.native", "echo", "cacheDir")
+	expected := filepath.Join(m.root, ".sinan-state", "cache", "example.native")
+	if err != nil || cache.Text != expected {
+		t.Fatal("cache directory not passed during initialize", err)
+	}
+	marker := filepath.Join(expected, "fixture")
+	if err := os.WriteFile(marker, []byte("cached"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Upgrade(packageVersion(t, true, "0.2.0"), true); err != nil {
+		t.Fatal(err)
+	}
+	after, err := m.Execute(context.Background(), "example.native", "echo", "cacheDir")
+	data, readErr := os.ReadFile(marker)
+	if err != nil || after.Text != expected || readErr != nil || string(data) != "cached" {
+		t.Fatal("upgrade lost plugin cache", err, readErr)
+	}
+	// A cache path that cannot be created is optional, rather than activation failure.
+	other := manager(t)
+	if _, err := other.Install(source(t, true), true); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(other.root, ".sinan-state", "cache"), []byte("blocked"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	without, err := other.Execute(context.Background(), "example.native", "echo", "cacheDir")
+	if err != nil || without.Text != "" {
+		t.Fatal("cache failure prevented activation", err)
+	}
+}
 func TestFailedUpgradeRestoresPackageAndTrust(t *testing.T) {
 	m := manager(t)
 	if _, err := m.Install(packageVersion(t, true, "0.1.0"), true); err != nil {

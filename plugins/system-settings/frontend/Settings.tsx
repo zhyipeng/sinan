@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import Shortcut, {type ShortcutBridge} from './Shortcut';
 
 export type SettingsSchema = { id: string; title: string; type: string };
 export type ConfigurablePlugin = { id: string; name: string; settings?: SettingsSchema[] | null };
 export type SettingsSnapshot = { revision: number; values: Record<string, string[]> };
 export type SettingsBridge = {
+  shortcut: ShortcutBridge;
   load(pluginID: string): Promise<SettingsSnapshot>;
   save(pluginID: string, revision: number, values: Record<string, string[]>): Promise<SettingsSnapshot>;
   clearHistory(): Promise<void>;
@@ -58,7 +60,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
         <h2>{plugin.name}</h2>
         {(plugin.settings ?? []).map(field => <div className="settings-field" key={field.id}>
           <label htmlFor={`${plugin.id}-${field.id}`}>{field.title}</label>
-          <textarea id={`${plugin.id}-${field.id}`} rows={3} maxLength={16400} spellCheck={false} disabled={!draft || !!pending} placeholder="每行一个目录绝对路径" value={draft?.values[field.id] ?? ''} onChange={event => {
+          <textarea id={`${plugin.id}-${field.id}`} rows={3} maxLength={16400} spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" disabled={!draft || !!pending} placeholder="每行一个目录绝对路径" value={draft?.values[field.id] ?? ''} onChange={event => {
             const value = event.target.value;
             setDrafts(current => ({ ...current, [plugin.id]: { ...current[plugin.id], values: { ...current[plugin.id].values, [field.id]: value } } }));
             setNotice(''); setError('');
@@ -68,6 +70,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
       </form>;
     })}
     <section className="settings-history"><div><h2>使用历史</h2><p className="settings-note">用于调整搜索结果顺序</p></div><button disabled={!!pending} onClick={() => void clear()}>{pending === 'history' ? '清除中…' : '清除使用历史'}</button></section>
+    <Shortcut bridge={bridge.shortcut} />
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {error && <p className="error" role="alert">{error}</p>}
   </div>;

@@ -17,3 +17,9 @@ if [ ! -d .sinan-dev/plugins/system.settings ]; then
 else
   ./bin/sinanctl -plugins .sinan-dev/plugins upgrade plugins/system-settings
 fi
+
+if [ ! -d .sinan-dev/plugins/system.plugin-manager ]; then
+  ./bin/sinanctl -plugins .sinan-dev/plugins install plugins/system-plugin-manager
+else
+  ./bin/sinanctl -plugins .sinan-dev/plugins upgrade plugins/system-plugin-manager
+fi

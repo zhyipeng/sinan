@@ -70,6 +70,10 @@ export function RecordIsolationProbe(report: $models.IsolationReport, rejected: 
     return $Call.ByID(795929968, report, rejected);
 }
 
+export function RecordShortcut(enabled: boolean): $CancellablePromise<void> {
+    return $Call.ByID(851920844, enabled);
+}
+
 export function Refresh(): $CancellablePromise<kernel$0.Snapshot> {
     return $Call.ByID(2382139382);
 }
@@ -84,6 +88,18 @@ export function ResizeLauncher(height: number): $CancellablePromise<void> {
 
 export function SavePluginSettings(pluginID: string, revision: number, values: { [_ in string]?: string[] | null } | null): $CancellablePromise<storage$0.SettingsSnapshot> {
     return $Call.ByID(2776673060, pluginID, revision, values);
+}
+
+export function SaveShortcut(value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
+    return $Call.ByID(2913582280, value, revision);
+}
+
+export function SetPluginEnabled(pluginID: string, enabled: boolean): $CancellablePromise<kernel$0.PluginInfo> {
+    return $Call.ByID(448181795, pluginID, enabled);
+}
+
+export function ShortcutSettings(): $CancellablePromise<$models.ShortcutState> {
+    return $Call.ByID(3261602732);
 }
 
 export function Snapshot(): $CancellablePromise<kernel$0.Snapshot> {

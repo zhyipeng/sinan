@@ -12,7 +12,7 @@ func main() {
 	var index *catalog.Catalog
 	if sdk.ServeWithHandlers(os.Stdin, os.Stdout, "system.app-search", sdk.Handlers{
 		Initialize: func(p protocol.InitializeParams) error {
-			index = catalog.New(append(catalog.DefaultRoots(), p.Settings["directories"]...))
+			index = catalog.NewWithCache(append(catalog.DefaultRoots(), p.Settings["directories"]...), p.CacheDir)
 			return nil
 		},
 		Search: func(ctx context.Context, p protocol.SearchParams) (protocol.SearchResult, error) {

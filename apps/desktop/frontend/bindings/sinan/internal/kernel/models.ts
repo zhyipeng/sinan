@@ -17,6 +17,7 @@ export interface PackagePreview {
 }
 
 export interface PluginInfo {
+    "disabled": boolean;
     "changed": boolean;
     "settings"?: manifest$0.Setting[] | null;
     "id": string;

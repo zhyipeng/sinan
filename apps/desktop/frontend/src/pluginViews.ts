@@ -1,12 +1,41 @@
 // Only repository-bundled trusted components can appear in the Shell.
 // A manifest view key never becomes an import URL or installed JavaScript path.
-import Settings, { type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory } from '../bindings/sinan/apps/desktop/hostservice';
-export const pluginViews: Record<string, typeof Settings | undefined> = { 'system.settings/settings': Settings };
+import { Events } from '@wailsio/runtime';
+import { createElement, type ComponentType } from 'react';
+import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
+import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
+import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
+import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled } from '../bindings/sinan/apps/desktop/hostservice';
+type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
+export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
+  'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
+  'system.plugin-manager/manager': ({onChanged,onRecover}) => createElement(PluginManager,{bridge:managementBridge,onChanged,onRecover}),
+};
+// These adapters are private to bundled trusted views, never passed to installed JS.
+const managementBridge: ManagementBridge = {
+  async refresh(){const data=await Refresh();return {plugins:data.plugins??[],diagnostics:data.diagnostics??[]};},
+  async stop(id){await Stop(id);},
+  async uninstall(id){await Uninstall(id);},
+  async reload(id){return await Reload(id);},
+  async inspect(directory){return await PreviewPackage(directory);},
+  async apply(directory,trust,fingerprint,installedFingerprint){return await ApplyPackage(directory,trust,fingerprint,installedFingerprint);},
+  async setEnabled(id,enabled){return await SetPluginEnabled(id,enabled);},
+};
 function normalize(value: {revision: number; values: Record<string, string[] | null | undefined> | null}): SettingsSnapshot {
   return { revision: value.revision, values: Object.fromEntries(Object.entries(value.values ?? {}).map(([key, paths]) => [key, paths ?? []])) };
 }
+let recordingQueue: Promise<void> = Promise.resolve();
 export const settingsBridge: SettingsBridge = {
+  shortcut: {
+    async load() { return await ShortcutSettings(); },
+    async save(value, revision) { return await SaveShortcut(value, revision); },
+    record(enabled) { recordingQueue = recordingQueue.catch(() => {}).then(() => RecordShortcut(enabled)).then(() => {}); return recordingQueue; },
+    subscribe(changed, captured) {
+      const offState = Events.On('shortcut:changed', event => changed(event.data as ShortcutState));
+      const offCaptured = Events.On('shortcut:recorded', event => captured(event.data as string));
+      return () => { offState(); offCaptured(); };
+    },
+  },
   async load(pluginID) { return normalize(await PluginSettings(pluginID)); },
   async save(pluginID, revision, values) { return normalize(await SavePluginSettings(pluginID, revision, values)); },
   async clearHistory() { await ClearHistory(); },

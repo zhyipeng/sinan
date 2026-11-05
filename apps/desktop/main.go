@@ -76,16 +76,23 @@ func main() {
 		event.Cancel()
 		window.Hide()
 	})
-	window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) { host.cancelSearch() })
+	window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) {
+		host.cancelSearch()
+		if host.shortcuts != nil {
+			go func() { _ = host.shortcuts.Record(false) }()
+		}
+	})
 	if !*uiProbe {
-		configureTray(app, host.launcher)
-		// Register after startup so OS conflicts are returned to us rather than only logged.
-		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
-			if err := app.GlobalShortcut.Register("CmdOrCtrl+Space", host.launcher.toggle); err != nil {
-				log.Print("全局快捷键注册失败，仍可通过托盘显示司南")
-				host.launcher.setShortcutError("Command + Space 注册失败，请检查系统聚焦或其他应用的快捷键占用。可从托盘打开司南。")
-			}
+		tray := configureTray(app, host.launcher)
+		host.shortcuts = newShortcutController(manager, app.GlobalShortcut, host.launcher.toggle, func(value string) {
+			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
+		}, func(state ShortcutState) {
+			host.launcher.setShortcutError(state.Error)
+			tray.SetTooltip("司南 · " + state.Shortcut)
+			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
 		})
+		// Register after startup so native conflicts are returned synchronously.
+		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) { host.shortcuts.Start() })
 		app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
 			go host.launcher.show()
 		})

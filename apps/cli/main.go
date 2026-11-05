@@ -24,7 +24,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -106,6 +106,11 @@ func run() error {
 			return errors.New("reload 需要插件 ID")
 		}
 		result, err = m.Reload(args[1])
+	case "enable", "disable":
+		if len(args) != 2 {
+			return errors.New("enable / disable 需要插件 ID")
+		}
+		result, err = m.SetPluginEnabled(args[1], args[0] == "enable")
 	default:
 		return errors.New("未知操作")
 	}
