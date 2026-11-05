@@ -91,7 +91,7 @@ macOS 可进一步运行不含 Wails Bridge 的原生边界验证宿主：
 make ui-probe
 ```
 
-该命令依次检查正常关闭、消息洪泛和禁用插件三种撤销路径。它把编译进程序的固定测试夹具安装到独立临时根目录，使用非持久 WKWebView、自定义资源 Scheme 和导航决策代理，不读取日常插件目录。父进程持有内核会话，独立客体进程通过会话专属 stdio 管道逐次读取资源，不复制整包资源。启动须完成管道与页面握手，撤销后通知退出，超时强制终止并回收。每次自动关闭验证窗口，只输出布尔结果；正常模式接受 close，洪泛模式 `budgetRevoked=true`，禁用模式 `lifecycleRevoked=true`；三种模式均应退出 0，且旧资源和消息都被拒绝，`separateProcess`、`childReaped` 和 `startupHandshake` 均为 true。正对照 HTTP 服务可访问，客体的网络和导航尝试不得到达该服务。命令目前要求 macOS+cgo，基础验证见 [ADR 0012](docs/adr/0012-native-ui-boundary-probe.md)，会话接入见 [ADR 0013](docs/adr/0013-ui-session-revocation.md)，进程监督见 [ADR 0014](docs/adr/0014-ui-guest-supervision.md)。
+该命令依次检查正常关闭、消息洪泛、禁用插件，以及脚本调用错误、JavaScript 卡死、可响应慢页面六种模式。它把编译进程序的固定测试夹具安装到独立临时根目录，使用非持久 WKWebView、自定义资源 Scheme 和导航决策代理，不读取日常插件目录。父进程持有内核会话，独立客体进程通过会话专属 stdio 管道逐次读取资源，不复制整包资源。启动须完成管道与页面握手，撤销后通知退出，超时强制终止并回收。每次自动关闭验证窗口，只输出固定诊断字段；正常模式接受 close，洪泛模式 `budgetRevoked=true`，禁用模式 `lifecycleRevoked=true`；各模式均应退出 0，且旧资源和消息都被拒绝，`separateProcess`、`childReaped` 和 `startupHandshake` 均为 true。正对照 HTTP 服务可访问，客体的网络和导航尝试不得到达该服务。故障模式额外输出 `failure=script-error` 或 `failure=unresponsive`，检查会话失效后在同一内核打开正常客体；慢页面须完成原生响应探测后正常关闭。故障与响应预算见 [ADR 0016](docs/adr/0016-ui-renderer-failure-probes.md)。命令目前要求 macOS+cgo，基础验证见 [ADR 0012](docs/adr/0012-native-ui-boundary-probe.md)，会话接入见 [ADR 0013](docs/adr/0013-ui-session-revocation.md)，进程监督见 [ADR 0014](docs/adr/0014-ui-guest-supervision.md)。
 
 可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和空权限列表；内核准备接口只接受已声明视图 ID。此声明尚不提供正常 Shell 中的第三方 HTML 入口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
 

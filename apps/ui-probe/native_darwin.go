@@ -48,5 +48,9 @@ func runNative(data []byte, target string, session viewSession, disable func() e
 	url := C.CString(target)
 	defer C.free(unsafe.Pointer(url))
 	r := C.sinanUIProbe(bundle, url, C.ulonglong(handle), control)
-	return report{Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
+	failure, known := map[C.int]string{C.SinanUIFailureNone: "", C.SinanUIFailureScript: "script-error", C.SinanUIFailureRenderer: "renderer-terminated", C.SinanUIFailureNavigation: "navigation-failed", C.SinanUIFailureUnresponsive: "unresponsive", C.SinanUIFailureDeadline: "deadline"}[r.failure]
+	if !known {
+		failure = "unknown"
+	}
+	return report{Failure: failure, HeartbeatCompleted: r.heartbeatCompleted != 0, Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
 }

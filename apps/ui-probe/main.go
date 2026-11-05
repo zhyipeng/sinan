@@ -14,12 +14,15 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"sinan/internal/kernel"
+	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/uiprocess"
 	"sinan/internal/plugin/uiview"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 //go:embed testdata/*
@@ -36,32 +39,34 @@ type viewSession interface {
 }
 
 type report struct {
-	SeparateProcess        bool `json:"separateProcess"`
-	ChildReaped            bool `json:"childReaped"`
-	StartupHandshake       bool `json:"startupHandshake"`
-	Ready                  bool `json:"ready"`
-	BindingsAbsent         bool `json:"bindingsAbsent"`
-	StorageIsolated        bool `json:"storageIsolated"`
-	OwnResourceLoaded      bool `json:"ownResourceLoaded"`
-	ForeignResourceBlocked bool `json:"foreignResourceBlocked"`
-	NavigationBlocked      bool `json:"navigationBlocked"`
-	NetworkBlocked         bool `json:"networkBlocked"`
-	InvalidMessageRejected bool `json:"invalidMessageRejected"`
-	CloseReceived          bool `json:"closeReceived"`
-	HTTPControl            bool `json:"httpControl"`
-	NoEscapeRequests       bool `json:"noEscapeRequests"`
-	BudgetRevoked          bool `json:"budgetRevoked"`
-	LifecycleRevoked       bool `json:"lifecycleRevoked"`
-	SessionRevoked         bool `json:"sessionRevoked"`
-	StaleResourceDenied    bool `json:"staleResourceDenied"`
-	StaleMessageDenied     bool `json:"staleMessageDenied"`
+	Failure                string `json:"failure,omitempty"`
+	HeartbeatCompleted     bool   `json:"heartbeatCompleted"`
+	SeparateProcess        bool   `json:"separateProcess"`
+	ChildReaped            bool   `json:"childReaped"`
+	StartupHandshake       bool   `json:"startupHandshake"`
+	Ready                  bool   `json:"ready"`
+	BindingsAbsent         bool   `json:"bindingsAbsent"`
+	StorageIsolated        bool   `json:"storageIsolated"`
+	OwnResourceLoaded      bool   `json:"ownResourceLoaded"`
+	ForeignResourceBlocked bool   `json:"foreignResourceBlocked"`
+	NavigationBlocked      bool   `json:"navigationBlocked"`
+	NetworkBlocked         bool   `json:"networkBlocked"`
+	InvalidMessageRejected bool   `json:"invalidMessageRejected"`
+	CloseReceived          bool   `json:"closeReceived"`
+	HTTPControl            bool   `json:"httpControl"`
+	NoEscapeRequests       bool   `json:"noEscapeRequests"`
+	BudgetRevoked          bool   `json:"budgetRevoked"`
+	LifecycleRevoked       bool   `json:"lifecycleRevoked"`
+	SessionRevoked         bool   `json:"sessionRevoked"`
+	StaleResourceDenied    bool   `json:"staleResourceDenied"`
+	StaleMessageDenied     bool   `json:"staleMessageDenied"`
 }
 
 func (r report) passed(flood, revoke bool) bool {
-	return r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.Ready && r.BindingsAbsent && r.StorageIsolated && r.OwnResourceLoaded && r.ForeignResourceBlocked && r.NavigationBlocked && r.NetworkBlocked && r.InvalidMessageRejected && r.HTTPControl && r.NoEscapeRequests && r.CloseReceived == (!flood && !revoke) && r.BudgetRevoked == flood && r.LifecycleRevoked == revoke && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied
+	return r.Failure == "" && r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.Ready && r.BindingsAbsent && r.StorageIsolated && r.OwnResourceLoaded && r.ForeignResourceBlocked && r.NavigationBlocked && r.NetworkBlocked && r.InvalidMessageRejected && r.HTTPControl && r.NoEscapeRequests && r.CloseReceived == (!flood && !revoke) && r.BudgetRevoked == flood && r.LifecycleRevoked == revoke && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied
 }
 
-func run(flood, revoke bool) bool {
+func run(flood, revoke bool, fault string) bool {
 	var escapes atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/control" {
@@ -85,6 +90,9 @@ func run(flood, revoke bool) bool {
 	if revoke {
 		viewID = "revoke"
 	}
+	if fault != "" {
+		viewID = "failure"
+	}
 	// Install fixed embedded fixtures into an isolated temporary root, so the
 	// native probe exercises the same fingerprint and lifecycle owner as plugins.
 	tmp, err := os.MkdirTemp("", "sinan-ui-session-probe-")
@@ -99,8 +107,26 @@ func run(flood, revoke bool) bool {
 	if os.CopyFS(filepath.Join(source, "ui"), fixture) != nil {
 		return false
 	}
-	manifest := []byte(`{"id":"example.ui-probe","name":"UI probe fixture","version":"0.1.0","apiVersion":"1","runtime":{"kind":"declarative"},"contributes":{"uiViews":[{"id":"normal","entry":"testdata/index.html","bridgeVersion":"1"},{"id":"flood","entry":"testdata/flood.html","bridgeVersion":"1"},{"id":"revoke","entry":"testdata/revoke.html","bridgeVersion":"1"}],"commands":[{"id":"open","title":"Probe","message":"fixture"}]},"permissions":[],"activationEvents":["onCommand:open"]}`)
-	if os.WriteFile(filepath.Join(source, "manifest.json"), manifest, 0600) != nil {
+	if fault != "" {
+		html, err := fixture.ReadFile("testdata/failure.html")
+		if err != nil || os.WriteFile(filepath.Join(source, "ui", "testdata", "failure.html"), []byte(strings.ReplaceAll(string(html), "MODE", fault)), 0600) != nil {
+			return false
+		}
+	}
+	manifestData, err := json.Marshal(manifest.Manifest{
+		ID: "example.ui-probe", Name: "UI probe fixture", Version: "0.1.0", APIVersion: protocol.APIVersion,
+		Runtime: manifest.Runtime{Kind: "declarative"},
+		Contributes: manifest.Contributions{
+			Commands: []manifest.Command{{ID: "open", Title: "Probe", Message: "fixture"}},
+			UIViews: []protocol.UIView{
+				{ID: "normal", Entry: "testdata/index.html", BridgeVersion: protocol.UIBridgeVersion},
+				{ID: "flood", Entry: "testdata/flood.html", BridgeVersion: protocol.UIBridgeVersion},
+				{ID: "revoke", Entry: "testdata/revoke.html", BridgeVersion: protocol.UIBridgeVersion},
+				{ID: "failure", Entry: "testdata/failure.html", BridgeVersion: protocol.UIBridgeVersion},
+			},
+		}, ActivationEvents: []string{"onCommand:open"},
+	})
+	if err != nil || os.WriteFile(filepath.Join(source, "manifest.json"), manifestData, 0600) != nil {
 		return false
 	}
 	manager, err := kernel.New(filepath.Join(tmp, "plugins"))
@@ -111,44 +137,73 @@ func run(flood, revoke bool) bool {
 	if _, err = manager.Install(source, false); err != nil {
 		return false
 	}
+	result, err := launch(manager, viewID, server.URL+"/escape")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return false
+	}
+	result.HTTPControl = controlOK
+	result.NoEscapeRequests = escapes.Load() == 0
+	_ = json.NewEncoder(os.Stdout).Encode(result)
+	if fault == "script" || fault == "hang" {
+		expected := "script-error"
+		if fault == "hang" {
+			expected = "unresponsive"
+		}
+		if !result.Ready || result.Failure != expected || result.CloseReceived || !result.hostPassed() {
+			return false
+		}
+		// Keep this same kernel alive and prove another guest can still use it.
+		recovered, err := launch(manager, "normal", server.URL+"/escape")
+		if err != nil {
+			return false
+		}
+		recovered.HTTPControl = controlOK
+		recovered.NoEscapeRequests = escapes.Load() == 0
+		_ = json.NewEncoder(os.Stdout).Encode(recovered)
+		return recovered.passed(false, false)
+	}
+	return result.passed(flood, revoke) && (fault != "slow" || result.HeartbeatCompleted)
+}
+
+func (r report) hostPassed() bool {
+	return r.SeparateProcess && r.ChildReaped && r.StartupHandshake && r.SessionRevoked && r.StaleResourceDenied && r.StaleMessageDenied && r.HTTPControl && r.NoEscapeRequests
+}
+
+func launch(manager *kernel.Manager, viewID, target string) (report, error) {
 	session, err := manager.OpenUIView(context.Background(), "example.ui-probe", viewID)
 	if err != nil {
-		return false
+		return report{}, err
 	}
 	defer session.Revoke()
 	executable, err := os.Executable()
 	if err != nil {
-		return false
+		return report{}, err
 	}
 	process, err := uiprocess.Start(context.Background(), session, uiprocess.Options{
 		Executable: executable, Args: []string{"-child"}, Lifetime: 12 * time.Second,
-		ProbeTarget:  server.URL + "/escape",
-		ProbeDisable: func() error { _, err := manager.SetPluginEnabled("example.ui-probe", false); return err },
+		ProbeTarget: target, ProbeDisable: func() error { _, err := manager.SetPluginEnabled("example.ui-probe", false); return err },
 	})
 	if err != nil {
-		return false
+		return report{}, err
 	}
 	outcome := process.Wait()
 	if outcome.Err != nil {
-		fmt.Fprintln(os.Stderr, outcome.Err)
-		return false
+		return report{}, outcome.Err
 	}
 	var result report
-	if json.Unmarshal(outcome.Report, &result) != nil {
-		return false
+	if err := json.Unmarshal(outcome.Report, &result); err != nil {
+		return report{}, err
 	}
 	result.SeparateProcess = process.PID() != os.Getpid()
-	result.ChildReaped = true      // Wait returns only after exec.Cmd.Wait has reaped it.
-	result.StartupHandshake = true // Start requires both hello and page ready.
-	result.HTTPControl = controlOK
-	result.NoEscapeRequests = escapes.Load() == 0
+	result.ChildReaped = true      // Wait reaps the process before returning.
+	result.StartupHandshake = true // Start requires hello and page ready.
 	result.SessionRevoked = !session.Active()
 	_, ok := session.Resource(session.EntryURL())
 	result.StaleResourceDenied = !ok
 	_, messageErr := session.Message([]byte(`{"kind":"ready","version":1}`))
 	result.StaleMessageDenied = messageErr != nil
-	_ = json.NewEncoder(os.Stdout).Encode(result)
-	return result.passed(flood, revoke)
+	return result, nil
 }
 
 func runChild() bool {
@@ -175,6 +230,7 @@ func runChild() bool {
 
 func main() {
 	child := flag.Bool("child", false, "内部 UI 客体进程")
+	fault := flag.String("fault", "", "验证 script / hang / slow 页面")
 	flood := flag.Bool("flood", false, "验证消息预算耗尽后撤销桥接")
 	revoke := flag.Bool("revoke", false, "验证禁用插件后撤销 UI 会话")
 	flag.Parse()
@@ -184,7 +240,7 @@ func main() {
 		}
 		return
 	}
-	if *flood && *revoke || !run(*flood, *revoke) {
+	if (*fault != "" && *fault != "script" && *fault != "hang" && *fault != "slow") || (*fault != "" && (*flood || *revoke)) || *flood && *revoke || !run(*flood, *revoke, *fault) {
 		fmt.Fprintln(os.Stderr, "UI 边界验证未通过或当前平台不受支持")
 		os.Exit(1)
 	}

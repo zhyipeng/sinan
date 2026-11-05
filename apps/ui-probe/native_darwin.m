@@ -33,9 +33,44 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
 @property NSUInteger rejected;
 @property NSUInteger messages;
 @property NSDictionary *guestReport;
+@property SinanUIFailure failure;
+@property BOOL heartbeatPending;
+@property BOOL heartbeatCompleted;
+@property NSTimeInterval heartbeatStarted;
+@property NSTimeInterval lastHeartbeat;
+- (void)fail:(SinanUIFailure)reason;
+- (void)checkResponsiveness;
+
 @end
 
 @implementation SinanUIProbe
+- (void)fail:(SinanUIFailure)reason {
+    if (self.done || self.revoked) return;
+    self.failure = reason;
+    self.bridgeRevoked = YES;
+    self.done = YES;
+    sinanUISessionRevoke(self.handle);
+}
+- (void)checkResponsiveness {
+    if (!self.ready || self.done || self.revoked) return;
+    NSTimeInterval now = NSProcessInfo.processInfo.systemUptime;
+    if (self.heartbeatPending) {
+        if (now - self.heartbeatStarted > 1.0) [self fail:SinanUIFailureUnresponsive];
+        return;
+    }
+    if (now - self.lastHeartbeat < 0.25) return;
+    self.heartbeatPending = YES;
+    self.heartbeatStarted = now;
+    __weak SinanUIProbe *weakSelf = self;
+    [self.view evaluateJavaScript:@"true" completionHandler:^(id value, NSError *error) {
+        SinanUIProbe *probe = weakSelf;
+        if (!probe || probe.done || probe.revoked) return;
+        probe.heartbeatPending = NO;
+        probe.lastHeartbeat = NSProcessInfo.processInfo.systemUptime;
+        if (error) [probe fail:SinanUIFailureScript];
+        else probe.heartbeatCompleted = YES;
+    }];
+}
 - (BOOL)revoked { return self.handle == 0 || atomic_load(&self.control->revoked); }
 - (void)webView:(WKWebView *)webView startURLSchemeTask:(id<WKURLSchemeTask>)task {
     NSString *url = task.request.URL.absoluteString;
@@ -74,9 +109,9 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
     self.navigationDenials++;
     return nil;
 }
-- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView { self.done = YES; }
-- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error { self.done = YES; }
-- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error { self.done = YES; }
+- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView { [self fail:SinanUIFailureRenderer]; }
+- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error { [self fail:SinanUIFailureNavigation]; }
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error { [self fail:SinanUIFailureNavigation]; }
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message {
     // This handler exists only in the development host. It has no filesystem,
     // command execution, settings or other Wails/host API to dispatch to.
@@ -99,7 +134,7 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
         self.ready = YES;
         NSData *target = [NSJSONSerialization dataWithJSONObject:@[self.target] options:0 error:nil];
         NSString *argument = [[NSString alloc] initWithData:target encoding:NSUTF8StringEncoding];
-        [self.view evaluateJavaScript:[NSString stringWithFormat:@"void window.runProbe((%@)[0]);", argument] completionHandler:^(id result, NSError *error) { if (error) self.done = YES; }];
+        [self.view evaluateJavaScript:[NSString stringWithFormat:@"void window.runProbe((%@)[0]);", argument] completionHandler:^(id result, NSError *error) { if (error) [self fail:SinanUIFailureScript]; }];
         return;
     }
     if (self.ready && [body[@"kind"] isEqual:@"report"] && body.count == 2 && !self.guestReport && [body[@"report"] isKindOfClass:NSDictionary.class]) {
@@ -161,9 +196,10 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         [window center];
         [window orderFront:nil];
         [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:delegate.entry]]];
-        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:8];
-        while (!delegate.done && deadline.timeIntervalSinceNow > 0) {
+        NSTimeInterval deadline = NSProcessInfo.processInfo.systemUptime + 8;
+        while (!delegate.done && NSProcessInfo.processInfo.systemUptime < deadline) {
             [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+            [delegate checkResponsiveness];
             if (delegate.revoked && !delegate.done) {
                 delegate.lifecycleRevoked = YES;
                 delegate.bridgeRevoked = YES;
@@ -171,6 +207,9 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                 [configuration.userContentController removeScriptMessageHandlerForName:@"sinan"];
             }
         }
+        if (!delegate.done) [delegate fail:SinanUIFailureDeadline];
+        result.failure = delegate.failure;
+        result.heartbeatCompleted = delegate.heartbeatCompleted;
         result.ready = delegate.ready;
         result.bindingsAbsent = [delegate.guestReport[@"bindingsAbsent"] boolValue];
         result.storageIsolated = !configuration.websiteDataStore.persistent && [delegate.guestReport[@"storageIsolated"] boolValue];

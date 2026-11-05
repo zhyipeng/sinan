@@ -1,5 +1,10 @@
 const send = message => window.webkit.messageHandlers.sinan.postMessage(message);
-window.runProbe = async target => {
+window.runProbe = target => {
+  if (document.body.dataset.fault === 'script') throw new Error('fixed probe failure');
+  if (document.body.dataset.fault === 'hang') { while (true) {} }
+  return runChecks(target);
+};
+const runChecks = async target => {
   const report = {
     bindingsAbsent: typeof window._wails === 'undefined' && typeof window.__WAILS__ === 'undefined',
     storageIsolated: false,
@@ -35,6 +40,6 @@ window.runProbe = async target => {
     }
     if (document.body.dataset.revoke === 'true') send({kind:'revoke'});
     send({kind:'close'});
-  }, 150);
+  }, document.body.dataset.fault === 'slow' ? 1400 : 150);
 };
 send({kind:'ready', version:1});

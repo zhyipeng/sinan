@@ -2,10 +2,12 @@
 
 #ifndef SINAN_UI_PROBE_H
 #define SINAN_UI_PROBE_H
+typedef enum { SinanUIFailureNone, SinanUIFailureScript, SinanUIFailureRenderer, SinanUIFailureNavigation, SinanUIFailureUnresponsive, SinanUIFailureDeadline } SinanUIFailure;
 typedef struct {
     int ready, bindingsAbsent, storageIsolated, ownResourceLoaded;
     int foreignResourceBlocked, navigationBlocked, networkBlocked;
     int invalidMessageRejected, closeReceived, budgetRevoked, lifecycleRevoked;
+    int failure, heartbeatCompleted;
 } SinanUIProbeReport;
 typedef struct SinanUIControl SinanUIControl;
 SinanUIControl *sinanUIControlNew(void);

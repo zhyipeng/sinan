@@ -50,3 +50,6 @@ ui-probe:
 	./bin/sinan-ui-probe
 	./bin/sinan-ui-probe -flood
 	./bin/sinan-ui-probe -revoke
+	./bin/sinan-ui-probe -fault script
+	./bin/sinan-ui-probe -fault hang
+	./bin/sinan-ui-probe -fault slow
