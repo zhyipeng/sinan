@@ -202,7 +202,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistentDataStore;
         [configuration setURLSchemeHandler:delegate forURLScheme:@"sinan-plugin"];
         [configuration.userContentController addScriptMessageHandler:delegate name:@"sinan"];
-        WKWebView *view = [[WKWebView alloc] initWithFrame:NSMakeRect(0,0,560,240) configuration:configuration];
+        WKWebView *view = [[WKWebView alloc] initWithFrame:(delegate.probe ? NSMakeRect(0,0,560,240) : NSMakeRect(0,0,640,480)) configuration:configuration];
         delegate.view = view;
         view.navigationDelegate = delegate;
         view.UIDelegate = delegate;

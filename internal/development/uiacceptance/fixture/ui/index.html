@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>窗口验收</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <main>
+    <header><h1>窗口验收</h1><span id="status" role="status">正在连接</span></header>
+    <label for="text">试试中文、英文和换行</label>
+    <textarea id="text" autofocus spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" placeholder="在这里输入…"></textarea>
+    <div class="input-state" aria-live="polite"><span id="composition">等待输入</span><span id="count">0 字符</span></div>
+    <footer>
+      <button id="clear" type="button">清空</button>
+      <button id="close" type="button">关闭窗口</button>
+      <button id="hang" class="danger" type="button">模拟卡死</button>
+    </footer>
+    <p id="hint">关闭后可从插件管理重新打开。</p>
+  </main>
+  <script src="main.js"></script>
+</body>
+</html>

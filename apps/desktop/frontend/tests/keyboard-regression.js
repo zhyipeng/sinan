@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan independent window regression');
+const task = await taskSpace('Sinan UI acceptance regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -242,6 +242,9 @@ await page.cdp('Emulation.setDeviceMetricsOverride',{width:640,height:800,device
 if(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth))throw new Error('Window actions overflow the launcher');
 console.log({windowScreenshot:await page.screenshot({path:'/tmp/sinan-ui-windows.png'})});
 console.log('PASS: independent window gate, changed/disabled package guards, declared view action and failure event');
+await page.goto('http://127.0.0.1:9245/tests/keyboard.html?acceptance=1');
+await page.waitForSelector('.management');
+console.log('PASS: temporary acceptance starts directly in plugin management');
 // A fresh page keeps the malformed display value away from earlier mutation assertions.
 await page.goto('http://127.0.0.1:9245/tests/keyboard.html');
 await page.waitForSelector('button[aria-label="管理插件"]');

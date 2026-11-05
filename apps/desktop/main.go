@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"sinan/internal/development/uiacceptance"
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/uiwindows"
 )
@@ -24,29 +26,66 @@ var appIcon []byte
 var trayIcon []byte
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	uiProbe := flag.Bool("ui-probe", false, "运行开发用 UI 隔离验证")
 	pluginUI := flag.Bool("plugin-ui", false, "启用开发期独立插件窗口")
+	acceptance := flag.Bool("ui-acceptance", false, "运行独立临时窗口验收环境")
+	acceptancePackages := flag.String("acceptance-packages", "plugins", "验收所需系统插件源码目录")
 	root := flag.String("plugins", "", "插件安装目录")
 	flag.Parse()
-	if *root == "" {
-		dir, err := os.UserConfigDir()
-		if err != nil {
-			log.Fatal("无法确定用户配置目录")
-		}
-		*root = filepath.Join(dir, "Sinan", "plugins")
+	if *acceptance && (*root != "" || *uiProbe) {
+		return errors.New("临时验收不能同时使用 -plugins 或 -ui-probe")
 	}
-	manager, err := kernel.New(*root)
-	if err != nil {
-		log.Fatal("无法初始化插件运行时：", err)
+	cleanupAcceptance := func() {}
+	var manager *kernel.Manager
+	if *acceptance {
+		if runtime.GOOS != "darwin" {
+			return errors.New("原生窗口验收目前仅支持 macOS")
+		}
+		env, err := uiacceptance.Prepare(*acceptancePackages)
+		if err != nil {
+			return err
+		}
+		defer env.Close()
+		cleanupAcceptance = env.Close
+		manager = env.Manager
+		*pluginUI = true
+		log.Print("临时窗口验收：在插件管理中找到「窗口验收」，点击「打开 input」。从验收实例托盘退出后自动清理。")
+		log.Print("Command + Space 若被日常实例占用，请先退出日常实例，或在验收实例的设置中修改快捷键。")
+	} else {
+		if *root == "" {
+			dir, err := os.UserConfigDir()
+			if err != nil {
+				return errors.New("无法确定用户配置目录")
+			}
+			*root = filepath.Join(dir, "Sinan", "plugins")
+		}
+		var err error
+		manager, err = kernel.New(*root)
+		if err != nil {
+			return err
+		}
 	}
 	defer manager.Close()
 	host := &HostService{manager: manager, probeEnabled: *uiProbe}
 	appURL := "/"
+	if *acceptance {
+		appURL = "/?acceptance=1"
+	}
 	if *uiProbe {
 		appURL = "/?isolation=1"
 	}
+	name := "Sinan"
+	if *acceptance {
+		name = "Sinan Acceptance"
+	}
 	app := application.New(application.Options{
-		Name:        "Sinan",
+		Name:        name,
 		Description: "插件驱动的桌面效率工具",
 		Icon:        appIcon,
 		Services:    []application.Service{application.NewService(host)},
@@ -58,6 +97,7 @@ func main() {
 				host.ui.Close()
 			}
 			manager.Close()
+			cleanupAcceptance()
 		},
 	})
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -115,7 +155,11 @@ func main() {
 			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
 		}, func(state ShortcutState) {
 			host.launcher.setShortcutError(state.Error)
-			tray.SetTooltip("司南 · " + state.Shortcut)
+			if *acceptance {
+				tray.SetTooltip("司南 · 临时验收 · " + state.Shortcut)
+			} else {
+				tray.SetTooltip("司南 · " + state.Shortcut)
+			}
 			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
 		})
 		// Register after startup so native conflicts are returned synchronously.
@@ -125,6 +169,7 @@ func main() {
 		})
 	}
 	if err := app.Run(); err != nil {
-		log.Fatal("桌面宿主运行失败")
+		return errors.New("桌面宿主运行失败")
 	}
+	return nil
 }

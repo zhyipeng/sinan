@@ -1,4 +1,4 @@
-.PHONY: setup bindings frontend build package run dev demo test ui-probe dev-ui
+.PHONY: setup bindings frontend build package run dev demo test ui-probe dev-ui ui-acceptance
 
 ifeq ($(shell go env GOOS),darwin)
 export CGO_CFLAGS += -mmacosx-version-min=12.0
@@ -61,3 +61,7 @@ ui-probe:
 	./bin/sinan-ui-probe -fault hang
 	./bin/sinan-ui-probe -fault slow
 	SINAN_NATIVE_UI_TEST=1 go test -race ./internal/plugin/uiwindows -run TestNativeHost
+
+# Disposable environment: never prepares or installs into .sinan-dev.
+ui-acceptance: build
+	./bin/sinan -ui-acceptance -acceptance-packages "$(CURDIR)/plugins"

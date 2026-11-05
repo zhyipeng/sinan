@@ -38,6 +38,7 @@ export default function App() {
   const commandRefs = useRef<(HTMLButtonElement | null)[]>([]);
   // Invalidates late UI results when a running command is dismissed and reopened.
   const generation = useRef(0);
+  const initialAcceptance = useRef(new URLSearchParams(window.location.search).get('acceptance') === '1');
 
   async function reload() {
     const snapshot = await Refresh();
@@ -144,6 +145,12 @@ export default function App() {
     if (!managerPlugin || !managerCommand) { openRecovery(); return; }
     generation.current++; setRecovery(false); setActive({plugin:managerPlugin,command:managerCommand}); setBusy(false); setOutput(''); setError('');
   }
+  useEffect(() => {
+    if (connected && initialAcceptance.current) {
+      initialAcceptance.current = false;
+      openManager();
+    }
+  }, [connected, managerPlugin, managerCommand]);
   useEffect(() => {
     if (active?.command.view && !data.plugins.some(plugin => !plugin.disabled && plugin.id === active.plugin.id && plugin.commands.some(command => command.id === active.command.id && command.view === active.command.view))) {
       generation.current++; setActive(undefined); setBusy(false); setOutput('');

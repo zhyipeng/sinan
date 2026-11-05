@@ -1,0 +1,18 @@
+:root { color-scheme: light; font-family: "PingFang SC", "Helvetica Neue", sans-serif; color: #29354e; background: #f6f7fb; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 760px; margin: 0 auto; padding: 22px 24px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+h1 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -.3px; }
+#status { font-size: 12px; color: #637392; }
+label { display: block; font-size: 13px; margin-bottom: 9px; }
+textarea { display: block; width: 100%; min-height: 136px; resize: vertical; padding: 12px; font: 16px/1.6 "PingFang SC", "Helvetica Neue", sans-serif; color: inherit; background: #fff; border: 1px solid #d8dfec; border-radius: 7px; }
+textarea:focus { outline: 2px solid #a3b8ed; outline-offset: 2px; }
+.input-state { display: flex; justify-content: space-between; margin-top: 10px; color: #637392; font-size: 12px; }
+footer { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+button { border: 1px solid #d8dfec; border-radius: 6px; padding: 8px 12px; background: #fff; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+button:focus-visible { outline: 2px solid #a3b8ed; outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+.danger { margin-left: auto; color: #a6444b; border-color: #e8cdd1; }
+p { font-size: 12px; line-height: 1.5; color: #637392; margin: 14px 0 0; }
+@media (max-width: 400px) { main { padding: 20px 16px; } .danger { margin-left: 0; } }
