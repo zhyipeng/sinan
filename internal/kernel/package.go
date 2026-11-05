@@ -138,6 +138,9 @@ func (m *Manager) PreviewPackage(source string) (PackagePreview, error) {
 		preview.InstalledVersion = old.manifest.Version
 		preview.InstalledFingerprint = old.fingerprint
 		installed, err := packageFingerprint(old.dir)
+		if err != nil || installed != old.fingerprint {
+			old.markUIChanged()
+		}
 		preview.Changed = err != nil || installed != digest || old.fingerprint != digest
 	}
 	return preview, nil

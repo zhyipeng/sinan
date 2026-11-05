@@ -75,6 +75,7 @@ func (m *Manager) SavePluginSettings(pluginID string, revision uint64, values ma
 	// Serialize snapshot replacement with activation. The next request initializes
 	// a new process with only this plugin's configuration namespace.
 	p.settings = settingsValues(p.manifest, saved.Values)
+	p.revokeViewsLocked()
 	if p.process != nil {
 		p.process.Stop()
 		p.process = nil

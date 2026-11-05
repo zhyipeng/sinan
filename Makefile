@@ -1,4 +1,4 @@
-.PHONY: setup bindings frontend build package run dev demo test
+.PHONY: setup bindings frontend build package run dev demo test ui-probe
 
 ifeq ($(shell go env GOOS),darwin)
 export CGO_CFLAGS += -mmacosx-version-min=12.0
@@ -43,3 +43,10 @@ demo: dev
 
 test: frontend
 	go test -race ./...
+
+ui-probe:
+	mkdir -p bin
+	go build -o bin/sinan-ui-probe ./apps/ui-probe
+	./bin/sinan-ui-probe
+	./bin/sinan-ui-probe -flood
+	./bin/sinan-ui-probe -revoke

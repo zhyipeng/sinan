@@ -16,6 +16,7 @@ import (
 
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/transport"
+	"sinan/internal/plugin/uiview"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
 )
@@ -39,6 +40,8 @@ type Snapshot struct {
 }
 
 type plugin struct {
+	views        map[*uiview.Session]struct{}
+	viewEpoch    uint64
 	disabled     bool
 	fingerprint  string
 	changed      bool
@@ -53,7 +56,8 @@ type plugin struct {
 }
 
 type Manager struct {
-	disabled           map[string]bool // Accessed under mutationMu.
+	views              map[*uiview.Session]struct{} // Accessed under mutationMu.
+	disabled           map[string]bool              // Accessed under mutationMu.
 	enablementErr      error
 	blockedUpgrades    map[string]bool
 	recoveryBlocked    bool
@@ -141,6 +145,9 @@ func (m *Manager) Refresh() Snapshot {
 		if old := oldPlugins[id]; old != nil {
 			old.mu.Lock()
 			old.changed = loadErr != nil || digest != old.fingerprint
+			if old.changed {
+				old.revokeViewsLocked()
+			}
 			old.mu.Unlock()
 			found[id] = old
 			if loadErr != nil {
@@ -180,6 +187,7 @@ func (m *Manager) Snapshot() Snapshot {
 			p.process.Stop()
 			p.process = nil
 			p.state = "failed"
+			p.revokeViewsLocked()
 		}
 		if !p.removed {
 			result.Plugins = append(result.Plugins, p.info())
@@ -358,6 +366,7 @@ func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Pro
 	if p.process != nil {
 		p.process.Stop()
 		p.process = nil
+		p.revokeViewsLocked()
 	}
 	if p.changed {
 		return nil, errors.New("插件文件已变化，请先重载")
@@ -405,6 +414,7 @@ func (p *plugin) failed(process *transport.Process) {
 		process.Stop()
 		p.process = nil
 		p.state = "failed"
+		p.revokeViewsLocked()
 	}
 }
 
@@ -533,6 +543,7 @@ func (p *plugin) stop(removed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.removed = p.removed || removed
+	p.revokeViewsLocked()
 	if p.process != nil {
 		p.process.Stop()
 		p.process = nil
@@ -541,6 +552,8 @@ func (p *plugin) stop(removed bool) {
 }
 
 func (m *Manager) Stop(id string) error {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
 	p, err := m.lookup(id)
 	if err != nil {
 		return err
@@ -582,6 +595,7 @@ func (m *Manager) Close() {
 	for _, p := range entries {
 		p.stop(true)
 	}
+	m.views = nil
 	m.active.Wait()
 	if m.lease != nil {
 		m.lease.Close()

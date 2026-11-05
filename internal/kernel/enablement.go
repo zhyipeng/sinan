@@ -76,6 +76,7 @@ func (m *Manager) SetPluginEnabled(id string, enabled bool) (PluginInfo, error) 
 		m.disabled[id] = true
 	}
 	p.disabled = !enabled
+	p.revokeViewsLocked()
 	if p.process != nil {
 		p.process.Stop()
 		p.process = nil

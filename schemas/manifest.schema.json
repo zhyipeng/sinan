@@ -155,6 +155,44 @@
               }
             }
           }
+        },
+        "uiViews": {
+          "type": "array",
+          "maxItems": 4,
+          "description": "受限 HTML 资源声明；不注册可信组件或开放 Shell 页面入口。",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "entry",
+              "bridgeVersion"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "entry": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(?!.*(?:^|/)\\.\\.?(?:/|$))(?:[A-Za-z0-9_.-]+/){0,8}[A-Za-z0-9_.-]*\\.html$",
+                "description": "相对于包内 ui/ 的规范 HTML 路径；禁止 URL、转义、符号链接。"
+              },
+              "bridgeVersion": {
+                "const": "1"
+              },
+              "permissions": {
+                "type": "array",
+                "maxItems": 0,
+                "items": {
+                  "type": "string"
+                },
+                "description": "默认无权限，当前桥拒绝所有非空请求；不继承原生后端用途声明。"
+              }
+            }
+          }
         }
       }
     },

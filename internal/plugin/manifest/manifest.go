@@ -35,15 +35,16 @@ type Runtime struct {
 }
 
 type Contributions struct {
- Settings []Setting `json:"settings,omitempty"`
-	Commands        []Command        `json:"commands"`
-	SearchProviders []SearchProvider `json:"searchProviders,omitempty"`
+	Settings        []Setting         `json:"settings,omitempty"`
+	Commands        []Command         `json:"commands"`
+	SearchProviders []SearchProvider  `json:"searchProviders,omitempty"`
+	UIViews         []protocol.UIView `json:"uiViews,omitempty"`
 }
 
 type Setting struct {
- ID string `json:"id"`
- Title string `json:"title"`
- Type string `json:"type"`
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
 }
 
 type SearchProvider struct {
@@ -53,7 +54,7 @@ type SearchProvider struct {
 }
 
 type Command struct {
- View string `json:"view,omitempty"`
+	View       string   `json:"view,omitempty"`
 	ID         string   `json:"id"`
 	Title      string   `json:"title"`
 	Keywords   []string `json:"keywords,omitempty"`
@@ -103,6 +104,16 @@ func (m Manifest) Validate() error {
 	if len(m.Contributes.Commands) == 0 {
 		return errors.New("插件至少需要提供一个命令")
 	}
+	if len(m.Contributes.UIViews) > 4 {
+		return errors.New("UI 视图数量超过限制")
+	}
+	views := map[string]bool{}
+	for _, view := range m.Contributes.UIViews {
+		if !ValidViewID(view.ID) || views[view.ID] || !ValidUIEntry(view.Entry) || view.BridgeVersion != protocol.UIBridgeVersion || len(view.Permissions) != 0 {
+			return errors.New("UI 视图声明无效、版本不兼容或请求了不支持的权限")
+		}
+		views[view.ID] = true
+	}
 	seen := map[string]bool{}
 	for _, c := range m.Contributes.Commands {
 		if c.Execution != "" && c.Execution != "direct" {
@@ -112,8 +123,10 @@ func (m Manifest) Validate() error {
 			return errors.New("命令 ID、标题无效或重复")
 		}
 		seen[c.ID] = true
-		if c.View!="" && (!commandPattern.MatchString(c.View) || c.Message!="" || c.Execution!="" || m.Runtime.Kind!="declarative") {return errors.New("视图命令声明无效")}
- if m.Runtime.Kind == "declarative" && c.Message == "" && c.View=="" {
+		if c.View != "" && (views[c.View] || !commandPattern.MatchString(c.View) || c.Message != "" || c.Execution != "" || m.Runtime.Kind != "declarative") {
+			return errors.New("视图命令声明无效")
+		}
+		if m.Runtime.Kind == "declarative" && c.Message == "" && c.View == "" {
 			return errors.New("声明式命令需要 message")
 		}
 		if m.Runtime.Kind == "process" && c.Message != "" {
@@ -128,13 +141,17 @@ func (m Manifest) Validate() error {
 			return errors.New("不支持的激活事件或未声明对应贡献")
 		}
 	}
-    if len(m.Contributes.Settings)>16{return errors.New("设置项数量超过限制")}
-    settingIDs:=map[string]bool{}
-    for _,setting:=range m.Contributes.Settings {
-      if !commandPattern.MatchString(setting.ID)||settingIDs[setting.ID]||strings.TrimSpace(setting.Title)==""||len(setting.Title)>128||setting.Type!="directory-list" {return errors.New("设置项声明无效或重复")}
-      settingIDs[setting.ID]=true
-    }
-    providers := map[string]bool{}
+	if len(m.Contributes.Settings) > 16 {
+		return errors.New("设置项数量超过限制")
+	}
+	settingIDs := map[string]bool{}
+	for _, setting := range m.Contributes.Settings {
+		if !commandPattern.MatchString(setting.ID) || settingIDs[setting.ID] || strings.TrimSpace(setting.Title) == "" || len(setting.Title) > 128 || setting.Type != "directory-list" {
+			return errors.New("设置项声明无效或重复")
+		}
+		settingIDs[setting.ID] = true
+	}
+	providers := map[string]bool{}
 	if len(m.Contributes.SearchProviders) > 8 {
 		return errors.New("搜索提供者数量超过限制")
 	}

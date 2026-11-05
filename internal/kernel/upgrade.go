@@ -72,6 +72,7 @@ func (m *Manager) applyPackage(source string, trustNative bool, expected string,
 	}
 	installedHash, hashErr := packageFingerprint(old.dir)
 	if hashErr != nil || installedHash != old.fingerprint {
+		old.markUIChanged()
 		return PluginInfo{}, errors.New("已安装文件已变化，请先重载或还原后升级")
 	}
 	if mf.Runtime.Kind == "process" && !trustNative {
@@ -217,7 +218,11 @@ func (m *Manager) reloadLocked(id string) (PluginInfo, error) {
 	}
 	mf, digest, err := loadPackage(old.dir)
 	if err != nil || mf.ID != id {
+		old.markUIChanged()
 		return PluginInfo{}, errors.New("插件包无效，已保留当前实例")
+	}
+	if digest != old.fingerprint {
+		old.markUIChanged()
 	}
 	candidate := m.packageInstance(mf, digest, old.dir)
 	if err = m.activateCandidate(candidate); err != nil {
