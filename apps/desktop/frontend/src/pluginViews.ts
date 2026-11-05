@@ -5,7 +5,7 @@ import { createElement, type ComponentType } from 'react';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled } from '../bindings/sinan/apps/desktop/hostservice';
+import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -13,13 +13,15 @@ export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> =
 };
 // These adapters are private to bundled trusted views, never passed to installed JS.
 const managementBridge: ManagementBridge = {
-  async refresh(){const data=await Refresh();return {plugins:data.plugins??[],diagnostics:data.diagnostics??[]};},
+  async refresh(){const [data,uiEnabled]=await Promise.all([Refresh(),PluginUIEnabled()]);return {plugins:data.plugins??[],diagnostics:data.diagnostics??[],uiEnabled};},
   async stop(id){await Stop(id);},
   async uninstall(id){await Uninstall(id);},
   async reload(id){return await Reload(id);},
   async inspect(directory){return await PreviewPackage(directory);},
   async apply(directory,trust,fingerprint,installedFingerprint){return await ApplyPackage(directory,trust,fingerprint,installedFingerprint);},
   async setEnabled(id,enabled){return await SetPluginEnabled(id,enabled);},
+  async openView(id,viewID){await OpenPluginView(id,viewID);},
+  subscribeWindows(failed){return Events.On('ui:closed',event=>{if((event.data as {failed?:boolean}).failed)failed();});},
 };
 function normalize(value: {revision: number; values: Record<string, string[] | null | undefined> | null}): SettingsSnapshot {
   return { revision: value.revision, values: Object.fromEntries(Object.entries(value.values ?? {}).map(([key, paths]) => [key, paths ?? []])) };

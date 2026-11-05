@@ -4,6 +4,9 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as manifest$0 from "../plugin/manifest/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 
 export interface PackagePreview {
     "installedFingerprint": string;
@@ -17,6 +20,7 @@ export interface PackagePreview {
 }
 
 export interface PluginInfo {
+    "uiViews"?: protocol$0.UIView[] | null;
     "disabled": boolean;
     "changed": boolean;
     "settings"?: manifest$0.Setting[] | null;

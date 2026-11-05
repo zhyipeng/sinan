@@ -5,3 +5,15 @@ export interface CommandResult {
     "text": string;
     "dismiss"?: boolean;
 }
+
+/**
+ * UIView declares resources only. It does not grant host capabilities or make
+ * an HTML command available in the trusted Shell. Permissions default to none;
+ * this first bridge version rejects every nonempty permission request.
+ */
+export interface UIView {
+    "id": string;
+    "entry": string;
+    "bridgeVersion": string;
+    "permissions"?: string[] | null;
+}

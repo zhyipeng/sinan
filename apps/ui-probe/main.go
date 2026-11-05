@@ -20,8 +20,8 @@ import (
 
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/manifest"
+	"sinan/internal/plugin/uihost"
 	"sinan/internal/plugin/uiprocess"
-	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -30,36 +30,16 @@ var fixture embed.FS
 
 func init() { runtime.LockOSThread() }
 
-type viewSession interface {
-	Active() bool
-	Resource(string) (uiview.Resource, bool)
-	Message([]byte) (uiview.Action, error)
-	Revoke()
-	OnRevoke(func()) func()
-}
-
 type report struct {
-	Failure                string `json:"failure,omitempty"`
-	HeartbeatCompleted     bool   `json:"heartbeatCompleted"`
-	SeparateProcess        bool   `json:"separateProcess"`
-	ChildReaped            bool   `json:"childReaped"`
-	StartupHandshake       bool   `json:"startupHandshake"`
-	Ready                  bool   `json:"ready"`
-	BindingsAbsent         bool   `json:"bindingsAbsent"`
-	StorageIsolated        bool   `json:"storageIsolated"`
-	OwnResourceLoaded      bool   `json:"ownResourceLoaded"`
-	ForeignResourceBlocked bool   `json:"foreignResourceBlocked"`
-	NavigationBlocked      bool   `json:"navigationBlocked"`
-	NetworkBlocked         bool   `json:"networkBlocked"`
-	InvalidMessageRejected bool   `json:"invalidMessageRejected"`
-	CloseReceived          bool   `json:"closeReceived"`
-	HTTPControl            bool   `json:"httpControl"`
-	NoEscapeRequests       bool   `json:"noEscapeRequests"`
-	BudgetRevoked          bool   `json:"budgetRevoked"`
-	LifecycleRevoked       bool   `json:"lifecycleRevoked"`
-	SessionRevoked         bool   `json:"sessionRevoked"`
-	StaleResourceDenied    bool   `json:"staleResourceDenied"`
-	StaleMessageDenied     bool   `json:"staleMessageDenied"`
+	uihost.Report
+	SeparateProcess     bool `json:"separateProcess"`
+	ChildReaped         bool `json:"childReaped"`
+	StartupHandshake    bool `json:"startupHandshake"`
+	HTTPControl         bool `json:"httpControl"`
+	NoEscapeRequests    bool `json:"noEscapeRequests"`
+	SessionRevoked      bool `json:"sessionRevoked"`
+	StaleResourceDenied bool `json:"staleResourceDenied"`
+	StaleMessageDenied  bool `json:"staleMessageDenied"`
 }
 
 func (r report) passed(flood, revoke bool) bool {
@@ -213,14 +193,8 @@ func runChild() bool {
 	}
 	defer client.Close()
 	init := client.Init()
-	data, err := json.Marshal(struct {
-		Entry string `json:"entry"`
-		CSP   string `json:"csp"`
-	}{init.Entry, init.CSP})
-	if err != nil {
-		return false
-	}
-	result, err := runNative(data, init.ProbeTarget, client, client.ProbeDisable)
+	native, err := uihost.Run(uihost.Config{Entry: init.Entry, CSP: init.CSP, Target: init.ProbeTarget, Probe: true, Title: "司南 UI 边界验证", DeadlineSeconds: 8}, client, client.ProbeDisable)
+	result := report{Report: native}
 	if err != nil {
 		return false
 	}

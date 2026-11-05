@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan plugin enablement regression');
+const task = await taskSpace('Sinan independent window regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -220,6 +220,28 @@ await page.click(query);
 await page.keyboard.press('Enter');
 await page.waitForSelector('.management');
 console.log('PASS: plugin management command, stop, uninstall, self-uninstall and independent recovery');
+// Independent windows stay behind a runtime gate, never a trusted view import.
+await page.goto('http://127.0.0.1:9245/tests/keyboard.html');
+await page.waitForSelector('button[aria-label="管理插件"]');
+await page.click('button[aria-label="管理插件"]');
+await page.waitForSelector('.management');
+if(await page.evaluate(()=>!!document.querySelector('[aria-label="打开 Fixture main"]')))throw new Error('UI gate was bypassed');
+await page.evaluate(()=>window.navigationFixture.enableUI());
+await page.click('loc=role:button[name="刷新"]');
+await page.waitForSelector('[aria-label="打开 Fixture main"]');
+if(!await page.evaluate(()=>document.querySelector('[aria-label="打开 Fixture main"]').disabled))throw new Error('Changed package view was enabled');
+await page.click('loc=role:button[name="重载 Fixture"]');
+await page.waitForFunction(()=>!document.querySelector('[aria-label="打开 Fixture main"]').disabled);
+await page.click('[aria-label="打开 Fixture main"]');
+await page.waitForFunction(()=>window.navigationFixture.counts().openedViews===1);
+await page.evaluate(()=>window.navigationFixture.failWindow());
+await page.waitForFunction(()=>document.querySelector('[role="alert"]')?.textContent.includes('插件窗口异常退出'));
+await page.click('loc=role:button[name="禁用 Fixture"]');
+await page.waitForFunction(()=>document.querySelector('[aria-label="打开 Fixture main"]').disabled);
+await page.cdp('Emulation.setDeviceMetricsOverride',{width:640,height:800,deviceScaleFactor:1,mobile:false});
+if(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth))throw new Error('Window actions overflow the launcher');
+console.log({windowScreenshot:await page.screenshot({path:'/tmp/sinan-ui-windows.png'})});
+console.log('PASS: independent window gate, changed/disabled package guards, declared view action and failure event');
 // A fresh page keeps the malformed display value away from earlier mutation assertions.
 await page.goto('http://127.0.0.1:9245/tests/keyboard.html');
 await page.waitForSelector('button[aria-label="管理插件"]');

@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"sinan/internal/kernel"
+	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/search"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
@@ -15,6 +17,8 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	ui             *uiwindows.Controller
+	uiError        string
 	shortcuts      *shortcutController
 	probeEnabled   bool
 	manager        *kernel.Manager
@@ -24,8 +28,14 @@ type HostService struct {
 	searchCancel   context.CancelFunc
 }
 
-func (h *HostService) Snapshot() kernel.Snapshot { return h.manager.Snapshot() }
-func (h *HostService) Refresh() kernel.Snapshot  { return h.manager.Refresh() }
+func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
+func (h *HostService) Refresh() kernel.Snapshot  { return h.uiDiagnostics(h.manager.Refresh()) }
+func (h *HostService) uiDiagnostics(snapshot kernel.Snapshot) kernel.Snapshot {
+	if h.uiError != "" {
+		snapshot.Diagnostics = append(snapshot.Diagnostics, h.uiError)
+	}
+	return snapshot
+}
 func (h *HostService) Install(directory string, trustNative bool) (kernel.PluginInfo, error) {
 	return h.manager.Install(directory, trustNative)
 }
@@ -177,3 +187,12 @@ func (h *HostService) SetPluginEnabled(pluginID string, enabled bool) (kernel.Pl
 	defer h.cancelSearch()
 	return h.manager.SetPluginEnabled(pluginID, enabled)
 }
+
+// OpenPluginView is only bound to the trusted Shell; the child gets no Wails bridge.
+func (h *HostService) OpenPluginView(pluginID, viewID string) error {
+	if h.ui == nil {
+		return errors.New("独立插件窗口尚未启用")
+	}
+	return h.ui.Open(pluginID, viewID)
+}
+func (h *HostService) PluginUIEnabled() bool { return h.ui != nil }

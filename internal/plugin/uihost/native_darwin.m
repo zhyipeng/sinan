@@ -14,13 +14,14 @@ SinanUIControl *sinanUIControlNew(void) {
 void sinanUIControlRevoke(SinanUIControl *control) { atomic_store(&control->revoked, true); }
 void sinanUIControlFree(SinanUIControl *control) { free(control); }
 
-@interface SinanUIProbe : NSObject <WKNavigationDelegate, WKUIDelegate, WKURLSchemeHandler, WKScriptMessageHandler>
+@interface SinanUIProbe : NSObject <WKNavigationDelegate, WKUIDelegate, WKURLSchemeHandler, WKScriptMessageHandler, NSWindowDelegate>
 @property unsigned long long handle;
 @property SinanUIControl *control;
 @property NSString *entry;
 @property NSString *csp;
 @property NSString *target;
 @property WKWebView *view;
+@property BOOL probe;
 @property BOOL initialNavigation;
 @property BOOL ready;
 @property BOOL closeReceived;
@@ -71,6 +72,20 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
         else probe.heartbeatCompleted = YES;
     }];
 }
+- (void)windowWillClose:(NSNotification *)notification {
+    if (self.done) return;
+    if (self.ready) {
+        const char *close = "{\"kind\":\"close\"}";
+        self.closeReceived = sinanUISessionMessage(self.handle, (char *)close, (int)strlen(close)) == 2;
+    }
+    sinanUISessionRevoke(self.handle);
+    self.done = YES;
+}
+- (void)webView:(WKWebView *)webView runJavaScriptAlertPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(void))completionHandler { completionHandler(); }
+- (void)webView:(WKWebView *)webView runJavaScriptConfirmPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completionHandler { completionHandler(NO); }
+- (void)webView:(WKWebView *)webView runJavaScriptTextInputPanelWithPrompt:(NSString *)prompt defaultText:(NSString *)defaultText initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSString *))completionHandler { completionHandler(nil); }
+- (void)webView:(WKWebView *)webView runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSArray<NSURL *> *))completionHandler { completionHandler(nil); }
+- (void)webView:(WKWebView *)webView requestMediaCapturePermissionForOrigin:(WKSecurityOrigin *)origin initiatedByFrame:(WKFrameInfo *)frame type:(WKMediaCaptureType)type decisionHandler:(void (^)(WKPermissionDecision))decisionHandler { decisionHandler(WKPermissionDecisionDeny); }
 - (BOOL)revoked { return self.handle == 0 || atomic_load(&self.control->revoked); }
 - (void)webView:(WKWebView *)webView startURLSchemeTask:(id<WKURLSchemeTask>)task {
     NSString *url = task.request.URL.absoluteString;
@@ -132,12 +147,13 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
     if ([body[@"kind"] isEqual:@"ready"] && body.count == 2 && !self.ready && [body[@"version"] isKindOfClass:NSNumber.class] && CFGetTypeID((__bridge CFTypeRef)body[@"version"]) != CFBooleanGetTypeID() && [body[@"version"] doubleValue] == 1) {
         if (sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length) != 1) { self.rejected++; return; }
         self.ready = YES;
+        if (!self.probe) return;
         NSData *target = [NSJSONSerialization dataWithJSONObject:@[self.target] options:0 error:nil];
         NSString *argument = [[NSString alloc] initWithData:target encoding:NSUTF8StringEncoding];
         [self.view evaluateJavaScript:[NSString stringWithFormat:@"void window.runProbe((%@)[0]);", argument] completionHandler:^(id result, NSError *error) { if (error) [self fail:SinanUIFailureScript]; }];
         return;
     }
-    if (self.ready && [body[@"kind"] isEqual:@"report"] && body.count == 2 && !self.guestReport && [body[@"report"] isKindOfClass:NSDictionary.class]) {
+    if (self.probe && self.ready && [body[@"kind"] isEqual:@"report"] && body.count == 2 && !self.guestReport && [body[@"report"] isKindOfClass:NSDictionary.class]) {
         NSDictionary *report = body[@"report"];
         NSArray *keys = @[@"bindingsAbsent",@"storageIsolated",@"ownResourceLoaded",@"networkBlocked"];
         if (report.count != keys.count) { self.rejected++; return; }
@@ -150,14 +166,14 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
     }
     // Fixed diagnostic action only: it is not part of Session.Message and does
     // not accept a page-provided plugin ID or any other host operation.
-    if (self.ready && self.guestReport && [body[@"kind"] isEqual:@"revoke"] && body.count == 1) {
+    if (self.probe && self.ready && self.guestReport && [body[@"kind"] isEqual:@"revoke"] && body.count == 1) {
         self.lifecycleRevoked = sinanUIProbeDisable(self.handle) == 1 && self.revoked;
         self.bridgeRevoked = YES;
         self.done = YES;
         [controller removeScriptMessageHandlerForName:@"sinan"];
         return;
     }
-    if (self.ready && self.guestReport && [body[@"kind"] isEqual:@"close"] && body.count == 1) {
+    if (self.ready && (!self.probe || self.guestReport) && [body[@"kind"] isEqual:@"close"] && body.count == 1) {
         if (sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length) == 2) { self.closeReceived = YES; self.done = YES; return; }
     } else {
         (void)sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length);
@@ -173,10 +189,11 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         NSDictionary *bundle = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         if (![bundle isKindOfClass:NSDictionary.class]) return result;
         [NSApplication sharedApplication];
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        [NSApp setActivationPolicy:[bundle[@"probe"] boolValue] ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular];
         [NSApp finishLaunching];
         SinanUIProbe *delegate = [SinanUIProbe new];
         delegate.entry = bundle[@"entry"];
+        delegate.probe = [bundle[@"probe"] boolValue];
         delegate.handle = handle;
         delegate.control = control;
         delegate.csp = bundle[@"csp"];
@@ -189,14 +206,17 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         delegate.view = view;
         view.navigationDelegate = delegate;
         view.UIDelegate = delegate;
-        NSWindow *window = [[NSWindow alloc] initWithContentRect:view.frame styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
-        window.title = @"司南 UI 边界验证";
+        NSWindow *window = [[NSWindow alloc] initWithContentRect:view.frame styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+        window.title = bundle[@"title"];
+        window.delegate = delegate;
         window.releasedWhenClosed = NO;
         window.contentView = view;
         [window center];
-        [window orderFront:nil];
+        if (delegate.probe) [window orderFront:nil];
+        else { [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES]; [window makeFirstResponder:view]; }
         [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:delegate.entry]]];
-        NSTimeInterval deadline = NSProcessInfo.processInfo.systemUptime + 8;
+        NSTimeInterval seconds = [bundle[@"deadlineSeconds"] doubleValue];
+        NSTimeInterval deadline = seconds > 0 ? NSProcessInfo.processInfo.systemUptime + seconds : INFINITY;
         while (!delegate.done && NSProcessInfo.processInfo.systemUptime < deadline) {
             [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
             [delegate checkResponsiveness];
@@ -229,6 +249,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         view.navigationDelegate = nil;
         view.UIDelegate = nil;
         delegate.view = nil;
+        window.delegate = nil;
         [window close];
         return result;
     }

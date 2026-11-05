@@ -1,6 +1,6 @@
 //go:build darwin && !ios && cgo
 
-package main
+package uihost
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
@@ -17,13 +17,15 @@ import (
 	"unsafe"
 )
 
-func runNative(data []byte, target string, session viewSession, disable func() error) (report, error) {
+const Supported = true
+
+func runNative(data []byte, target string, session Session, disable func() error) (Report, error) {
 	if !session.Active() {
-		return report{}, errors.New("UI 会话已撤销")
+		return Report{}, errors.New("UI 会话已撤销")
 	}
 	control := C.sinanUIControlNew()
 	if control == nil {
-		return report{}, errors.New("无法创建 UI 撤销信号")
+		return Report{}, errors.New("无法创建 UI 撤销信号")
 	}
 	handle := cgo.NewHandle(&nativeBinding{session: session, disable: disable})
 	var gateMu sync.Mutex
@@ -52,5 +54,5 @@ func runNative(data []byte, target string, session viewSession, disable func() e
 	if !known {
 		failure = "unknown"
 	}
-	return report{Failure: failure, HeartbeatCompleted: r.heartbeatCompleted != 0, Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
+	return Report{Failure: failure, HeartbeatCompleted: r.heartbeatCompleted != 0, Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
 }

@@ -22,6 +22,7 @@ import (
 )
 
 type PluginInfo struct {
+	UIViews         []protocol.UIView         `json:"uiViews,omitempty"`
 	Disabled        bool                      `json:"disabled"`
 	Changed         bool                      `json:"changed"`
 	Settings        []manifest.Setting        `json:"settings,omitempty"`
@@ -203,7 +204,7 @@ func (p *plugin) info() PluginInfo {
 	if p.disabled {
 		state = "disabled"
 	}
-	return PluginInfo{Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	return PluginInfo{UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.

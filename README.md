@@ -23,9 +23,9 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 - 宿主 CLI、协议类型、Go 插件 SDK，以及应用检索与设置系统插件。
 - 宿主搜索协调、静态命令索引、动态来源并行合并、请求取消及来源失败隔离。
 - 配置服务、可信设置组件插件、额外应用目录及桌面历史清除入口。
-- 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；尚未开放第三方 UI 加载。
+- 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；尚未开放默认启用的第三方 UI 加载。
 
-首版 macOS 应用检索插件已实现名称匹配、应用图标与直接启动。设置插件支持目录、历史清除和快捷键；本地插件管理界面由 `system.plugin-manager` 提供。SQLite、第三方插件 UI、插件市场和远程更新尚未实现。
+首版 macOS 应用检索插件已实现名称匹配、应用图标与直接启动。设置插件支持目录、历史清除和快捷键；本地插件管理界面由 `system.plugin-manager` 提供。独立插件 UI 已有 macOS 开发入口，默认关闭；SQLite、插件市场和远程更新尚未实现。
 
 ## 搜索交互
 
@@ -93,9 +93,20 @@ make ui-probe
 
 该命令依次检查正常关闭、消息洪泛、禁用插件，以及脚本调用错误、JavaScript 卡死、可响应慢页面六种模式。它把编译进程序的固定测试夹具安装到独立临时根目录，使用非持久 WKWebView、自定义资源 Scheme 和导航决策代理，不读取日常插件目录。父进程持有内核会话，独立客体进程通过会话专属 stdio 管道逐次读取资源，不复制整包资源。启动须完成管道与页面握手，撤销后通知退出，超时强制终止并回收。每次自动关闭验证窗口，只输出固定诊断字段；正常模式接受 close，洪泛模式 `budgetRevoked=true`，禁用模式 `lifecycleRevoked=true`；各模式均应退出 0，且旧资源和消息都被拒绝，`separateProcess`、`childReaped` 和 `startupHandshake` 均为 true。正对照 HTTP 服务可访问，客体的网络和导航尝试不得到达该服务。故障模式额外输出 `failure=script-error` 或 `failure=unresponsive`，检查会话失效后在同一内核打开正常客体；慢页面须完成原生响应探测后正常关闭。故障与响应预算见 [ADR 0016](docs/adr/0016-ui-renderer-failure-probes.md)。命令目前要求 macOS+cgo，基础验证见 [ADR 0012](docs/adr/0012-native-ui-boundary-probe.md)，会话接入见 [ADR 0013](docs/adr/0013-ui-session-revocation.md)，进程监督见 [ADR 0014](docs/adr/0014-ui-guest-supervision.md)。
 
-可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和空权限列表；内核准备接口只接受已声明视图 ID。此声明尚不提供正常 Shell 中的第三方 HTML 入口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
+可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和空权限列表；内核准备接口只接受已声明视图 ID。Shell 不加载第三方 HTML；开发期可通过插件管理打开独立窗口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
 
 内核会话准备接口固定读取已安装包的 `ui/` 子目录，绑定插件实例、包指纹、声明视图 ID 和桥版本，资源加载前后检查包内容。停止、禁用、重载、升级、卸载、配置保存及检测到包文件变化时撤销会话；回退相同包也不会让旧句柄复活。外部文件变化在刷新或打开会话等校验点发现，尚无文件监听。每插件最多 4 个、每宿主最多 16 个活动会话，此接口不暴露给 Wails 或插件进程。
+
+## 独立插件窗口（开发期）
+
+```sh
+make dev-ui
+# 已构建时：./bin/sinan -plugins .sinan-dev/plugins -plugin-ui
+```
+
+默认启动不启用。开启后，在插件管理中可打开包内 `contributes.uiViews` 声明的视图；不会自动安装测试插件。若日常实例正在运行，先通过托盘退出，再启动开发实例。`make build` 构建固定的 `sinan-ui-host`，`make package` 将它一并放入应用包；缺少它时保留 Shell 并显示诊断。
+
+客体窗口可关闭、缩放、输入；关闭、插件停用或宿主退出会撤销并回收。原生自动测试已覆盖页面焦点、普通关闭、拒绝探测动作与运行超过 8 秒；中文输入法和全屏焦点尚需实机验证。没有操作系统沙箱或 CPU/内存硬配额，目前不适合公共第三方分发。见 [ADR 0017](docs/adr/0017-desktop-plugin-windows.md)。
 
 ## 应用检索
 

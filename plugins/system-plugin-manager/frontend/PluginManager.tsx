@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
-export type ManagedPlugin = {id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean};
-export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]};
+export type ManagedPlugin = {id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string}[] | null};
+export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]; uiEnabled?: boolean};
 export type PackagePreview = {id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean};
 export type ManagementBridge = {
   refresh(): Promise<ManagedSnapshot>;
@@ -11,6 +11,8 @@ export type ManagementBridge = {
   inspect(directory: string): Promise<PackagePreview>;
   apply(directory: string, trust: boolean, fingerprint: string, installedFingerprint: string): Promise<unknown>;
   setEnabled(id:string,enabled:boolean):Promise<unknown>;
+  openView?(id:string,viewID:string):Promise<void>;
+  subscribeWindows?(failed:()=>void):()=>void;
 };
 const states: Record<string,string> = {installed:'已安装',activating:'启动中',activated:'已激活',running:'运行中',deactivated:'已停止',failed:'运行失败',disabled:'已禁用'};
 
@@ -31,6 +33,8 @@ export default function PluginManager({bridge, onChanged, onRecover}: {bridge: M
       .finally(()=>{if(current)setBusy(false);});
     return ()=>{current=false;alive.current=false;};
   },[bridge]);
+
+  useEffect(()=>bridge.subscribeWindows?.(()=>setError('插件窗口异常退出，请重试。')),[bridge]);
 
   async function perform(action:()=>Promise<unknown>, message='') {
     if(pending.current)return;
@@ -61,6 +65,7 @@ export default function PluginManager({bridge, onChanged, onRecover}: {bridge: M
           <button className="danger" disabled={busy} aria-label={`卸载 ${plugin.name}`} onClick={()=>void perform(()=>bridge.uninstall(plugin.id))}>卸载</button>
           <button disabled={busy} aria-label={`重载 ${plugin.name}`} onClick={()=>void perform(()=>bridge.reload(plugin.id))}>重载</button>
           <button disabled={busy} aria-label={`${plugin.disabled?'启用':'禁用'} ${plugin.name}`} onClick={()=>void perform(()=>bridge.setEnabled(plugin.id,!!plugin.disabled))}>{plugin.disabled?'启用':'禁用'}</button>
+          {data.uiEnabled&&plugin.uiViews?.map(view=><button key={view.id} disabled={busy||plugin.disabled||plugin.changed} aria-label={`打开 ${plugin.name} ${view.id}`} onClick={()=>void perform(()=>bridge.openView!(plugin.id,view.id))}>打开 {view.id}</button>)}
         </div>
       </div>)}
       {!busy&&!data.plugins.length&&<p className="empty">还没有插件，从本地目录安装一个。</p>}

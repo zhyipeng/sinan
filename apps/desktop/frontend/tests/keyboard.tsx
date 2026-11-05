@@ -23,9 +23,10 @@ let config={revision:0,values:{directories:[] as string[]}};
 let shortcut={shortcut:'Cmd+Space',active:'Cmd+Space',default:'Cmd+Space',revision:0,error:'',ready:true};
 let recording=false;
 let managerPresent=true, fixturePresent=true, managerRestores=0, stops=0, uninstalls=0;
+let uiEnabled=false, openedViews=0;
 let brokenName=false;
 let failEnablement=false;
-const plugin = {disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
+const plugin = {uiViews:[{id:'main',entry:'index.html',bridgeVersion:'1'},{id:'a'.repeat(64),entry:'other.html',bridgeVersion:'1'}],disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
 const settingsPlugin={disabled:false,...settingsManifest,kind:'declarative',state:'installed',commands:settingsManifest.contributes.commands};
 const managerPlugin={disabled:false,...managerManifest,kind:'declarative',state:'installed',commands:managerManifest.contributes.commands};
 const appPlugin={disabled:false,id:'system.app-search',name:'应用检索',version:'0.4.0',kind:'process',state:'installed',commands:[],settings:[{id:'directories',title:'额外应用目录',type:'directory-list'}]};
@@ -43,7 +44,9 @@ const fixture = {
   complete() { done=true; publish(); },
   refresh() { publish(); },
   mutatePackage() { sourceFingerprint="c".repeat(64); },
-  counts() { return {executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
+  counts() { return {openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
+  enableUI(){uiEnabled=true;},
+  failWindow(){window._wails.dispatchWailsEvent({name:'ui:closed',data:{pluginId:plugin.id,viewId:'main',failed:true}});},
   failNextToggle() {failEnablement=true;},
   breakManager() { brokenName=true; },
   repairFixture() {brokenName=false;},
@@ -53,6 +56,10 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 1572518711:return uiEnabled;
+    case 188677181:
+      if(!uiEnabled||plugin.disabled||plugin.changed||args.args[0]!==plugin.id||args.args[1]!=='main')throw new Error('视图不可用');
+      openedViews++;return;
     case 2914360659: case 2382139382:return {plugins:[...(fixturePresent?[{...plugin,name:brokenName?{invalid:true}:plugin.name}]:[]),settingsPlugin,appPlugin,...(managerPresent?[managerPlugin]:[])],diagnostics:[]};
     case 1864886877:return '';
     case 3261602732:return shortcut;

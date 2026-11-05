@@ -51,8 +51,8 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .error { color: #ac3f43; background: #fff0f0; padding: 12px 14px; margin: 8px 12px 12px; border-radius: 7px; font-size: 12px; overflow-wrap: anywhere; }
 .plugin { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .plugin:first-child { padding-top: 0; }
-.plugin-actions { display: flex; gap: 4px; }
-.plugin-actions button { font-size: 12px; }
+.plugin-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 70%; }
+.plugin-actions button { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .danger { color: #a44c52; }
 .install { margin-top: 24px; }
 .install > label:first-child { font-size: 13px; font-weight: 550; }

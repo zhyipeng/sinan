@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"sinan/internal/kernel"
+	"sinan/internal/plugin/uiwindows"
 )
 
 //go:embed all:frontend/dist
@@ -23,6 +25,7 @@ var trayIcon []byte
 
 func main() {
 	uiProbe := flag.Bool("ui-probe", false, "运行开发用 UI 隔离验证")
+	pluginUI := flag.Bool("plugin-ui", false, "启用开发期独立插件窗口")
 	root := flag.String("plugins", "", "插件安装目录")
 	flag.Parse()
 	if *root == "" {
@@ -49,7 +52,13 @@ func main() {
 		Services:    []application.Service{application.NewService(host)},
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
-		OnShutdown:  func() { host.cancelSearch(); manager.Close() },
+		OnShutdown: func() {
+			host.cancelSearch()
+			if host.ui != nil {
+				host.ui.Close()
+			}
+			manager.Close()
+		},
 	})
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "launcher", Title: "司南", Width: launcherWidth, Height: launcherMinHeight,
@@ -82,6 +91,24 @@ func main() {
 			go func() { _ = host.shortcuts.Record(false) }()
 		}
 	})
+	if *pluginUI && !*uiProbe {
+		executable, err := os.Executable()
+		if runtime.GOOS != "darwin" {
+			host.uiError = "独立插件窗口目前仅支持 macOS"
+		} else if err != nil {
+			host.uiError = "无法确定 UI 客体程序位置"
+		} else {
+			controller, err := uiwindows.New(manager, filepath.Join(filepath.Dir(executable), "sinan-ui-host"), func(event uiwindows.Event) {
+				window.DispatchWailsEvent(&application.CustomEvent{Name: "ui:closed", Data: event, Sender: "kernel.ui"})
+			})
+			if err != nil {
+				host.uiError = err.Error()
+			} else {
+				host.ui = controller
+				defer controller.Close()
+			}
+		}
+	}
 	if !*uiProbe {
 		tray := configureTray(app, host.launcher)
 		host.shortcuts = newShortcutController(manager, app.GlobalShortcut, host.launcher.toggle, func(value string) {

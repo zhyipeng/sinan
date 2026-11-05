@@ -53,10 +53,21 @@ export function LauncherStatus(): $CancellablePromise<string> {
 }
 
 /**
+ * OpenPluginView is only bound to the trusted Shell; the child gets no Wails bridge.
+ */
+export function OpenPluginView(pluginID: string, viewID: string): $CancellablePromise<void> {
+    return $Call.ByID(188677181, pluginID, viewID);
+}
+
+/**
  * Configuration methods are exposed only to the trusted Shell and bundled views.
  */
 export function PluginSettings(pluginID: string): $CancellablePromise<storage$0.SettingsSnapshot> {
     return $Call.ByID(2611427045, pluginID);
+}
+
+export function PluginUIEnabled(): $CancellablePromise<boolean> {
+    return $Call.ByID(1572518711);
 }
 
 export function PreviewPackage(directory: string): $CancellablePromise<kernel$0.PackagePreview> {

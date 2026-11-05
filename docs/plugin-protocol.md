@@ -122,16 +122,16 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 
 ## 内部 UI 会话准备接口
 
-内核 `OpenUIView(ctx, pluginId, viewId)` 目前仅供内部开发宿主验证，读取已安装包固定的 `ui/` 子目录；它不是 Wails 方法或进程 RPC，不会因为某个页面提交插件 ID 就授予会话。
+内核 `OpenUIView(ctx, pluginId, viewId)` 供宿主窗口控制器和内部开发验证使用，读取已安装包固定的 `ui/` 子目录；它不是 Wails 方法或进程 RPC，不会因为某个页面提交插件 ID 就授予会话。
 
 会话由宿主对象身份确定归属，绑定已安装实例、指纹、声明的视图 ID 和桥版本，仅支持资源读取、单次 `{"kind":"ready","version":1}` 及 `{"kind":"close"}`。额外/重复字段、重复握手、其他动作和页面自报身份被拒绝。消息上限 4 KiB、每会话最多 32 条，超限撤销；最多每插件 4 个、每宿主 16 个活动会话。
 
-生命周期操作和检测到包变化时撤销会话。旧句柄随后不能读取资源、重放消息或因重装/回退到相同指纹而复活。原生验证宿主每次 Scheme 请求都通过该会话，不保存整包资源副本；父进程立即拒绝后续资源与消息，子进程通过异步通知关闭原生入口，超时终止回收。此前交付的字节不能收回。开发验证通过会话专属 stdio 管道接入独立原生客体：管道不接受页面选择归属，支持 hello / ready、逐次资源读取、撤销和退出回收；这不是插件后端 RPC，也未开放执行、设置等 Host API。帧、请求次数、累计资源和运行时长均受预算限制。进程监督细节见 [ADR 0014](adr/0014-ui-guest-supervision.md)，公开 API 仍待设计。stdio API 1 保持不变。详见 [ADR 0013](adr/0013-ui-session-revocation.md)。
+生命周期操作和检测到包变化时撤销会话。旧句柄随后不能读取资源、重放消息或因重装/回退到相同指纹而复活。原生验证宿主每次 Scheme 请求都通过该会话，不保存整包资源副本；父进程立即拒绝后续资源与消息，子进程通过异步通知关闭原生入口，超时终止回收。此前交付的字节不能收回。开发验证通过会话专属 stdio 管道接入独立原生客体：管道不接受页面选择归属，支持 hello / ready、逐次资源读取、撤销和退出回收；这不是插件后端 RPC，也未开放执行、设置等 Host API。帧、请求次数、累计资源和运行时长均受预算限制。进程监督细节见 [ADR 0014](adr/0014-ui-guest-supervision.md)，桌面开发入口见 [ADR 0017](adr/0017-desktop-plugin-windows.md)，面向公共分发的 API 仍待完善。stdio API 1 保持不变。详见 [ADR 0013](adr/0013-ui-session-revocation.md)。
 
 
 ## 受限 UI 资源声明
 
-Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供资源元数据；普通 Shell 尚无 HTML 命令入口。`commands[].view` 仍只选择宿主构建时注册的可信组件，与声明的 UI ID 同名时拒绝，避免隐式切换承载方式。
+Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供资源元数据；普通 Shell 尚无 HTML 命令入口；开发开关启用时，可信插件管理组件可以按声明 ID 请求独立窗口。`commands[].view` 仍只选择宿主构建时注册的可信组件，与声明的 UI ID 同名时拒绝，避免隐式切换承载方式。
 
 ```json
 {
@@ -147,4 +147,24 @@ Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供
 
 只有宿主能按声明 ID 创建会话，不能通过入口路径或页面自报身份创建。声明缺失、版本不支持、资源不可用、插件禁用或包改变均拒绝；升级移除视图后旧句柄失效。`packages/plugin-protocol/ui.go` 定义声明类型，`schemas/manifest.schema.json` 提供静态结构约束，Go 校验额外检查 ID 唯一和可信组件冲突。
 
-后端 stdio API 1 保持不变。旧宿主通过未知字段拒绝新声明，不会降级为可信组件；旧插件无需添加该字段。此轮未增加公开加载 RPC、Wails 方法或通用 UI 权限授权服务。见 [ADR 0015](adr/0015-declared-ui-views.md)。
+后端 stdio API 1 保持不变。旧宿主通过未知字段拒绝新声明，不会降级为可信组件；旧插件无需添加该字段。后续桌面开发入口增加仅供可信 Shell 的 `PluginUIEnabled` / `OpenPluginView(pluginId, viewId)`，默认关闭，不暴露给客体或后端 RPC；它不允许选择入口、可执行文件、脚本或权限。没有通用 UI 权限授权服务。见 [ADR 0015](adr/0015-declared-ui-views.md)。
+
+
+## 桌面开发窗口入口
+
+`make dev-ui` 或宿主 `-plugin-ui` 开启独立窗口；默认启动关闭。可信管理组件获取 `PluginUIEnabled()` 后显示包声明视图的打开按钮，调用 `OpenPluginView(pluginId, viewId)`。普通命令执行和可信组件注册不因此改变；页面不会获得这两个 Wails 方法。
+
+宿主只运行自身目录的固定 `sinan-ui-host`，不会运行包内指定的 UI 程序。窗口控制器拒绝重复打开同一插件/视图，等待 ready 后返回；关闭后可重新打开，包变更和启用状态仍由内核会话控制。退出宿主时取消启动并等待所有客体回收，再释放内核。helper 缺失或平台不支持时返回诊断并保留 Shell。客体异步退出事件 `ui:closed` 只发送给可信 Shell，字段为 pluginId / viewId / failed，不传播页面错误原文。
+
+普通客体只有 ready / close，桥接消息依然受限；关闭原生窗口也撤销会话。不执行固定测试函数，不处理 report / revoke 探测动作，没有 8 秒探测期限；开发窗口在父进程侧暂设 1 小时总期限，响应超时策略继续生效。非持久存储、资源归属、CSP、导航拒绝与进程预算沿用此前边界，额外拒绝 JS 对话框、原生文件选择器和媒体采集请求。没有 CPU/内存硬配额或操作系统沙箱。
+
+
+普通 macOS 开发页面可在初始化完成后发送 ready，由用户操作发送 close：
+
+```js
+const send = message => window.webkit.messageHandlers.sinan.postMessage(message);
+send({ kind: 'ready', version: 1 });
+document.querySelector('#close').addEventListener('click', () => send({ kind: 'close' }));
+```
+
+脚本应放在包内独立 `.js` 资源中，HTML 以相对路径引用；固定 CSP 不允许内联脚本或远程脚本。此入口目前是 macOS 开发接口，不代表已提供跨平台 JavaScript SDK。

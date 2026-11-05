@@ -1,6 +1,6 @@
 //go:build darwin && !ios && cgo
 
-package main
+package uihost
 
 /*
 #include <stdlib.h>
@@ -16,7 +16,7 @@ import (
 )
 
 type nativeBinding struct {
-	session viewSession
+	session Session
 	disable func() error
 }
 
@@ -73,7 +73,7 @@ func sinanUIProbeDisable(handle C.ulonglong) (result C.int) {
 		}
 	}()
 	binding := bindingFor(handle)
-	if binding.session.Active() && binding.disable() == nil {
+	if binding.disable != nil && binding.session.Active() && binding.disable() == nil {
 		return 1
 	}
 	return 0
