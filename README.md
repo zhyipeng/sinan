@@ -20,7 +20,7 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 - 包内容变更检测、显式重载、保留配置的升级与初始化失败回退。
 - 声明式插件与按需激活的 Go 独立进程插件。
 - JSON-RPC 2.0 stdio 握手、命令调用、超时终止和失败隔离。
-- 宿主 CLI、协议类型、Go 插件 SDK，以及两个命令示例和两个独立搜索 Provider。
+- 宿主 CLI、协议类型、Go 插件 SDK，以及应用检索与设置系统插件。
 - 宿主搜索协调、静态命令索引、动态来源并行合并、请求取消及来源失败隔离。
 - 配置服务、可信设置组件插件、额外应用目录及桌面历史清除入口。
 - 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；尚未开放第三方 UI 加载。
@@ -45,12 +45,10 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 ```sh
 go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 make setup
-make demo
+make dev
 ```
 
-再次运行前先从托盘退出当前实例。`make demo` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备四个示例插件，在 macOS 上追加应用检索插件，再安装设置插件并打开窗口。脚本只对仓库自带的 Go 示例和仓库自带的应用检索插件使用信任安装。重复执行会升级已有示例；相同内容不重启，无需手动卸载。
-
-搜索 `demo` 可看到静态命令和快慢两个动态来源；搜索包含 `fail` 的文字可观察慢来源失败，其他结果仍可使用。以 `slow:` 开头的查询用于验证取消。
+再次运行前先从托盘退出当前实例。`make dev` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备应用检索（macOS）和设置插件并打开窗口。脚本仅对仓库自带的应用检索插件使用信任安装；重复执行会升级已有系统插件，相同内容不重启。`make demo` 作为兼容别名保留，不再安装 demo 插件。
 
 普通启动使用 `make run`，默认插件目录为 `os.UserConfigDir()/Sinan/plugins`；在 macOS 中即 `~/Library/Application Support/Sinan/plugins`。可通过窗口内 `···` 的本地插件入口填入插件目录安装；原生插件需勾选信任。
 
@@ -62,19 +60,17 @@ make test        # 包含真实子进程的竞态测试
 
 键盘导航的浏览器回归需要本机 `ego-browser` CLI：先运行 `npm --prefix apps/desktop/frontend run dev`，再在另一终端运行 `npm --prefix apps/desktop/frontend run test:keyboard`。固定测试页控制慢结果到达时机，覆盖搜索未结束时的上下键、同批次增量更新、鼠标静止、结果插入和回车打开选中项；不会连接真实插件。
 
-前端资源嵌入宿主，修改后用 `make build` 或 `make demo` 重新构建。当前尚未配置 Wails 热重载工作流；仅打开前端 Vite 页面无法调用桌面宿主。
+前端资源嵌入宿主，修改后用 `make build` 或 `make dev` 重新构建。当前尚未配置 Wails 热重载工作流；仅打开前端 Vite 页面无法调用桌面宿主。
 
 ## 独立插件验证
 
-完成一次 `make demo` 构建后，从托盘退出司南，再使用 CLI：
+完成一次 `make dev` 构建后，从托盘退出司南，再使用 CLI：
 
 ```sh
 ./bin/sinanctl -plugins .sinan-dev/plugins list
-./bin/sinanctl -plugins .sinan-dev/plugins search demo
-./bin/sinanctl -plugins .sinan-dev/plugins run example.hello hello
-./bin/sinanctl -plugins .sinan-dev/plugins run example.echo echo '你好，司南'
-./bin/sinanctl -plugins .sinan-dev/plugins uninstall example.echo
-./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install .sinan-dev/packages/echo
+./bin/sinanctl -plugins .sinan-dev/plugins search calculator
+./bin/sinanctl -plugins .sinan-dev/plugins settings system.app-search
+./bin/sinanctl -plugins .sinan-dev/plugins reload system.app-search
 ```
 
 CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通过“停止”终止。CLI 与桌面不能同时打开同一个插件根目录；宿主生命周期内持有目录独占锁，即使只读 CLI 命令也需先退出桌面。
@@ -91,7 +87,7 @@ CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通�
 
 ## 应用检索
 
-`make demo` 后搜索 `计算器`、`calculator` 或 `safari`，使用上下键选择并回车直接打开应用。扫描标准系统应用目录、`/Applications` 和 `~/Applications`，同时支持英文文件名、系统本地化名称和英文词首字母（如 `vsc`）。图标随结果展示。
+`make dev` 后搜索 `计算器`、`calculator` 或 `safari`，使用上下键选择并回车直接打开应用。扫描标准系统应用目录、`/Applications` 和 `~/Applications`，同时支持英文文件名、系统本地化名称和英文词首字母（如 `vsc`）。图标随结果展示。
 
 索引在首次查询建立，超过一分钟后的下一次查询自动重建；也可搜索并执行“刷新应用索引”。支持拼音全拼、首字母（如 `jisuanqi` / `jsq`），宿主按成功动作的频率和近期使用轻量加权。可在设置中添加额外应用目录。此插件以可信原生进程运行，用途声明不提供操作系统沙箱；具体边界见 [ADR 0004](docs/adr/0004-application-search.md)。
 

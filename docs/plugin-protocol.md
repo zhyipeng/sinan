@@ -66,7 +66,7 @@ UTF-8 JSON 对象按换行分帧，stdout 只能输出协议消息。请求使�
 
 ## SDK 与工具
 
-Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandlers`，搜索处理函数接收 `context.Context`，必须响应取消。SDK 允许并行请求、序列化响应；可参考两个[搜索示例](../plugins/example-search-fast/manifest.json)。TypeScript 协议声明位于 `packages/plugin-protocol/index.ts`，尚无完整 TypeScript 运行时 SDK。
+Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandlers`，搜索处理函数接收 `context.Context`，必须响应取消。SDK 允许并行请求、序列化响应；可参考[应用检索插件](../plugins/system-app-search/cmd/main.go)。TypeScript 协议声明位于 `packages/plugin-protocol/index.ts`，尚无完整 TypeScript 运行时 SDK。
 
 `sinanctl search 查询` 按增量输出聚合 JSON，包含 `queryId`、`items`、`pending`、`failures` 和 `done`。CLI 退出时回收进程；桌面保持已激活进程。同一插件根目录由一个宿主独占；运行 CLI 前须先退出使用该目录的桌面实例。
 

@@ -1,4 +1,4 @@
-.PHONY: setup bindings frontend build package run demo test
+.PHONY: setup bindings frontend build package run dev demo test
 
 ifeq ($(shell go env GOOS),darwin)
 export CGO_CFLAGS += -mmacosx-version-min=12.0
@@ -34,9 +34,12 @@ package: build
 	cp apps/desktop/Info.plist bin/Sinan.app/Contents/Info.plist
 	cp apps/desktop/assets/AppIcon.icns bin/Sinan.app/Contents/Resources/AppIcon.icns
 
-demo: build
-	sh scripts/prepare-demo.sh
+dev: build
+	sh scripts/prepare-dev.sh
 	./bin/sinan -plugins .sinan-dev/plugins
+
+# Compatibility alias; the development instance contains only system plugins.
+demo: dev
 
 test: frontend
 	go test -race ./...
