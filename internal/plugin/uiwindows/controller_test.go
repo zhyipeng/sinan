@@ -110,8 +110,8 @@ func TestControllerLifecycle(t *testing.T) {
 	if err := c.Open("example.ui", "main"); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Open("example.ui", "main"); err == nil {
-		t.Fatal("duplicate guest accepted")
+	if err := c.Open("example.ui", "main"); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := m.SetPluginEnabled("example.ui", false); err != nil {
 		t.Fatal(err)
@@ -166,13 +166,30 @@ func TestCommandAndManagementShareWindowReservation(t *testing.T) {
 	if err := c.OpenCommand("example.ui", "window"); err != nil {
 		t.Fatal(err)
 	}
+	// Occupy the remaining kernel slots. Focusing must not allocate a session.
+	for range 3 {
+		s, err := m.OpenUIView(context.Background(), "example.ui", "main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(s.Revoke)
+	}
+	c.mu.Lock()
+	originalPID := c.opening["example.ui/main"].process.PID()
+	c.mu.Unlock()
 	for _, open := range []func() error{
 		func() error { return c.Open("example.ui", "main") },
 		func() error { return c.OpenCommand("example.ui", "alias") },
 	} {
-		if open() == nil {
-			t.Fatal("same view opened through another entry")
+		if err := open(); err != nil {
+			t.Fatal(err)
 		}
+	}
+	c.mu.Lock()
+	currentPID := c.opening["example.ui/main"].process.PID()
+	c.mu.Unlock()
+	if originalPID != currentPID {
+		t.Fatal("focus created a different process")
 	}
 	select {
 	case <-events:
@@ -205,7 +222,7 @@ func TestControllerShutdownDuringStartup(t *testing.T) {
 		c.mu.Lock()
 		started := c.opening["example.ui/main"]
 		c.mu.Unlock()
-		if started {
+		if started != nil {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -226,6 +243,42 @@ func TestControllerShutdownDuringStartup(t *testing.T) {
 	defer c.mu.Unlock()
 	if len(c.opening) != 0 {
 		t.Fatal("shutdown leaked reservation")
+	}
+}
+
+func TestConcurrentStartupWaitersShareWindow(t *testing.T) {
+	m := installed(t, "")
+	c, events := controller(t, m, "wait-revoke")
+	const count = 6
+	errors := make(chan error, count)
+	var wg sync.WaitGroup
+	for range count {
+		wg.Go(func() { errors <- c.OpenCommand("example.ui", "window") })
+	}
+	wg.Wait()
+	close(errors)
+	// Calls that observe startup share it; calls arriving after startup may
+	// encounter the single outstanding focus control, but never spawn a guest.
+	succeeded := 0
+	for err := range errors {
+		if err == nil {
+			succeeded++
+		}
+	}
+	if succeeded == 0 {
+		t.Fatal("no startup succeeded")
+	}
+	c.mu.Lock()
+	windows := len(c.opening)
+	c.mu.Unlock()
+	if windows != 1 {
+		t.Fatal("parallel opens created multiple windows")
+	}
+	if err := m.Stop("example.ui"); err != nil {
+		t.Fatal(err)
+	}
+	if waitEvent(t, events, 3*time.Second).Failed {
+		t.Fatal("shared guest failed")
 	}
 }
 
@@ -331,5 +384,41 @@ setTimeout(()=>send({kind:'close'}),250);
 	}
 	if json.Unmarshal(result.Report, &report) != nil || !report.EventLoopResponsive || !report.CloseReceived {
 		t.Fatal("script completed without dispatching the native AppKit queue")
+	}
+}
+
+func TestNativeHostFocusPreservesContent(t *testing.T) {
+	if nativeGuest == "" {
+		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
+	}
+	m := installed(t, `
+const field=document.querySelector('#input');
+field.value='keep-input';
+const send=body=>window.webkit.messageHandlers.sinan.postMessage(body);
+send({kind:'ready',version:1});
+setTimeout(()=>{if(field.value==='keep-input')send({kind:'close'});},1500);
+`)
+	session, err := m.OpenUICommand(context.Background(), "example.ui", "window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	process, err := uiprocess.Start(context.Background(), session, uiprocess.Options{Executable: nativeGuest, Lifetime: 8 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer process.Stop()
+	for range 2 {
+		if err = process.Focus(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := process.Wait()
+	var report struct {
+		FocusHandled        int  `json:"focusHandled"`
+		CloseReceived       bool `json:"closeReceived"`
+		EventLoopResponsive bool `json:"eventLoopResponsive"`
+	}
+	if result.Err != nil || json.Unmarshal(result.Report, &report) != nil || report.FocusHandled != 2 || !report.CloseReceived || !report.EventLoopResponsive {
+		t.Fatal("native focus did not preserve the live document")
 	}
 }

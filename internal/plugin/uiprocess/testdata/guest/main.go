@@ -40,6 +40,10 @@ func main() {
 		os.Exit(8)
 	}
 	defer c.Close()
+	if mode == "unsolicited-focused" {
+		_ = c.Focused(1)
+		return
+	}
 	if mode == "hello-only" {
 		time.Sleep(time.Minute)
 		return
@@ -68,15 +72,29 @@ func main() {
 		time.Sleep(time.Minute)
 		return
 	}
-	if mode == "wait-revoke" {
+	if mode == "wait-revoke" || mode == "delay-focus" {
 		done := make(chan struct{})
 		c.OnRevoke(func() { close(done) })
-		<-done
-		if c.Finish(json.RawMessage(`{"revoked":true}`)) != nil {
-			os.Exit(11)
+		delayed := false
+		for {
+			select {
+			case id := <-c.FocusRequests():
+				if mode == "delay-focus" && !delayed {
+					delayed = true
+					time.Sleep(3 * time.Second)
+				}
+				if c.Focused(id) != nil {
+					os.Exit(16)
+				}
+			case <-done:
+				if c.Finish(json.RawMessage(`{"revoked":true}`)) != nil {
+					os.Exit(11)
+				}
+				return
+			}
 		}
-		return
 	}
+
 	resource, own := c.Resource(c.Init().Entry)
 	_, foreign := c.Resource("sinan-plugin://other.plugin/index.html")
 	_, invalid := c.Message([]byte(`{"kind":"execute"}`))

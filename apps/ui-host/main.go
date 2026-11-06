@@ -18,7 +18,11 @@ func run() bool {
 	}
 	defer client.Close()
 	init := client.Init()
-	result, err := uihost.Run(uihost.Config{Entry: init.Entry, CSP: init.CSP, Title: "司南插件"}, client, nil)
+	title := init.Title
+	if title == "" {
+		title = "司南插件"
+	}
+	result, err := uihost.Run(uihost.Config{Entry: init.Entry, CSP: init.CSP, Title: title}, client, nil)
 	if err != nil {
 		return false
 	}

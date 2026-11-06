@@ -66,7 +66,7 @@ func Prepare(packages string) (*Environment, error) {
 	}
 	mf := manifest.Manifest{ID: PluginID, Name: "窗口验收", Version: "0.1.0", APIVersion: protocol.APIVersion, Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{
 		Commands: []manifest.Command{{ID: "open", Title: "窗口验收", Keywords: []string{"window", "验收", "独立窗口"}, UIView: "input"}},
-		UIViews:  []protocol.UIView{{ID: "input", Entry: "index.html", BridgeVersion: protocol.UIBridgeVersion}},
+		UIViews:  []protocol.UIView{{Title: "输入测试", ID: "input", Entry: "index.html", BridgeVersion: protocol.UIBridgeVersion}},
 	}}
 	data, err := json.Marshal(mf)
 	if err != nil || os.WriteFile(filepath.Join(source, "manifest.json"), data, 0600) != nil {

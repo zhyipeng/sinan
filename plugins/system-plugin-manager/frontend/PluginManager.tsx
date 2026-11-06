@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export type ManagedPlugin = {id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string}[] | null};
+export type ManagedPlugin = {id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string;title?:string}[] | null};
 export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]; uiEnabled?: boolean};
 export type PackagePreview = {id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean};
 export type ManagementBridge = {
@@ -65,7 +65,7 @@ export default function PluginManager({bridge, onChanged, onRecover}: {bridge: M
           <button className="danger" disabled={busy} aria-label={`卸载 ${plugin.name}`} onClick={()=>void perform(()=>bridge.uninstall(plugin.id))}>卸载</button>
           <button disabled={busy} aria-label={`重载 ${plugin.name}`} onClick={()=>void perform(()=>bridge.reload(plugin.id))}>重载</button>
           <button disabled={busy} aria-label={`${plugin.disabled?'启用':'禁用'} ${plugin.name}`} onClick={()=>void perform(()=>bridge.setEnabled(plugin.id,!!plugin.disabled))}>{plugin.disabled?'启用':'禁用'}</button>
-          {data.uiEnabled&&plugin.uiViews?.map(view=><button key={view.id} disabled={busy||plugin.disabled||plugin.changed} aria-label={`打开 ${plugin.name} ${view.id}`} onClick={()=>void perform(()=>bridge.openView!(plugin.id,view.id))}>打开 {view.id}</button>)}
+          {data.uiEnabled&&plugin.uiViews?.map(view=><button key={view.id} disabled={busy||plugin.disabled||plugin.changed} aria-label={`打开 ${plugin.name} ${view.title||view.id}`} onClick={()=>void perform(()=>bridge.openView!(plugin.id,view.id))}>打开 {view.title||view.id}</button>)}
         </div>
       </div>)}
       {!busy&&!data.plugins.length&&<p className="empty">还没有插件，从本地目录安装一个。</p>}

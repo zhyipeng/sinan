@@ -12,6 +12,7 @@ export interface CommandResult {
  * this first bridge version rejects every nonempty permission request.
  */
 export interface UIView {
+    "title"?: string;
     "id": string;
     "entry": string;
     "bridgeVersion": string;

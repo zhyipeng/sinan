@@ -226,6 +226,18 @@
                   "type": "string"
                 },
                 "description": "默认无权限，当前桥拒绝所有非空请求；不继承原生后端用途声明。"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+                "allOf": [
+                  {
+                    "pattern": "\\S"
+                  }
+                ],
+                "description": "可选显示标题；省略时使用插件名称。"
               }
             }
           }

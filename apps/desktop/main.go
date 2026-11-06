@@ -55,7 +55,7 @@ func run() error {
 		cleanupAcceptance = env.Close
 		manager = env.Manager
 		*pluginUI = true
-		log.Print("临时窗口验收：在插件管理中找到「窗口验收」，点击「打开 input」。从验收实例托盘退出后自动清理。")
+		log.Print("临时窗口验收：在插件管理中找到「窗口验收」，点击「打开 输入测试」。从验收实例托盘退出后自动清理。")
 		log.Print("Command + Space 若被日常实例占用，请先退出日常实例，或在验收实例的设置中修改快捷键。")
 	} else {
 		if *root == "" {

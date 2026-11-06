@@ -7,6 +7,7 @@ const UIBridgeVersion = "1"
 // an HTML command available in the trusted Shell. Permissions default to none;
 // this first bridge version rejects every nonempty permission request.
 type UIView struct {
+	Title         string   `json:"title,omitempty"`
 	ID            string   `json:"id"`
 	Entry         string   `json:"entry"`
 	BridgeVersion string   `json:"bridgeVersion"`

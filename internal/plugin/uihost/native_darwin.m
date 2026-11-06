@@ -211,7 +211,22 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         window.delegate = delegate;
         window.releasedWhenClosed = NO;
         window.contentView = view;
-        [window center];
+        // Cocoa screen frames and mouseLocation share logical global coordinates,
+        // including negative origins on monitors to the left/below the main one.
+        NSScreen *targetScreen = NSScreen.mainScreen;
+        NSPoint cursor = NSEvent.mouseLocation;
+        for (NSScreen *screen in NSScreen.screens) {
+            if (NSMouseInRect(cursor, screen.frame, NO)) { targetScreen = screen; break; }
+        }
+        if (targetScreen) {
+            NSRect work = targetScreen.visibleFrame;
+            NSRect frame = window.frame;
+            frame.size.width = MIN(frame.size.width, work.size.width);
+            frame.size.height = MIN(frame.size.height, work.size.height);
+            frame.origin.x = NSMinX(work) + (work.size.width-frame.size.width)/2;
+            frame.origin.y = NSMinY(work) + (work.size.height-frame.size.height)/2;
+            [window setFrame:frame display:YES];
+        } else [window center];
         if (delegate.probe) [window orderFront:nil];
         else { [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES]; [window makeFirstResponder:view]; }
         [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:delegate.entry]]];
@@ -220,6 +235,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         const short marker = 0x534E;
         [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil subtype:marker data1:0 data2:0] atStart:NO];
         BOOL eventLoopResponsive = NO;
+        int focusHandled = 0;
         NSTimeInterval seconds = [bundle[@"deadlineSeconds"] doubleValue];
         NSTimeInterval deadline = seconds > 0 ? NSProcessInfo.processInfo.systemUptime + seconds : INFINITY;
         while (!delegate.done && NSProcessInfo.processInfo.systemUptime < deadline) {
@@ -234,6 +250,16 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                 }
                 [NSApp updateWindows];
             }
+            if (delegate.ready && !delegate.done && !delegate.revoked) {
+                unsigned long long focus = sinanUIPollFocus(handle);
+                if (focus && !delegate.revoked) {
+                    if (window.miniaturized) [window deminiaturize:nil];
+                    [window makeKeyAndOrderFront:nil];
+                    [NSApp activateIgnoringOtherApps:YES];
+                    [window makeFirstResponder:view];
+                    if (!delegate.revoked && sinanUIFocused(handle, focus)) focusHandled++;
+                }
+            }
             [delegate checkResponsiveness];
             if (delegate.revoked && !delegate.done) {
                 delegate.lifecycleRevoked = YES;
@@ -244,6 +270,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         }
         if (!delegate.done) [delegate fail:SinanUIFailureDeadline];
         result.eventLoopResponsive = eventLoopResponsive;
+        result.focusHandled = focusHandled;
         result.failure = delegate.failure;
         result.heartbeatCompleted = delegate.heartbeatCompleted;
         result.ready = delegate.ready;

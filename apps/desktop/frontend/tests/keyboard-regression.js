@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan search window command regression');
+const task = await taskSpace('Sinan window focus and title regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -241,6 +241,11 @@ await page.waitForFunction(()=>document.querySelector('[aria-label="打开 Fixtu
 await page.cdp('Emulation.setDeviceMetricsOverride',{width:640,height:800,deviceScaleFactor:1,mobile:false});
 if(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth))throw new Error('Window actions overflow the launcher');
 console.log({windowScreenshot:await page.screenshot({path:'/tmp/sinan-ui-windows.png'})});
+await page.evaluate(()=>window.navigationFixture.nameView());
+await page.click('loc=role:button[name="刷新"]');
+await page.waitForSelector('[aria-label="打开 Fixture 输入视图"]');
+if(await page.evaluate(()=>!!document.querySelector('[aria-label="打开 Fixture main"]')))throw new Error('View title did not replace the raw ID label');
+console.log('PASS: manifest view title in management entry');
 console.log('PASS: independent window gate, changed/disabled package guards, declared view action and failure event');
 await page.goto('http://127.0.0.1:9245/tests/keyboard.html?acceptance=1');
 await page.waitForSelector('.management');

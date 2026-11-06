@@ -78,3 +78,42 @@ func sinanUIProbeDisable(handle C.ulonglong) (result C.int) {
 	}
 	return 0
 }
+
+type focusSession interface {
+	NextFocus() uint64
+	Focused(uint64) error
+}
+
+//export sinanUIPollFocus
+func sinanUIPollFocus(handle C.ulonglong) (result C.ulonglong) {
+	defer func() {
+		if recover() != nil {
+			result = 0
+		}
+	}()
+	binding := bindingFor(handle)
+	if !binding.session.Active() {
+		return 0
+	}
+	if client, ok := binding.session.(focusSession); ok {
+		return C.ulonglong(client.NextFocus())
+	}
+	return 0
+}
+
+//export sinanUIFocused
+func sinanUIFocused(handle C.ulonglong, id C.ulonglong) (result C.int) {
+	defer func() {
+		if recover() != nil {
+			result = 0
+		}
+	}()
+	binding := bindingFor(handle)
+	if !binding.session.Active() {
+		return 0
+	}
+	if client, ok := binding.session.(focusSession); ok && client.Focused(uint64(id)) == nil {
+		return 1
+	}
+	return 0
+}

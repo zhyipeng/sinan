@@ -29,22 +29,24 @@ type Result struct {
 	Err    error
 }
 type Process struct {
-	cmd         *exec.Cmd
-	input       *os.File
-	output      *os.File
-	session     *uiview.Session
-	options     Options
-	exchange    sync.Mutex
-	mu          sync.Mutex
-	result      Result
-	finished    bool
-	ready       chan struct{}
-	readyOnce   sync.Once
-	stop        chan struct{}
-	stopOnce    sync.Once
-	done        chan struct{}
-	readDone    chan struct{}
-	unsubscribe func()
+	focusSequence uint64
+	focusPending  map[uint64]chan bool
+	cmd           *exec.Cmd
+	input         *os.File
+	output        *os.File
+	session       *uiview.Session
+	options       Options
+	exchange      sync.Mutex
+	mu            sync.Mutex
+	result        Result
+	finished      bool
+	ready         chan struct{}
+	readyOnce     sync.Once
+	stop          chan struct{}
+	stopOnce      sync.Once
+	done          chan struct{}
+	readDone      chan struct{}
+	unsubscribe   func()
 }
 
 func Start(ctx context.Context, session *uiview.Session, options Options) (*Process, error) {
@@ -104,7 +106,7 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	go p.wait()
 	go func() {
 		p.exchange.Lock()
-		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
+		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
 		p.exchange.Unlock()
 		if err != nil {
 			p.fail("UI 初始化写入失败")
@@ -202,11 +204,19 @@ func (p *Process) serve() {
 	var sequence uint64
 	hello := false
 	served := 0
+	requests := 0
 	for scanner.Scan() {
 		var req request
-		if decode(scanner.Bytes(), &req) != nil || req.ID != sequence+1 || req.ID > maxRequests {
+		if decode(scanner.Bytes(), &req) != nil || (req.Kind != "focused" && req.Control != 0) || req.ID != sequence+1 || req.ID == 0 {
 			p.fail("UI 管道协议无效")
 			return
+		}
+		if req.Kind != "focused" {
+			requests++
+			if requests > maxRequests {
+				p.fail("UI 请求预算耗尽")
+				return
+			}
 		}
 		sequence = req.ID
 		p.mu.Lock()
@@ -219,6 +229,7 @@ func (p *Process) serve() {
 		p.exchange.Lock()
 		res := response{Kind: "reply", ID: req.ID}
 		invalid := false
+		var focusAck chan bool
 		switch req.Kind {
 		case "hello":
 			if hello || req.ID != 1 || req.Version != 1 || req.URL != "" || len(req.Message) > 0 || len(req.Report) > 0 {
@@ -227,6 +238,20 @@ func (p *Process) serve() {
 			}
 			hello = true
 			res.OK = true
+		case "focused":
+			if !hello || req.Control == 0 || req.Version != 0 || req.URL != "" || len(req.Message) > 0 || len(req.Report) > 0 {
+				invalid = true
+				break
+			}
+			p.mu.Lock()
+			focusAck = p.focusPending[req.Control]
+			delete(p.focusPending, req.Control)
+			p.mu.Unlock()
+			if focusAck == nil {
+				invalid = true
+				break
+			}
+			res.OK = p.session.Active()
 		case "resource":
 			if !hello || req.Version != 0 || len(req.URL) > 1024 || len(req.Message) > 0 || len(req.Report) > 0 {
 				invalid = true
@@ -290,6 +315,12 @@ func (p *Process) serve() {
 		if err != nil {
 			p.fail("UI 管道写入失败")
 			return
+		}
+		if focusAck != nil {
+			select {
+			case focusAck <- res.OK:
+			default:
+			}
 		}
 	}
 	p.mu.Lock()

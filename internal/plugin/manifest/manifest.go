@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	protocol "sinan/packages/plugin-protocol"
 )
@@ -110,6 +112,10 @@ func (m Manifest) Validate() error {
 	}
 	views := map[string]bool{}
 	for _, view := range m.Contributes.UIViews {
+		if view.Title != "" && (strings.TrimSpace(view.Title) == "" || utf8.RuneCountInString(view.Title) > 64 || strings.ContainsFunc(view.Title, unicode.IsControl)) {
+			return errors.New("UI 视图标题无效")
+		}
+
 		if !ValidViewID(view.ID) || views[view.ID] || !ValidUIEntry(view.Entry) || view.BridgeVersion != protocol.UIBridgeVersion || len(view.Permissions) != 0 {
 			return errors.New("UI 视图声明无效、版本不兼容或请求了不支持的权限")
 		}

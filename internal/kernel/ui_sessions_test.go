@@ -387,3 +387,36 @@ func TestUICommandUsesBindingAfterUpgrade(t *testing.T) {
 		t.Fatal("command used stale view from before upgrade")
 	}
 }
+
+func TestUIViewMetadataDoesNotConsumeSlots(t *testing.T) {
+	m := manager(t)
+	source := uiPackage(t, false, "0.1.0")
+	mf, err := manifest.Load(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf.Contributes.UIViews[0].Title = "输入"
+	mf.Contributes.Commands = append(mf.Contributes.Commands, manifest.Command{ID: "window", Title: "Window", UIView: "main"})
+	writeManifest(t, source, mf)
+	if _, err = m.Install(source, false); err != nil {
+		t.Fatal(err)
+	}
+	for range maxUIPluginSessions {
+		openUI(t, m, mf.ID)
+	}
+	for range 8 {
+		binding, err := m.ResolveUICommand(context.Background(), mf.ID, "window")
+		if err != nil || binding.Title != mf.Name+" · 输入" || binding.ViewID != "main" {
+			t.Fatal("metadata resolution failed at the session limit")
+		}
+	}
+	if _, err = m.OpenUIView(context.Background(), mf.ID, "main"); err == nil {
+		t.Fatal("metadata resolution changed the session limit")
+	}
+	if _, err = m.SetPluginEnabled(mf.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = m.ResolveUIView(context.Background(), mf.ID, "main"); err == nil {
+		t.Fatal("disabled view metadata reused")
+	}
+}

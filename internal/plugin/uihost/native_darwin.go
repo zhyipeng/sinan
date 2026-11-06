@@ -54,5 +54,5 @@ func runNative(data []byte, target string, session Session, disable func() error
 	if !known {
 		failure = "unknown"
 	}
-	return Report{EventLoopResponsive: r.eventLoopResponsive != 0, Failure: failure, HeartbeatCompleted: r.heartbeatCompleted != 0, Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
+	return Report{FocusHandled: int(r.focusHandled), EventLoopResponsive: r.eventLoopResponsive != 0, Failure: failure, HeartbeatCompleted: r.heartbeatCompleted != 0, Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
 }

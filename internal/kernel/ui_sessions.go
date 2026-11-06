@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
+	"unicode"
 
 	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
@@ -102,7 +104,7 @@ func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string) (*uiv
 	if err = ctx.Err(); err != nil {
 		return nil, err
 	}
-	session, err := uiview.NewSession(uiview.Binding{PluginID: id, Fingerprint: p.fingerprint, ViewID: viewID, BridgeVersion: declaration.BridgeVersion}, bundle)
+	session, err := uiview.NewSession(uiview.Binding{PluginID: id, Title: uiWindowTitle(p.manifest.Name, declaration.Title), Fingerprint: p.fingerprint, ViewID: viewID, BridgeVersion: declaration.BridgeVersion}, bundle)
 	if err != nil {
 		return nil, err
 	}
@@ -132,3 +134,24 @@ func (p *plugin) revokeViewsLocked() {
 }
 
 func (p *plugin) markUIChanged() { p.mu.Lock(); p.changed = true; p.revokeViewsLocked(); p.mu.Unlock() }
+
+func uiWindowTitle(name, title string) string {
+	name = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, name)
+	runes := []rune(strings.TrimSpace(name))
+	if len(runes) > 64 {
+		runes = append(runes[:64], '…')
+	}
+	name = string(runes)
+	if name == "" {
+		name = "司南插件"
+	}
+	if title = strings.TrimSpace(title); title != "" {
+		return name + " · " + title
+	}
+	return name
+}

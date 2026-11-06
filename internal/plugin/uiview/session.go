@@ -16,6 +16,7 @@ const MaxMessageBytes = 4096
 const MaxSessionMessages = 32
 
 type Binding struct {
+	Title         string
 	ViewID        string
 	BridgeVersion string
 	PluginID      string

@@ -47,7 +47,7 @@ func session(t *testing.T) *uiview.Session {
 }
 
 func options(mode string) Options {
-	return Options{Executable: guest, Args: []string{mode}, StartupTimeout: time.Second, Lifetime: 5 * time.Second, ShutdownGrace: 200 * time.Millisecond}
+	return Options{Executable: guest, Args: []string{mode}, StartupTimeout: 3 * time.Second, Lifetime: 5 * time.Second, ShutdownGrace: 200 * time.Millisecond}
 }
 
 func TestPrivatePipeRoundTrip(t *testing.T) {
@@ -69,11 +69,14 @@ func TestPrivatePipeRoundTrip(t *testing.T) {
 }
 
 func TestStartupFailuresRevokeAndReap(t *testing.T) {
-	for _, mode := range []string{"crash", "silent", "bad", "version", "duplicate", "oversize", "hello-only"} {
+	for _, mode := range []string{"crash", "silent", "bad", "version", "duplicate", "oversize", "hello-only", "unsolicited-focused"} {
 		t.Run(mode, func(t *testing.T) {
 			s := session(t)
 			opts := options(mode)
 			opts.StartupTimeout = 250 * time.Millisecond
+			if mode == "unsolicited-focused" {
+				opts.StartupTimeout = 3 * time.Second
+			}
 			start := time.Now()
 			if p, err := Start(context.Background(), s, opts); err == nil || p != nil {
 				t.Fatal("invalid guest accepted")
@@ -104,7 +107,7 @@ func TestTerminationAndFaultIsolation(t *testing.T) {
 				opts.Args = []string{mode}
 			}
 			if mode == "lifetime" {
-				opts.Lifetime = 300 * time.Millisecond
+				opts.Lifetime = 4 * time.Second
 			}
 			p, err := Start(ctx, s, opts)
 			if err != nil {
@@ -175,5 +178,106 @@ func TestStrictEnvelope(t *testing.T) {
 		if decode([]byte(frame), &req) == nil {
 			t.Fatal("noncanonical envelope accepted")
 		}
+	}
+}
+
+func TestFocusAcknowledgementAndRevocation(t *testing.T) {
+	s := session(t)
+	opts := options("wait-revoke")
+	opts.Lifetime = 10 * time.Second
+	p, err := Start(context.Background(), s, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Stop)
+	for range 260 {
+		if err = p.Focus(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !s.Active() {
+		t.Fatal("solicited focus acknowledgements consumed the page request budget")
+	}
+	s.Revoke()
+	if p.Focus() == nil {
+		t.Fatal("revoked window focused")
+	}
+	if p.Wait().Err != nil {
+		t.Fatal("cooperative focus guest failed")
+	}
+}
+
+func TestFocusTimeoutDoesNotKillHealthyGuest(t *testing.T) {
+	s := session(t)
+	opts := options("delay-focus")
+	opts.Lifetime = 10 * time.Second
+	p, err := Start(context.Background(), s, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop()
+	if p.Focus() == nil || !s.Active() {
+		t.Fatal("late focus did not time out while preserving guest")
+	}
+	if p.Focus() == nil {
+		t.Fatal("second pending control accepted")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		p.mu.Lock()
+		waiting := len(p.focusPending) > 0
+		p.mu.Unlock()
+		if !waiting {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("late acknowledgement not drained")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if p.Focus() != nil {
+		t.Fatal("late acknowledgement poisoned further controls")
+	}
+	if !s.Active() {
+		t.Fatal("focus timeout killed guest")
+	}
+}
+
+func TestRevocationInterruptsPendingFocus(t *testing.T) {
+	s := session(t)
+	p, err := Start(context.Background(), s, options("hang"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Stop)
+	result := make(chan error, 1)
+	go func() { result <- p.Focus() }()
+	deadline := time.Now().Add(time.Second)
+	for {
+		p.mu.Lock()
+		pending := len(p.focusPending) > 0
+		p.mu.Unlock()
+		if pending {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("focus did not start")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	s.Revoke()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("revocation accepted pending focus")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("revocation did not interrupt focus")
+	}
+	if p.Wait().Err == nil {
+		t.Fatal("uncooperative guest not reaped")
+	}
+	if p.Focus() == nil {
+		t.Fatal("closed guest revived")
 	}
 }

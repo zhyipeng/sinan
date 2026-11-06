@@ -7,7 +7,7 @@ typedef struct {
     int ready, bindingsAbsent, storageIsolated, ownResourceLoaded;
     int foreignResourceBlocked, navigationBlocked, networkBlocked;
     int invalidMessageRejected, closeReceived, budgetRevoked, lifecycleRevoked;
-    int failure, heartbeatCompleted, eventLoopResponsive;
+    int failure, heartbeatCompleted, eventLoopResponsive, focusHandled;
 } SinanUIProbeReport;
 typedef struct SinanUIControl SinanUIControl;
 SinanUIControl *sinanUIControlNew(void);
@@ -18,4 +18,6 @@ extern char *sinanUISessionResource(unsigned long long handle, char *url);
 extern int sinanUISessionMessage(unsigned long long handle, char *json, int length);
 extern void sinanUISessionRevoke(unsigned long long handle);
 extern int sinanUIProbeDisable(unsigned long long handle);
+extern unsigned long long sinanUIPollFocus(unsigned long long handle);
+extern int sinanUIFocused(unsigned long long handle, unsigned long long id);
 #endif

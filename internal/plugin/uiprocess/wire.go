@@ -19,6 +19,7 @@ const maxRequests = 256
 const maxResourceBytes = 8 << 20
 
 type Init struct {
+	Title       string `json:"title,omitempty"`
 	Kind        string `json:"kind"`
 	Version     int    `json:"version"`
 	Entry       string `json:"entry"`
@@ -26,6 +27,7 @@ type Init struct {
 	ProbeTarget string `json:"probeTarget,omitempty"`
 }
 type request struct {
+	Control uint64          `json:"control,omitempty"`
 	ID      uint64          `json:"id"`
 	Kind    string          `json:"kind"`
 	Version int             `json:"version,omitempty"`

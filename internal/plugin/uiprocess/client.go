@@ -13,6 +13,7 @@ import (
 // Client is the trusted renderer's proxy. Authority and resource bytes stay in
 // the parent; a revoked local gate never falls back to a resource cache.
 type Client struct {
+	focusRequests    chan uint64
 	init             Init
 	reader           io.ReadCloser
 	writer           io.WriteCloser
@@ -38,8 +39,9 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 	if decode(scanner.Bytes(), &init) != nil || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP {
 		return nil, errors.New("UI 初始化消息无效")
 	}
-	c := &Client{init: init, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
+	c := &Client{focusRequests: make(chan uint64, 1), init: init, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
 	go func() {
+		var focusSequence uint64
 		defer c.Close()
 		for scanner.Scan() {
 			var frame response
@@ -48,6 +50,15 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 			}
 			if frame.Kind == "revoke" && frame.ID == 0 && !frame.OK && frame.Resource == nil && frame.Action == 0 {
 				c.revokeLocal()
+				continue
+			}
+			if frame.Kind == "focus" && frame.ID > 0 && frame.ID == focusSequence+1 && !frame.OK && frame.Resource == nil && frame.Action == 0 {
+				focusSequence = frame.ID
+				select {
+				case c.focusRequests <- frame.ID:
+				default:
+					return
+				}
 				continue
 			}
 			if frame.Kind != "reply" || frame.ID == 0 {
@@ -208,5 +219,20 @@ func (c *Client) Finish(report json.RawMessage) error {
 		return errors.New("UI 验证报告无效")
 	}
 	_, err := c.call(request{Kind: "finish", Report: report}, true)
+	return err
+}
+
+// These controls belong to the trusted renderer, never to page messages.
+func (c *Client) FocusRequests() <-chan uint64 { return c.focusRequests }
+func (c *Client) NextFocus() uint64 {
+	select {
+	case id := <-c.focusRequests:
+		return id
+	default:
+		return 0
+	}
+}
+func (c *Client) Focused(id uint64) error {
+	_, err := c.call(request{Kind: "focused", Control: id}, false)
 	return err
 }

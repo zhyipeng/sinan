@@ -29,7 +29,7 @@ let completeWindow: (()=>void)|undefined;
 let commandOpenArgs:unknown[]=[];
 let brokenName=false;
 let failEnablement=false;
-const plugin = {uiViews:[{id:'main',entry:'index.html',bridgeVersion:'1'},{id:'a'.repeat(64),entry:'other.html',bridgeVersion:'1'}],disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
+const plugin = {uiViews:[{id:'main',title:'',entry:'index.html',bridgeVersion:'1'},{id:'a'.repeat(64),entry:'other.html',bridgeVersion:'1'}],disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
 const settingsPlugin={disabled:false,...settingsManifest,kind:'declarative',state:'installed',commands:settingsManifest.contributes.commands};
 const managerPlugin={disabled:false,...managerManifest,kind:'declarative',state:'installed',commands:managerManifest.contributes.commands};
 const appPlugin={disabled:false,id:'system.app-search',name:'应用检索',version:'0.4.0',kind:'process',state:'installed',commands:[],settings:[{id:'directories',title:'额外应用目录',type:'directory-list'}]};
@@ -49,6 +49,7 @@ const fixture = {
   mutatePackage() { sourceFingerprint="c".repeat(64); },
   counts() { return {pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
   enableUI(){uiEnabled=true;},
+  nameView(){plugin.uiViews[0].title='输入视图';},
   readyWindows(){uiEnabled=true;plugin.changed=false;},
   failNextWindowOpen(){failWindowOpen=true;},
   deferWindowOpen(){deferWindow=true;},

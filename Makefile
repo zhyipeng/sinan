@@ -49,7 +49,7 @@ dev-ui: build
 demo: dev
 
 test: frontend
-	go test -race ./...
+	go test -race -p 1 ./...
 
 ui-probe:
 	mkdir -p bin
