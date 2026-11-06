@@ -15,6 +15,9 @@ import (
 )
 
 type Options struct {
+	Panel        bool
+	WindowAction func(string) bool // signal state only; never block on UI
+
 	Executable     string
 	Args           []string
 	StartupTimeout time.Duration
@@ -106,7 +109,7 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	go p.wait()
 	go func() {
 		p.exchange.Lock()
-		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
+		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), Panel: options.Panel, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
 		p.exchange.Unlock()
 		if err != nil {
 			p.fail("UI 初始化写入失败")
@@ -207,7 +210,7 @@ func (p *Process) serve() {
 	requests := 0
 	for scanner.Scan() {
 		var req request
-		if decode(scanner.Bytes(), &req) != nil || (req.Kind != "focused" && req.Control != 0) || req.ID != sequence+1 || req.ID == 0 {
+		if decode(scanner.Bytes(), &req) != nil || (req.Kind != "focused" && req.Control != 0) || (req.Kind != "window-action" && req.WindowAction != "") || req.ID != sequence+1 || req.ID == 0 {
 			p.fail("UI 管道协议无效")
 			return
 		}
@@ -252,6 +255,15 @@ func (p *Process) serve() {
 				break
 			}
 			res.OK = p.session.Active()
+		case "window-action":
+			if !hello || req.Version != 0 || req.URL != "" || len(req.Message) > 0 || len(req.Report) > 0 || !p.options.Panel || p.options.WindowAction == nil || (req.WindowAction != "detach" && req.WindowAction != "back") {
+				invalid = true
+				break
+			}
+			res.OK = p.session.Active() && p.options.WindowAction(req.WindowAction)
+			if res.OK && req.WindowAction == "back" {
+				p.session.Revoke()
+			}
 		case "resource":
 			if !hello || req.Version != 0 || len(req.URL) > 1024 || len(req.Message) > 0 || len(req.Report) > 0 {
 				invalid = true

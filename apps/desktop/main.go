@@ -139,7 +139,12 @@ func run() error {
 			host.uiError = "无法确定 UI 客体程序位置"
 		} else {
 			controller, err := uiwindows.New(manager, filepath.Join(filepath.Dir(executable), "sinan-ui-host"), func(event uiwindows.Event) {
-				window.DispatchWailsEvent(&application.CustomEvent{Name: "ui:closed", Data: event, Sender: "kernel.ui"})
+				if event.ReturnToSearch {
+					go host.showMain()
+				}
+				if !event.Detached {
+					window.DispatchWailsEvent(&application.CustomEvent{Name: "ui:closed", Data: event, Sender: "kernel.ui"})
+				}
 			})
 			if err != nil {
 				host.uiError = err.Error()
@@ -150,8 +155,8 @@ func run() error {
 		}
 	}
 	if !*uiProbe {
-		tray := configureTray(app, host.launcher)
-		host.shortcuts = newShortcutController(manager, app.GlobalShortcut, host.launcher.toggle, func(value string) {
+		tray := configureTray(app, host.showMain)
+		host.shortcuts = newShortcutController(manager, app.GlobalShortcut, host.toggleMain, func(value string) {
 			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
 		}, func(state ShortcutState) {
 			host.launcher.setShortcutError(state.Error)
@@ -165,7 +170,7 @@ func run() error {
 		// Register after startup so native conflicts are returned synchronously.
 		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) { host.shortcuts.Start() })
 		app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
-			go host.launcher.show()
+			go host.showMain()
 		})
 	}
 	if err := app.Run(); err != nil {

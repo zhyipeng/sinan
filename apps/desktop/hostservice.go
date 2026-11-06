@@ -204,3 +204,20 @@ func (h *HostService) OpenPluginCommand(pluginID, commandID string) error {
 	}
 	return h.ui.OpenCommand(pluginID, commandID)
 }
+
+func (h *HostService) toggleMain() {
+	if h.ui != nil {
+		if handled, _ := h.ui.Main(true); handled {
+			return
+		}
+	}
+	h.launcher.toggle()
+}
+func (h *HostService) showMain() {
+	if h.ui != nil {
+		if handled, _ := h.ui.Main(false); handled {
+			return
+		}
+	}
+	h.launcher.show()
+}

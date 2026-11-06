@@ -51,6 +51,12 @@ func main() {
 	if _, err = c.Message([]byte(`{"kind":"ready","version":1}`)); err != nil {
 		os.Exit(9)
 	}
+	if mode == "back" {
+		time.Sleep(100 * time.Millisecond)
+		_ = c.WindowAction("back")
+		_ = c.Finish(json.RawMessage(`{"back":true}`))
+		return
+	}
 	if mode == "hang" {
 		time.Sleep(time.Minute)
 		return
@@ -72,18 +78,23 @@ func main() {
 		time.Sleep(time.Minute)
 		return
 	}
-	if mode == "wait-revoke" || mode == "delay-focus" {
+	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" {
 		done := make(chan struct{})
 		c.OnRevoke(func() { close(done) })
 		delayed := false
 		for {
 			select {
-			case id := <-c.FocusRequests():
+			case control := <-c.Controls():
 				if mode == "delay-focus" && !delayed {
 					delayed = true
 					time.Sleep(3 * time.Second)
 				}
-				if c.Focused(id) != nil {
+				if mode == "panel" && control.Kind == "detach" {
+					if c.WindowAction("detach") != nil {
+						os.Exit(17)
+					}
+				}
+				if c.Focused(control.ID) != nil {
 					os.Exit(16)
 				}
 			case <-done:

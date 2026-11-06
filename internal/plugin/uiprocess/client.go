@@ -12,8 +12,13 @@ import (
 
 // Client is the trusted renderer's proxy. Authority and resource bytes stay in
 // the parent; a revoked local gate never falls back to a resource cache.
+type Control struct {
+	ID   uint64
+	Kind string
+}
+
 type Client struct {
-	focusRequests    chan uint64
+	focusRequests    chan Control
 	init             Init
 	reader           io.ReadCloser
 	writer           io.WriteCloser
@@ -39,7 +44,7 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 	if decode(scanner.Bytes(), &init) != nil || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP {
 		return nil, errors.New("UI 初始化消息无效")
 	}
-	c := &Client{focusRequests: make(chan uint64, 1), init: init, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
+	c := &Client{focusRequests: make(chan Control, 1), init: init, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
 	go func() {
 		var focusSequence uint64
 		defer c.Close()
@@ -52,10 +57,10 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 				c.revokeLocal()
 				continue
 			}
-			if frame.Kind == "focus" && frame.ID > 0 && frame.ID == focusSequence+1 && !frame.OK && frame.Resource == nil && frame.Action == 0 {
+			if (frame.Kind == "focus" || frame.Kind == "toggle" || frame.Kind == "detach") && frame.ID > 0 && frame.ID == focusSequence+1 && !frame.OK && frame.Resource == nil && frame.Action == 0 {
 				focusSequence = frame.ID
 				select {
-				case c.focusRequests <- frame.ID:
+				case c.focusRequests <- Control{ID: frame.ID, Kind: frame.Kind}:
 				default:
 					return
 				}
@@ -223,14 +228,18 @@ func (c *Client) Finish(report json.RawMessage) error {
 }
 
 // These controls belong to the trusted renderer, never to page messages.
-func (c *Client) FocusRequests() <-chan uint64 { return c.focusRequests }
-func (c *Client) NextFocus() uint64 {
+func (c *Client) Controls() <-chan Control { return c.focusRequests }
+func (c *Client) NextControl() Control {
 	select {
-	case id := <-c.focusRequests:
-		return id
+	case control := <-c.focusRequests:
+		return control
 	default:
-		return 0
+		return Control{}
 	}
+}
+func (c *Client) WindowAction(action string) error {
+	_, err := c.call(request{Kind: "window-action", WindowAction: action}, false)
+	return err
 }
 func (c *Client) Focused(id uint64) error {
 	_, err := c.call(request{Kind: "focused", Control: id}, false)

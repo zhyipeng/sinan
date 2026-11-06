@@ -422,3 +422,107 @@ setTimeout(()=>{if(field.value==='keep-input')send({kind:'close'});},1500);
 		t.Fatal("native focus did not preserve the live document")
 	}
 }
+
+func TestAttachedPanelDetachesFromMainVisibility(t *testing.T) {
+	m := installed(t, "")
+	c, events := controller(t, m, "panel")
+	if handled, err := c.Main(true); handled || err != nil {
+		t.Fatal("empty main panel handled")
+	}
+	if err := c.Open("example.ui", "main"); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if handled, err := c.Main(true); !handled || err != nil {
+			t.Fatal("attached panel toggle failed", err)
+		}
+	}
+	c.mu.Lock()
+	entry := c.panel
+	c.mu.Unlock()
+	pid := entry.process.PID()
+	if err := entry.process.Detach(); err != nil {
+		t.Fatal(err)
+	}
+	event := waitEvent(t, events, time.Second)
+	if !event.Detached || event.ReturnToSearch {
+		t.Fatal("detach unexpectedly reopened search")
+	}
+	if handled, err := c.Main(true); handled || err != nil {
+		t.Fatal("detached window controlled by main shortcut")
+	}
+	if !entry.session.Active() || entry.process.PID() != pid {
+		t.Fatal("detach replaced or revoked session")
+	}
+	if err := c.Open("example.ui", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if handled, _ := c.Main(false); handled {
+		t.Fatal("focusing detached window attached it again")
+	}
+}
+
+func TestNativeHostPanelDetachPreservesDocument(t *testing.T) {
+	if nativeGuest == "" {
+		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
+	}
+	m := installed(t, `
+const field=document.querySelector('#input');
+field.value='before-detach';
+const send=body=>window.webkit.messageHandlers.sinan.postMessage(body);
+send({kind:'ready',version:1});
+setTimeout(()=>{if(field.value==='before-detach')send({kind:'close'});},2500);
+`)
+	session, err := m.OpenUICommand(context.Background(), "example.ui", "window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := make(chan string, 1)
+	process, err := uiprocess.Start(context.Background(), session, uiprocess.Options{
+		Executable: nativeGuest, Panel: true, Lifetime: 8 * time.Second,
+		WindowAction: func(action string) bool { actions <- action; return true },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer process.Stop()
+	for range 2 {
+		if err := process.Toggle(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := process.Detach(); err != nil {
+		t.Fatal(err)
+	}
+	if action := <-actions; action != "detach" {
+		t.Fatal("wrong native action")
+	}
+	if err := process.Focus(); err != nil {
+		t.Fatal(err)
+	}
+	result := process.Wait()
+	var report struct {
+		Detached            bool `json:"detached"`
+		TogglesHandled      int  `json:"togglesHandled"`
+		CloseReceived       bool `json:"closeReceived"`
+		EventLoopResponsive bool `json:"eventLoopResponsive"`
+	}
+	if result.Err != nil || json.Unmarshal(result.Report, &report) != nil || !report.Detached || report.TogglesHandled != 2 || !report.CloseReceived || !report.EventLoopResponsive {
+		t.Fatal("native panel did not retain document through detach", result.Err)
+	}
+}
+
+func TestAttachedPanelBackReturnsToSearch(t *testing.T) {
+	m := installed(t, "")
+	c, events := controller(t, m, "back")
+	if err := c.Open("example.ui", "main"); err != nil {
+		t.Fatal(err)
+	}
+	event := waitEvent(t, events, 2*time.Second)
+	if !event.ReturnToSearch || event.Detached {
+		t.Fatal("back did not restore search")
+	}
+	if handled, _ := c.Main(true); handled {
+		t.Fatal("back left main panel attached")
+	}
+}

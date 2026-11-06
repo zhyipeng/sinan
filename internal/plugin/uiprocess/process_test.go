@@ -281,3 +281,23 @@ func TestRevocationInterruptsPendingFocus(t *testing.T) {
 		t.Fatal("closed guest revived")
 	}
 }
+
+func TestWindowActionRequiresPanelRole(t *testing.T) {
+	s := session(t)
+	opts := options("back")
+	called := make(chan struct{}, 1)
+	opts.WindowAction = func(string) bool { called <- struct{}{}; return true }
+	p, err := Start(context.Background(), s, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := p.Wait()
+	select {
+	case <-called:
+		t.Fatal("non-panel invoked window action")
+	default:
+	}
+	if result.Err == nil || s.Active() {
+		t.Fatal("non-panel window action was not rejected")
+	}
+}

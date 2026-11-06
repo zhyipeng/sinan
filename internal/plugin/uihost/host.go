@@ -16,6 +16,7 @@ type Session interface {
 }
 
 type Config struct {
+	Panel           bool   `json:"panel"`
 	Entry           string `json:"entry"`
 	CSP             string `json:"csp"`
 	Title           string `json:"title"`
@@ -25,6 +26,8 @@ type Config struct {
 }
 
 type Report struct {
+	Detached               bool   `json:"detached"`
+	TogglesHandled         int    `json:"togglesHandled"`
 	FocusHandled           int    `json:"focusHandled"`
 	EventLoopResponsive    bool   `json:"eventLoopResponsive"`
 	Failure                string `json:"failure,omitempty"`

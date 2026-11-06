@@ -94,12 +94,12 @@ func (l *launcher) setShortcutError(message string) {
 }
 func (l *launcher) status() string { l.mu.Lock(); defer l.mu.Unlock(); return l.shortcutError }
 
-func configureTray(app *application.App, l *launcher) *application.SystemTray {
+func configureTray(app *application.App, show func()) *application.SystemTray {
 	tray := app.SystemTray.New()
 	tray.SetTemplateIcon(trayIcon)
 	tray.SetTooltip("司南")
 	menu := app.NewMenu()
-	menu.Add("显示司南").OnClick(func(_ *application.Context) { go l.show() })
+	menu.Add("显示司南").OnClick(func(_ *application.Context) { go show() })
 	menu.AddSeparator()
 	menu.Add("退出司南").OnClick(func(_ *application.Context) { app.Quit() })
 	tray.SetMenu(menu)

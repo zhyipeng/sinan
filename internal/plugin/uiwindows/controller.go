@@ -16,16 +16,19 @@ import (
 )
 
 type Event struct {
-	PluginID string `json:"pluginId"`
-	ViewID   string `json:"viewId"`
-	Failed   bool   `json:"failed"`
+	PluginID       string `json:"pluginId"`
+	ViewID         string `json:"viewId"`
+	ReturnToSearch bool   `json:"returnToSearch"`
+	Detached       bool   `json:"detached"`
+	Failed         bool   `json:"failed"`
 }
 
 type windowEntry struct {
-	session *uiview.Session
-	process *uiprocess.Process
-	ready   chan struct{}
-	err     error // immutable after ready is closed
+	attached bool
+	session  *uiview.Session
+	process  *uiprocess.Process
+	ready    chan struct{}
+	err      error // immutable after ready is closed
 }
 
 type Controller struct {
@@ -35,6 +38,7 @@ type Controller struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	mu      sync.Mutex
+	panel   *windowEntry
 	closed  bool
 	opening map[string]*windowEntry
 	active  sync.WaitGroup
@@ -46,7 +50,7 @@ func New(manager *kernel.Manager, executable string, onExit func(Event)) (*Contr
 		return nil, errors.New("UI 客体程序不可用，请重新构建宿主")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Controller{manager: manager, options: uiprocess.Options{Executable: executable, Lifetime: time.Hour}, ctx: ctx, cancel: cancel, onExit: onExit, opening: map[string]*windowEntry{}}, nil
+	return &Controller{manager: manager, options: uiprocess.Options{Executable: executable, Lifetime: time.Hour, Panel: true}, ctx: ctx, cancel: cancel, onExit: onExit, opening: map[string]*windowEntry{}}, nil
 }
 
 func (c *Controller) Open(pluginID, viewID string) error {
@@ -83,6 +87,9 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 				c.mu.Lock()
 				if c.opening[key] == owned {
 					delete(c.opening, key)
+				}
+				if c.panel == owned {
+					c.panel = nil
 				}
 				owned.err = err
 				close(owned.ready)
@@ -128,9 +135,23 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		}
 		return existing.process.Focus()
 	}
-	owned = &windowEntry{ready: make(chan struct{})}
+	previous := c.panel
+	owned = &windowEntry{ready: make(chan struct{}), attached: c.options.Panel}
+	if owned.attached {
+		c.panel = owned
+	}
 	c.opening[key] = owned
 	c.mu.Unlock()
+	if previous != nil && previous != owned {
+		select {
+		case <-previous.ready:
+			if previous.session != nil {
+				previous.session.Revoke()
+			}
+		case <-c.ctx.Done():
+			return errors.New("UI 运行时已关闭")
+		}
+	}
 	session, err = prepare(c.ctx)
 	if err != nil {
 		return err
@@ -139,7 +160,24 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		return errors.New("插件已变化，请重试")
 	}
 	owned.session = session
-	process, err := uiprocess.Start(c.ctx, session, c.options)
+	options := c.options
+	options.WindowAction = func(action string) bool {
+		c.mu.Lock()
+		if c.closed || !owned.attached || c.panel != owned {
+			c.mu.Unlock()
+			return false
+		}
+		owned.attached = false
+		if c.panel == owned {
+			c.panel = nil
+		}
+		c.mu.Unlock()
+		if c.onExit != nil {
+			go c.onExit(Event{PluginID: pluginID, ViewID: viewID, Detached: action == "detach", ReturnToSearch: action == "back"})
+		}
+		return true
+	}
+	process, err := uiprocess.Start(c.ctx, session, options)
 	if err != nil {
 		return err
 	}
@@ -162,11 +200,15 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		if c.opening[key] == owned {
 			delete(c.opening, key)
 		}
+		returnToSearch := c.panel == owned
+		if returnToSearch {
+			c.panel = nil
+		}
 		closed := c.closed
 		c.mu.Unlock()
 		c.active.Done()
 		if !closed && c.onExit != nil {
-			c.onExit(Event{PluginID: pluginID, ViewID: viewID, Failed: failed})
+			c.onExit(Event{PluginID: pluginID, ViewID: viewID, Failed: failed, ReturnToSearch: returnToSearch})
 		}
 	}()
 	return nil
@@ -179,4 +221,29 @@ func (c *Controller) Close() {
 	c.cancel()
 	c.mu.Unlock()
 	c.active.Wait()
+}
+
+// Main handles only the attached panel. Detached windows never participate.
+func (c *Controller) Main(toggle bool) (bool, error) {
+	c.mu.Lock()
+	entry := c.panel
+	c.mu.Unlock()
+	if entry == nil {
+		return false, nil
+	}
+	select {
+	case <-entry.ready:
+	case <-c.ctx.Done():
+		return false, nil
+	}
+	c.mu.Lock()
+	attached := c.panel == entry && entry.attached
+	c.mu.Unlock()
+	if !attached || entry.err != nil || entry.process == nil || !entry.session.Active() {
+		return false, nil
+	}
+	if toggle {
+		return true, entry.process.Toggle()
+	}
+	return true, entry.process.Focus()
 }

@@ -11,6 +11,7 @@ import "C"
 import (
 	"encoding/json"
 	"runtime/cgo"
+	"sinan/internal/plugin/uiprocess"
 	"sinan/internal/plugin/uiview"
 	"unsafe"
 )
@@ -80,12 +81,13 @@ func sinanUIProbeDisable(handle C.ulonglong) (result C.int) {
 }
 
 type focusSession interface {
-	NextFocus() uint64
+	NextControl() uiprocess.Control
+	WindowAction(string) error
 	Focused(uint64) error
 }
 
-//export sinanUIPollFocus
-func sinanUIPollFocus(handle C.ulonglong) (result C.ulonglong) {
+//export sinanUIPollControl
+func sinanUIPollControl(handle C.ulonglong, id *C.ulonglong) (result C.int) {
 	defer func() {
 		if recover() != nil {
 			result = 0
@@ -96,7 +98,40 @@ func sinanUIPollFocus(handle C.ulonglong) (result C.ulonglong) {
 		return 0
 	}
 	if client, ok := binding.session.(focusSession); ok {
-		return C.ulonglong(client.NextFocus())
+		control := client.NextControl()
+		*id = C.ulonglong(control.ID)
+		switch control.Kind {
+		case "focus":
+			return 1
+		case "toggle":
+			return 2
+		case "detach":
+			return 3
+		}
+	}
+	return 0
+}
+
+//export sinanUIWindowAction
+func sinanUIWindowAction(handle C.ulonglong, kind C.int) (result C.int) {
+	defer func() {
+		if recover() != nil {
+			result = 0
+		}
+	}()
+	binding := bindingFor(handle)
+	if !binding.session.Active() {
+		return 0
+	}
+	if kind != 1 && kind != 2 {
+		return 0
+	}
+	action := "detach"
+	if kind == 2 {
+		action = "back"
+	}
+	if client, ok := binding.session.(focusSession); ok && client.WindowAction(action) == nil {
+		return 1
 	}
 	return 0
 }

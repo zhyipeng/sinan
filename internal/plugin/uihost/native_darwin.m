@@ -14,6 +14,26 @@ SinanUIControl *sinanUIControlNew(void) {
 void sinanUIControlRevoke(SinanUIControl *control) { atomic_store(&control->revoked, true); }
 void sinanUIControlFree(SinanUIControl *control) { free(control); }
 
+@interface SinanMainPanel : NSPanel
+@end
+@implementation SinanMainPanel
+- (BOOL)canBecomeKeyWindow { return YES; }
+- (BOOL)canBecomeMainWindow { return NO; }
+@end
+
+static void positionPanel(NSWindow *window) {
+    NSScreen *target = NSScreen.mainScreen;
+    for (NSScreen *screen in NSScreen.screens)
+        if (NSMouseInRect(NSEvent.mouseLocation, screen.frame, NO)) { target = screen; break; }
+    NSRect work = target.visibleFrame;
+    NSRect frame = window.frame;
+    frame.size.width = MIN(680, work.size.width);
+    frame.size.height = MIN(530, work.size.height * 0.8 - 16);
+    frame.origin.x = NSMidX(work) - frame.size.width / 2;
+    frame.origin.y = NSMaxY(work) - work.size.height * 0.2 - frame.size.height;
+    [window setFrame:frame display:YES];
+}
+
 @interface SinanUIProbe : NSObject <WKNavigationDelegate, WKUIDelegate, WKURLSchemeHandler, WKScriptMessageHandler, NSWindowDelegate>
 @property unsigned long long handle;
 @property SinanUIControl *control;
@@ -22,6 +42,9 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
 @property NSString *target;
 @property WKWebView *view;
 @property BOOL probe;
+@property BOOL attached;
+@property BOOL detachRequested;
+@property BOOL backRequested;
 @property BOOL initialNavigation;
 @property BOOL ready;
 @property BOOL closeReceived;
@@ -45,6 +68,11 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
 @end
 
 @implementation SinanUIProbe
+- (void)detachPanel:(id)sender { self.detachRequested = YES; }
+- (void)backPanel:(id)sender { self.backRequested = YES; }
+- (void)windowDidResignKey:(NSNotification *)notification {
+    if (self.attached) [(NSWindow *)notification.object orderOut:nil];
+}
 - (void)fail:(SinanUIFailure)reason {
     if (self.done || self.revoked) return;
     self.failure = reason;
@@ -189,11 +217,12 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         NSDictionary *bundle = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         if (![bundle isKindOfClass:NSDictionary.class]) return result;
         [NSApplication sharedApplication];
-        [NSApp setActivationPolicy:[bundle[@"probe"] boolValue] ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular];
+        [NSApp setActivationPolicy:([bundle[@"probe"] boolValue] || [bundle[@"panel"] boolValue]) ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular];
         [NSApp finishLaunching];
         SinanUIProbe *delegate = [SinanUIProbe new];
         delegate.entry = bundle[@"entry"];
         delegate.probe = [bundle[@"probe"] boolValue];
+        delegate.attached = [bundle[@"panel"] boolValue] && !delegate.probe;
         delegate.handle = handle;
         delegate.control = control;
         delegate.csp = bundle[@"csp"];
@@ -206,11 +235,37 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         delegate.view = view;
         view.navigationDelegate = delegate;
         view.UIDelegate = delegate;
-        NSWindow *window = [[NSWindow alloc] initWithContentRect:view.frame styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+        NSWindow *window;
+        if (delegate.attached) {
+            window = [[SinanMainPanel alloc] initWithContentRect:NSMakeRect(0,0,680,530) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
+            window.level = NSFloatingWindowLevel;
+            window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
+            ((NSPanel *)window).hidesOnDeactivate = NO;
+        } else {
+            window = [[NSWindow alloc] initWithContentRect:view.frame styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+        }
         window.title = bundle[@"title"];
         window.delegate = delegate;
         window.releasedWhenClosed = NO;
-        window.contentView = view;
+        if (delegate.attached) {
+            NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0,0,680,530)];
+            window.contentView = container;
+            view.frame = NSMakeRect(0,0,680,480);
+            view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+            [container addSubview:view];
+            NSButton *back = [NSButton buttonWithTitle:@"返回" target:delegate action:@selector(backPanel:)];
+            back.frame = NSMakeRect(12,490,54,28);
+            back.autoresizingMask = NSViewMinYMargin;
+            [container addSubview:back];
+            NSTextField *title = [NSTextField labelWithString:bundle[@"title"] ?: @"司南插件"];
+            title.frame = NSMakeRect(80,493,350,22);
+            title.autoresizingMask = NSViewMinYMargin;
+            [container addSubview:title];
+            NSButton *detach = [NSButton buttonWithTitle:@"独立 ⌘⇧D" target:delegate action:@selector(detachPanel:)];
+            detach.frame = NSMakeRect(548,490,120,28);
+            detach.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+            [container addSubview:detach];
+        } else window.contentView = view;
         // Cocoa screen frames and mouseLocation share logical global coordinates,
         // including negative origins on monitors to the left/below the main one.
         NSScreen *targetScreen = NSScreen.mainScreen;
@@ -227,8 +282,9 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
             frame.origin.y = NSMinY(work) + (work.size.height-frame.size.height)/2;
             [window setFrame:frame display:YES];
         } else [window center];
+        if (delegate.attached) positionPanel(window);
         if (delegate.probe) [window orderFront:nil];
-        else { [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES]; [window makeFirstResponder:view]; }
+        else { [window makeKeyAndOrderFront:nil]; if (!delegate.attached) [NSApp activateIgnoringOtherApps:YES]; [window makeFirstResponder:view]; }
         [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:delegate.entry]]];
         // A fixed, harmless event verifies that the AppKit queue is dispatched,
         // rather than merely servicing CF/NSRunLoop sources (e.g. WebKit IPC).
@@ -236,6 +292,8 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:window.windowNumber context:nil subtype:marker data1:0 data2:0] atStart:NO];
         BOOL eventLoopResponsive = NO;
         int focusHandled = 0;
+        int togglesHandled = 0;
+        BOOL detached = NO;
         NSTimeInterval seconds = [bundle[@"deadlineSeconds"] doubleValue];
         NSTimeInterval deadline = seconds > 0 ? NSProcessInfo.processInfo.systemUptime + seconds : INFINITY;
         while (!delegate.done && NSProcessInfo.processInfo.systemUptime < deadline) {
@@ -245,19 +303,63 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                 // window unresponsive to WindowServer, keyboard and mouse input.
                 NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.02] inMode:NSDefaultRunLoopMode dequeue:YES];
                 if (event) {
-                    [NSApp sendEvent:event];
+                    NSEventModifierFlags modifiers = event.modifierFlags & (NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption | NSEventModifierFlagControl);
+                    if (delegate.attached && event.type == NSEventTypeKeyDown && modifiers == (NSEventModifierFlagCommand | NSEventModifierFlagShift) && [event.charactersIgnoringModifiers.lowercaseString isEqual:@"d"])
+                        delegate.detachRequested = YES;
+                    else [NSApp sendEvent:event];
                     if (event.type == NSEventTypeApplicationDefined && event.subtype == marker) eventLoopResponsive = YES;
                 }
                 [NSApp updateWindows];
             }
             if (delegate.ready && !delegate.done && !delegate.revoked) {
-                unsigned long long focus = sinanUIPollFocus(handle);
-                if (focus && !delegate.revoked) {
-                    if (window.miniaturized) [window deminiaturize:nil];
-                    [window makeKeyAndOrderFront:nil];
-                    [NSApp activateIgnoringOtherApps:YES];
-                    [window makeFirstResponder:view];
-                    if (!delegate.revoked && sinanUIFocused(handle, focus)) focusHandled++;
+                unsigned long long controlID = 0;
+                int kind = sinanUIPollControl(handle, &controlID);
+                if (kind == 3) delegate.detachRequested = YES;
+                if (kind == 1 || kind == 2) {
+                    if (kind == 2 && delegate.attached && window.visible) [window orderOut:nil];
+                    else {
+                        if (delegate.attached) positionPanel(window);
+                        if (window.miniaturized) [window deminiaturize:nil];
+                        [window makeKeyAndOrderFront:nil];
+                        if (!delegate.attached) [NSApp activateIgnoringOtherApps:YES];
+                        [window makeFirstResponder:view];
+                    }
+                }
+                if (delegate.backRequested && delegate.attached) {
+                    delegate.backRequested = NO;
+                    if (sinanUIWindowAction(handle, 2)) delegate.done = YES;
+                }
+                if (delegate.detachRequested && delegate.attached) {
+                    delegate.detachRequested = NO;
+                    if (sinanUIWindowAction(handle, 1)) {
+                        NSWindow *previous = window;
+                        delegate.attached = NO;
+                        [view removeFromSuperview];
+                        window = [[NSWindow alloc] initWithContentRect:view.frame styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+                        window.releasedWhenClosed = NO;
+                        window.title = bundle[@"title"];
+                        window.delegate = delegate;
+                        window.contentView = view;
+                        NSRect previousFrame = previous.frame;
+                        NSRect work = previous.screen.visibleFrame;
+                        previous.delegate = nil;
+                        [previous close];
+                        NSRect frame = window.frame;
+                        frame.origin.x = NSMidX(previousFrame) - frame.size.width / 2;
+                        frame.origin.y = NSMaxY(previousFrame) - frame.size.height;
+                        frame.origin.x = MAX(NSMinX(work), MIN(frame.origin.x, NSMaxX(work) - frame.size.width));
+                        frame.origin.y = MAX(NSMinY(work), MIN(frame.origin.y, NSMaxY(work) - frame.size.height));
+                        [window setFrame:frame display:YES];
+                        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+                        [window makeKeyAndOrderFront:nil];
+                        [NSApp activateIgnoringOtherApps:YES];
+                        [window makeFirstResponder:view];
+                        detached = YES;
+                    }
+                }
+                if (kind && !delegate.revoked && sinanUIFocused(handle, controlID)) {
+                    if (kind == 1) focusHandled++;
+                    if (kind == 2) togglesHandled++;
                 }
             }
             [delegate checkResponsiveness];
@@ -271,6 +373,8 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         if (!delegate.done) [delegate fail:SinanUIFailureDeadline];
         result.eventLoopResponsive = eventLoopResponsive;
         result.focusHandled = focusHandled;
+        result.detached = detached;
+        result.togglesHandled = togglesHandled;
         result.failure = delegate.failure;
         result.heartbeatCompleted = delegate.heartbeatCompleted;
         result.ready = delegate.ready;

@@ -22,7 +22,7 @@ func run() bool {
 	if title == "" {
 		title = "司南插件"
 	}
-	result, err := uihost.Run(uihost.Config{Entry: init.Entry, CSP: init.CSP, Title: title}, client, nil)
+	result, err := uihost.Run(uihost.Config{Panel: init.Panel, Entry: init.Entry, CSP: init.CSP, Title: title}, client, nil)
 	if err != nil {
 		return false
 	}

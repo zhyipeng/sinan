@@ -7,7 +7,10 @@ import (
 
 // Focus is bounded and allows only one outstanding control. A late reply is
 // drained without killing a healthy window or creating another focus request.
-func (p *Process) Focus() error {
+func (p *Process) Focus() error  { return p.control("focus") }
+func (p *Process) Toggle() error { return p.control("toggle") }
+func (p *Process) Detach() error { return p.control("detach") }
+func (p *Process) control(kind string) error {
 	if !p.session.Active() {
 		return errors.New("视图已关闭，请重新打开")
 	}
@@ -34,7 +37,7 @@ func (p *Process) Focus() error {
 		if !p.session.Active() {
 			err = errors.New("revoked")
 		} else {
-			err = writeFrame(p.input, response{Kind: "focus", ID: id})
+			err = writeFrame(p.input, response{Kind: kind, ID: id})
 		}
 		p.exchange.Unlock()
 		if err != nil {
