@@ -131,7 +131,7 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 
 ## 受限 UI 资源声明
 
-Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供资源元数据；普通 Shell 尚无 HTML 命令入口；开发开关启用时，可信插件管理组件可以按声明 ID 请求独立窗口。`commands[].view` 仍只选择宿主构建时注册的可信组件，与声明的 UI ID 同名时拒绝，避免隐式切换承载方式。
+Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供资源元数据；Shell 不加载 HTML；开发开关启用时，可信管理组件可按声明 ID 请求独立窗口，搜索命令可通过 `uiView` 关联该声明。`commands[].view` 仍只选择宿主构建时注册的可信组件，与声明的 UI ID 同名时拒绝，避免隐式切换承载方式。
 
 ```json
 {
@@ -168,3 +168,23 @@ document.querySelector('#close').addEventListener('click', () => send({ kind: 'c
 ```
 
 脚本应放在包内独立 `.js` 资源中，HTML 以相对路径引用；固定 CSP 不允许内联脚本或远程脚本。此入口目前是 macOS 开发接口，不代表已提供跨平台 JavaScript SDK。
+
+
+## 搜索命令打开独立视图
+
+命令可用 `uiView` 引用同一插件的声明 ID：
+
+```json
+{
+  "commands": [{"id": "open", "title": "窗口验收", "keywords": ["window"], "uiView": "input"}],
+  "uiViews": [{"id": "input", "entry": "index.html", "bridgeVersion": "1", "permissions": []}]
+}
+```
+
+片段属于 contributes。uiView 不能与非空 message / view / execution 混用，引用必须存在；declarative / process 均可声明。原有 view 继续只打开可信组件，uiView 不成为导入地址或脚本路径。
+
+用户选择结果后，可信 Shell 调用 `OpenPluginCommand(pluginId, commandId)`。内核在同一变更锁中解析已安装包的当前绑定，并沿用启用状态、包指纹、资源和会话检查；前端不能为命令覆盖视图。普通 Execute（包括 CLI run）拒绝此类命令；打开视图不调用后端 execute。搜索 Provider 的激活规则保持不变。
+
+成功启动才隐藏面板，失败保留搜索；启动期间重新呼出面板后，迟到结果不能隐藏新面板。开发开关仍默认关闭，未启用时拒绝打开。同一视图的命令别名和管理入口共同去重，重复打开暂返回错误，不自动聚焦现有窗口。输入参数暂不传给页面，UI 仍只能 ready / close。
+
+旧宿主拒绝未知 uiView 字段，后端 API 1 和 UI 桥版本不变。详见 [ADR 0020](adr/0020-search-opens-independent-views.md)。

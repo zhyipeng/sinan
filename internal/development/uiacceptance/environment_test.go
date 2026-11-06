@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sinan/internal/search"
 	"sort"
 	"testing"
 )
@@ -27,6 +28,15 @@ func TestPrepareAndCleanup(t *testing.T) {
 	sort.Strings(ids)
 	if !reflect.DeepEqual(ids, []string{PluginID, "system.plugin-manager", "system.settings"}) {
 		t.Fatal("unexpected acceptance plugins")
+	}
+	var result search.Update
+	(&search.Coordinator{Backend: env.Manager}).Query(context.Background(), "acceptance", "窗口验收", func(update search.Update) { result = update })
+	if !result.Done || len(result.Items) != 1 || result.Items[0].PluginID != PluginID || result.Items[0].CommandID != "open" {
+		t.Fatal("acceptance view command not searchable")
+	}
+	commandSession, err := env.Manager.OpenUICommand(context.Background(), PluginID, "open")
+	if err != nil || commandSession.Binding().ViewID != "input" {
+		t.Fatal("acceptance command did not resolve its view")
 	}
 	session, err := env.Manager.OpenUIView(context.Background(), PluginID, "input")
 	if err != nil {

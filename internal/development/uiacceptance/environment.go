@@ -65,7 +65,7 @@ func Prepare(packages string) (*Environment, error) {
 		return nil, errors.New("无法准备验收页面")
 	}
 	mf := manifest.Manifest{ID: PluginID, Name: "窗口验收", Version: "0.1.0", APIVersion: protocol.APIVersion, Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{
-		Commands: []manifest.Command{{ID: "help", Title: "窗口验收说明", Message: "请在插件管理中找到「窗口验收」，点击「打开 input」。"}},
+		Commands: []manifest.Command{{ID: "open", Title: "窗口验收", Keywords: []string{"window", "验收", "独立窗口"}, UIView: "input"}},
 		UIViews:  []protocol.UIView{{ID: "input", Entry: "index.html", BridgeVersion: protocol.UIBridgeVersion}},
 	}}
 	data, err := json.Marshal(mf)

@@ -60,7 +60,7 @@ func installed(t *testing.T, script string) *kernel.Manager {
 			t.Fatal(err)
 		}
 	}
-	mf := manifest.Manifest{ID: "example.ui", Name: "Fixture", Version: "0.1.0", APIVersion: "1", Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{Commands: []manifest.Command{{ID: "hello", Title: "Fixture", Message: "fixture"}}, UIViews: []protocol.UIView{{ID: "main", Entry: "index.html", BridgeVersion: "1"}}}}
+	mf := manifest.Manifest{ID: "example.ui", Name: "Fixture", Version: "0.1.0", APIVersion: "1", Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{Commands: []manifest.Command{{ID: "hello", Title: "Fixture", Message: "fixture"}, {ID: "window", Title: "Window", UIView: "main"}, {ID: "alias", Title: "Alias", UIView: "main"}}, UIViews: []protocol.UIView{{ID: "main", Entry: "index.html", BridgeVersion: "1"}}}}
 	data, err := json.Marshal(mf)
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func controller(t *testing.T, m *kernel.Manager, mode string) (*Controller, chan
 		t.Fatal(err)
 	}
 	c.options.Args = []string{mode}
-	c.options.StartupTimeout = time.Second
+	c.options.StartupTimeout = 3 * time.Second
 	c.options.ShutdownGrace = 100 * time.Millisecond
 	t.Cleanup(c.Close)
 	return c, events
@@ -154,6 +154,45 @@ func TestControllerFailureAndReopen(t *testing.T) {
 	}
 	if waitEvent(t, events, 3*time.Second).Failed {
 		t.Fatal("healthy guest affected")
+	}
+}
+
+func TestCommandAndManagementShareWindowReservation(t *testing.T) {
+	m := installed(t, "")
+	c, events := controller(t, m, "wait-revoke")
+	if err := c.OpenCommand("example.ui", "hello"); err == nil {
+		t.Fatal("non-UI command opened")
+	}
+	if err := c.OpenCommand("example.ui", "window"); err != nil {
+		t.Fatal(err)
+	}
+	for _, open := range []func() error{
+		func() error { return c.Open("example.ui", "main") },
+		func() error { return c.OpenCommand("example.ui", "alias") },
+	} {
+		if open() == nil {
+			t.Fatal("same view opened through another entry")
+		}
+	}
+	select {
+	case <-events:
+		t.Fatal("rejected duplicate revoked the original window")
+	default:
+	}
+	if err := m.Stop("example.ui"); err != nil {
+		t.Fatal(err)
+	}
+	if waitEvent(t, events, 3*time.Second).Failed {
+		t.Fatal("cooperative original guest failed")
+	}
+	if err := c.OpenCommand("example.ui", "alias"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Stop("example.ui"); err != nil {
+		t.Fatal(err)
+	}
+	if waitEvent(t, events, 3*time.Second).Failed {
+		t.Fatal("command alias could not reopen closed window")
 	}
 }
 
@@ -254,7 +293,7 @@ setTimeout(() => {
 	}
 	t.Cleanup(c.Close)
 	started := time.Now()
-	if err = c.Open("example.ui", "main"); err != nil {
+	if err = c.OpenCommand("example.ui", "window"); err != nil {
 		t.Fatal(err)
 	}
 	if event := waitEvent(t, events, 12*time.Second); event.Failed || time.Since(started) < 8*time.Second {

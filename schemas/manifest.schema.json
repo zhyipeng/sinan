@@ -99,8 +99,44 @@
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9-]*$",
                 "description": "仅请求打开宿主构建时注册的可信组件，不是脚本或页面路径。"
+              },
+              "uiView": {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "description": "只引用同一插件已声明的 uiViews ID；由宿主打开独立客体，不进入可信组件。"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "uiView"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "view"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "message"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "execution"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
           }
         },
         "searchProviders": {
@@ -280,6 +316,11 @@
                     {
                       "required": [
                         "view"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "uiView"
                       ]
                     }
                   ]

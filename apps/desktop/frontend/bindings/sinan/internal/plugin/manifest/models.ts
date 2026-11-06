@@ -9,6 +9,7 @@ export interface Command {
     "message"?: string;
     "execution"?: string;
     "searchOnly"?: boolean;
+    "uiView"?: string;
 }
 
 export interface SearchProvider {

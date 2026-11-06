@@ -78,3 +78,32 @@ func TestLoadUIRejectsUnknownCapabilityFields(t *testing.T) {
 		}
 	}
 }
+
+func TestIndependentViewCommandBinding(t *testing.T) {
+	for _, kind := range []string{"declarative", "process"} {
+		t.Run(kind, func(t *testing.T) {
+			base := func() Manifest {
+				m := uiManifest()
+				m.Runtime.Kind = kind
+				if kind == "process" {
+					m.Runtime.Entry = "bin/plugin"
+				}
+				m.Contributes.Commands = []Command{{ID: "open", Title: "Open", UIView: "main"}}
+				return m
+			}
+			if err := base().Validate(); err != nil {
+				t.Fatal(err)
+			}
+			for _, mutate := range []func(*Command){
+				func(c *Command) { c.UIView = "missing" }, func(c *Command) { c.UIView = "../main" },
+				func(c *Command) { c.View = "settings" }, func(c *Command) { c.Message = "mixed" }, func(c *Command) { c.Execution = "direct" },
+			} {
+				m := base()
+				mutate(&m.Contributes.Commands[0])
+				if m.Validate() == nil {
+					t.Fatal("invalid UI command accepted")
+				}
+			}
+		})
+	}
+}

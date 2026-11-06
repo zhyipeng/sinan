@@ -14,8 +14,9 @@ declare global {
   }
 }
 
-const commands: { id: string; title: string; execution?: string; view?: string }[] = ['Alpha', 'Beta', 'Gamma', 'Late'].map(title => ({id:title.toLowerCase(),title}));
+const commands: { id: string; title: string; execution?: string; uiView?:string; view?: string }[] = ['Alpha', 'Beta', 'Gamma', 'Late'].map(title => ({id:title.toLowerCase(),title}));
 commands.push({id:'unregistered',title:'Unregistered',view:'external'});
+commands.push({id:'window',title:'Independent window',uiView:'main'});
 commands.push({ id:'application', title:'Application', execution:'direct' });
 let executions=0, dismissals=0, saves=0, clears=0, reloads=0, upgrades=0;
 let installedFingerprint="b".repeat(64), sourceFingerprint="a".repeat(64);
@@ -23,7 +24,9 @@ let config={revision:0,values:{directories:[] as string[]}};
 let shortcut={shortcut:'Cmd+Space',active:'Cmd+Space',default:'Cmd+Space',revision:0,error:'',ready:true};
 let recording=false;
 let managerPresent=true, fixturePresent=true, managerRestores=0, stops=0, uninstalls=0;
-let uiEnabled=false, openedViews=0;
+let uiEnabled=false, openedViews=0, commandWindows=0, failWindowOpen=false, deferWindow=false;
+let completeWindow: (()=>void)|undefined;
+let commandOpenArgs:unknown[]=[];
 let brokenName=false;
 let failEnablement=false;
 const plugin = {uiViews:[{id:'main',entry:'index.html',bridgeVersion:'1'},{id:'a'.repeat(64),entry:'other.html',bridgeVersion:'1'}],disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
@@ -44,8 +47,13 @@ const fixture = {
   complete() { done=true; publish(); },
   refresh() { publish(); },
   mutatePackage() { sourceFingerprint="c".repeat(64); },
-  counts() { return {openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
+  counts() { return {pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
   enableUI(){uiEnabled=true;},
+  readyWindows(){uiEnabled=true;plugin.changed=false;},
+  failNextWindowOpen(){failWindowOpen=true;},
+  deferWindowOpen(){deferWindow=true;},
+  completeWindowOpen(){completeWindow?.();},
+  showLauncher(){window._wails.dispatchWailsEvent({name:'launcher:show',data:null});},
   failWindow(){window._wails.dispatchWailsEvent({name:'ui:closed',data:{pluginId:plugin.id,viewId:'main',failed:true}});},
   failNextToggle() {failEnablement=true;},
   breakManager() { brokenName=true; },
@@ -56,6 +64,13 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 2354522669:
+      if(!uiEnabled)throw new Error('独立插件窗口尚未启用');
+      if(plugin.disabled||plugin.changed||args.args[0]!==plugin.id||args.args[1]!=='window')throw new Error('视图不可用');
+      commandOpenArgs=[...args.args];
+      if(failWindowOpen){failWindowOpen=false;throw new Error('UI 客体启动或握手失败');}
+      if(deferWindow){deferWindow=false;return new Promise(resolve=>{completeWindow=()=>{commandWindows++;resolve(undefined);};});}
+      commandWindows++;return;
     case 1572518711:return uiEnabled;
     case 188677181:
       if(!uiEnabled||plugin.disabled||plugin.changed||args.args[0]!==plugin.id||args.args[1]!=='main')throw new Error('视图不可用');
@@ -71,6 +86,7 @@ setTransport({async call(object,_method,_window,args){
       queueMicrotask(()=>window._wails.dispatchWailsEvent({name:'shortcut:changed',data:shortcut}));return shortcut;
     case 1083380061:
       sequence=String(args.args[0]);items=args.args[1]==='apps'?[item('Application')]:['Alpha','Beta','Gamma'].map(item);done=false;
+      if(args.args[1]==='window')items=[{...item('Window'),commandId:'window',providerId:'$commands',title:'独立窗口'}];
       if(args.args[1]==='unknown-view')items=[item('Unregistered')];
       if(args.args[1]==='settings')items=[{...item('Settings'),key:'system.settings/$commands/open',pluginId:'system.settings',commandId:'open',title:'设置',kind:'declarative'}];
       if(args.args[1]==='plugins')items=managerPresent?[{...item('Manager'),key:'system.plugin-manager/$commands/open',pluginId:managerManifest.id,commandId:'open',title:'插件管理',kind:'declarative'}]:[];

@@ -289,3 +289,101 @@ func TestUIWithoutDeclarationAndMissingResourceDenied(t *testing.T) {
 		})
 	}
 }
+
+func TestUICommandResolvesInstalledBindingWithoutBackend(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprint(native), func(t *testing.T) {
+			m := manager(t)
+			source := uiPackage(t, native, "0.1.0")
+			mf, err := manifest.Load(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mf.Contributes.Commands = append(mf.Contributes.Commands, manifest.Command{ID: "window", Title: "Window", UIView: "main"})
+			writeManifest(t, source, mf)
+			if _, err = m.Install(source, native); err != nil {
+				t.Fatal(err)
+			}
+			if err = m.Stop(mf.ID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = m.Execute(context.Background(), mf.ID, "window", ""); err == nil {
+				t.Fatal("UI command executed as backend command")
+			}
+			s, err := m.OpenUICommand(context.Background(), mf.ID, "window")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s.Binding().ViewID != "main" {
+				t.Fatal("wrong command binding")
+			}
+			p, err := m.lookup(mf.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p.mu.Lock()
+			running := p.process != nil
+			p.mu.Unlock()
+			if running {
+				t.Fatal("opening UI activated backend")
+			}
+			for _, commandID := range []string{"main", "index.html", "missing", mf.Contributes.Commands[0].ID} {
+				if _, err = m.OpenUICommand(context.Background(), mf.ID, commandID); err == nil {
+					t.Fatal("non-UI command or view path accepted")
+				}
+			}
+			if _, err = m.SetPluginEnabled(mf.ID, false); err != nil {
+				t.Fatal(err)
+			}
+			assertUIRevoked(t, s)
+			if _, err = m.OpenUICommand(context.Background(), mf.ID, "window"); err == nil {
+				t.Fatal("disabled UI command opened")
+			}
+			if _, err = m.SetPluginEnabled(mf.ID, true); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(m.root, mf.ID, "ui", "index.html"), []byte("changed"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = m.OpenUICommand(context.Background(), mf.ID, "window"); err == nil {
+				t.Fatal("changed package UI command opened")
+			}
+		})
+	}
+}
+
+func TestUICommandUsesBindingAfterUpgrade(t *testing.T) {
+	m := manager(t)
+	prepare := func(version, viewID string) string {
+		dir := uiPackage(t, false, version)
+		mf, err := manifest.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mf.Contributes.UIViews = append(mf.Contributes.UIViews, protocol.UIView{ID: "second", Entry: "second.html", BridgeVersion: "1"})
+		mf.Contributes.Commands = append(mf.Contributes.Commands, manifest.Command{ID: "window", Title: "Window", UIView: viewID})
+		writeManifest(t, dir, mf)
+		if err = os.WriteFile(filepath.Join(dir, "ui", "second.html"), []byte("second"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	if _, err := m.Install(prepare("0.1.0", "main"), false); err != nil {
+		t.Fatal(err)
+	}
+	old, err := m.OpenUICommand(context.Background(), "example.hello", "window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = m.Upgrade(prepare("0.2.0", "second"), false); err != nil {
+		t.Fatal(err)
+	}
+	assertUIRevoked(t, old)
+	current, err := m.OpenUICommand(context.Background(), "example.hello", "window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Binding().ViewID != "second" || current.EntryURL() != "sinan-plugin://example.hello/second.html" {
+		t.Fatal("command used stale view from before upgrade")
+	}
+}

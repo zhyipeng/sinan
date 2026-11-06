@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan UI acceptance regression');
+const task = await taskSpace('Sinan search window command regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -245,6 +245,41 @@ console.log('PASS: independent window gate, changed/disabled package guards, dec
 await page.goto('http://127.0.0.1:9245/tests/keyboard.html?acceptance=1');
 await page.waitForSelector('.management');
 console.log('PASS: temporary acceptance starts directly in plugin management');
+// Search opens declared independent windows without backend execution or a tool form.
+async function windowSearch() {
+  await page.goto('http://127.0.0.1:9245/tests/keyboard.html');
+  await page.waitForSelector(query);
+  await page.fill(query,'window');
+  await page.waitForSelector('.command');
+  await page.click(query);
+}
+await windowSearch();
+await page.keyboard.press('Enter');
+await page.waitForFunction(()=>document.querySelector('[role="alert"]')?.textContent.includes('尚未启用'));
+if(await page.evaluate(()=>window.navigationFixture.counts().executions||window.navigationFixture.counts().dismissals))throw new Error('Disabled UI fell through to execution or dismissal');
+await page.evaluate(()=>window.navigationFixture.readyWindows());
+await page.click(query);await page.keyboard.press('Enter');
+await page.waitForFunction(()=>window.navigationFixture.counts().commandWindows===1&&window.navigationFixture.counts().dismissals===1);
+const opened=await page.evaluate(()=>window.navigationFixture.counts());
+if(opened.executions!==0||JSON.stringify(opened.commandOpenArgs)!==JSON.stringify(['example.fixture','window']))throw new Error('Command route forwarded query or used backend execution');
+if(await page.evaluate(()=>!!document.querySelector('h1')))throw new Error('Independent view rendered a Shell tool form');
+await windowSearch();
+await page.evaluate(()=>{window.navigationFixture.readyWindows();window.navigationFixture.failNextWindowOpen();});
+await page.click(query);
+await page.keyboard.press('Enter');
+await page.waitForFunction(()=>document.querySelector('[role="alert"]')?.textContent.includes('握手失败'));
+if(await page.evaluate(()=>window.navigationFixture.counts().dismissals!==0||document.querySelector('input[aria-label="搜索命令"]').value!=='window'))throw new Error('Failed opening lost search state');
+await windowSearch();
+await page.evaluate(()=>{window.navigationFixture.readyWindows();window.navigationFixture.deferWindowOpen();});
+await page.click(query);
+await page.keyboard.press('Enter');
+await page.waitForFunction(()=>window.navigationFixture.counts().pendingWindow);
+await page.evaluate(()=>window.navigationFixture.showLauncher());
+await page.waitForFunction(()=>document.querySelector('input[aria-label="搜索命令"]').value==='');
+await page.evaluate(()=>window.navigationFixture.completeWindowOpen());
+await page.waitForFunction(()=>window.navigationFixture.counts().commandWindows===1);
+if(await page.evaluate(()=>window.navigationFixture.counts().dismissals!==0))throw new Error('Late opening hid a newly shown launcher');
+console.log('PASS: search window command, runtime gate, identity-only arguments, failure retention and stale completion');
 // A fresh page keeps the malformed display value away from earlier mutation assertions.
 await page.goto('http://127.0.0.1:9245/tests/keyboard.html');
 await page.waitForSelector('button[aria-label="管理插件"]');

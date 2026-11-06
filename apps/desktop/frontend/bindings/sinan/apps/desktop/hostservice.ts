@@ -53,6 +53,13 @@ export function LauncherStatus(): $CancellablePromise<string> {
 }
 
 /**
+ * OpenPluginCommand accepts command identity only; the kernel resolves its view.
+ */
+export function OpenPluginCommand(pluginID: string, commandID: string): $CancellablePromise<void> {
+    return $Call.ByID(2354522669, pluginID, commandID);
+}
+
+/**
  * OpenPluginView is only bound to the trusted Shell; the child gets no Wails bridge.
  */
 export function OpenPluginView(pluginID: string, viewID: string): $CancellablePromise<void> {

@@ -237,7 +237,9 @@ func TestConcurrentSnapshotAndCommands(t *testing.T) {
 
 func awaitSearch(t *testing.T, m *Manager, id string) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
+	// The first probe may include cold process activation; it uses Execute's
+	// five-second budget. Independent responsiveness assertions stay separate.
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		result, err := m.Execute(context.Background(), id, "echo", "active")
 		if err != nil {

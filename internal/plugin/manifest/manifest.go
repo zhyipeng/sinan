@@ -61,6 +61,7 @@ type Command struct {
 	Message    string   `json:"message,omitempty"`
 	Execution  string   `json:"execution,omitempty"`
 	SearchOnly bool     `json:"searchOnly,omitempty"`
+	UIView     string   `json:"uiView,omitempty"`
 }
 
 func ValidID(id string) bool { return idPattern.MatchString(id) && len(id) <= 128 }
@@ -123,10 +124,13 @@ func (m Manifest) Validate() error {
 			return errors.New("命令 ID、标题无效或重复")
 		}
 		seen[c.ID] = true
+		if c.UIView != "" && (!views[c.UIView] || c.View != "" || c.Message != "" || c.Execution != "") {
+			return errors.New("独立视图命令必须引用已声明视图，且不能混用其他执行方式")
+		}
 		if c.View != "" && (views[c.View] || !commandPattern.MatchString(c.View) || c.Message != "" || c.Execution != "" || m.Runtime.Kind != "declarative") {
 			return errors.New("视图命令声明无效")
 		}
-		if m.Runtime.Kind == "declarative" && c.Message == "" && c.View == "" {
+		if m.Runtime.Kind == "declarative" && c.Message == "" && c.View == "" && c.UIView == "" {
 			return errors.New("声明式命令需要 message")
 		}
 		if m.Runtime.Kind == "process" && c.Message != "" {

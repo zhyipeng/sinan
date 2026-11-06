@@ -452,7 +452,7 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 			break
 		}
 	}
-	if command != nil && command.View != "" {
+	if command != nil && (command.View != "" || command.UIView != "") {
 		return protocol.CommandResult{}, errors.New("此命令需要在桌面视图中打开")
 	}
 	if command == nil {

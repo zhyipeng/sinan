@@ -196,3 +196,11 @@ func (h *HostService) OpenPluginView(pluginID, viewID string) error {
 	return h.ui.Open(pluginID, viewID)
 }
 func (h *HostService) PluginUIEnabled() bool { return h.ui != nil }
+
+// OpenPluginCommand accepts command identity only; the kernel resolves its view.
+func (h *HostService) OpenPluginCommand(pluginID, commandID string) error {
+	if h.ui == nil {
+		return errors.New("独立插件窗口尚未启用")
+	}
+	return h.ui.OpenCommand(pluginID, commandID)
+}

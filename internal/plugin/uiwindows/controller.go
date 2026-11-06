@@ -12,6 +12,7 @@ import (
 
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/uiprocess"
+	"sinan/internal/plugin/uiview"
 )
 
 type Event struct {
@@ -42,7 +43,46 @@ func New(manager *kernel.Manager, executable string, onExit func(Event)) (*Contr
 }
 
 func (c *Controller) Open(pluginID, viewID string) error {
-	key := pluginID + "/" + viewID
+	return c.open(func(ctx context.Context) (*uiview.Session, error) { return c.manager.OpenUIView(ctx, pluginID, viewID) })
+}
+func (c *Controller) OpenCommand(pluginID, commandID string) error {
+	return c.open(func(ctx context.Context) (*uiview.Session, error) {
+		return c.manager.OpenUICommand(ctx, pluginID, commandID)
+	})
+}
+
+func (c *Controller) open(prepare func(context.Context) (*uiview.Session, error)) error {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return errors.New("UI 运行时已关闭")
+	}
+	c.active.Add(1)
+	c.mu.Unlock()
+	transferred, reserved := false, false
+	var session *uiview.Session
+	var key string
+	defer func() {
+		if !transferred {
+			if session != nil {
+				session.Revoke()
+			}
+			if reserved {
+				c.mu.Lock()
+				delete(c.opening, key)
+				c.mu.Unlock()
+			}
+			c.active.Done()
+		}
+	}()
+	var err error
+	session, err = prepare(c.ctx)
+	if err != nil {
+		return err
+	}
+	binding := session.Binding()
+	pluginID, viewID := binding.PluginID, binding.ViewID
+	key = pluginID + "/" + viewID
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -53,18 +93,8 @@ func (c *Controller) Open(pluginID, viewID string) error {
 		return errors.New("此视图已经打开")
 	}
 	c.opening[key] = true
-	c.active.Add(1)
+	reserved = true
 	c.mu.Unlock()
-	transferred := false
-	defer func() {
-		if !transferred {
-			c.release(key)
-		}
-	}()
-	session, err := c.manager.OpenUIView(c.ctx, pluginID, viewID)
-	if err != nil {
-		return err
-	}
 	process, err := uiprocess.Start(c.ctx, session, c.options)
 	if err != nil {
 		return err
@@ -91,13 +121,6 @@ func (c *Controller) Open(pluginID, viewID string) error {
 		}
 	}()
 	return nil
-}
-
-func (c *Controller) release(key string) {
-	c.mu.Lock()
-	delete(c.opening, key)
-	c.mu.Unlock()
-	c.active.Done()
 }
 
 // Close cancels startups and running guests and waits until all have been reaped.

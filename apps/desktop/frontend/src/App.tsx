@@ -4,9 +4,9 @@ import { pluginViews } from './pluginViews';
 import Recovery from './Recovery';
 import PluginViewBoundary from './PluginViewBoundary';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
-import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenPluginCommand } from '../bindings/sinan/apps/desktop/hostservice';
 
-type Command = { view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
+type Command = { uiView?: string; view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
 type Plugin = { disabled?: boolean; changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
 type SearchItem = { icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
 type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
@@ -164,6 +164,14 @@ export default function App() {
     const plugin = data.plugins.find(plugin => plugin.id === item.pluginId);
     if(plugin?.disabled){setError('插件已禁用。');return;}
     const command = plugin?.commands.find(command => command.id === item.commandId);
+    if (plugin && command?.uiView) {
+      const current = generation.current;
+      void perform(async () => {
+        await OpenPluginCommand(plugin.id, command.id);
+        if (current === generation.current) await HideLauncher();
+      });
+      return;
+    }
     if (plugin && command?.view && !pluginViews[`${plugin.id}/${command.view}`]) { setError('此视图尚未在桌面宿主中注册。'); return; }
     if (plugin && command?.execution === 'direct') {
       const current = generation.current;
