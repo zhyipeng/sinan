@@ -13,6 +13,26 @@ import (
 	"sinan/internal/plugin/uiview"
 )
 
+func grantAllUI(t *testing.T, m *Manager, id string) {
+	t.Helper()
+	state, err := m.UIPermissions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, plugin := range state.Plugins {
+		if plugin.ID == id {
+			caps := []string{}
+			for _, cap := range plugin.Permissions {
+				caps = append(caps, cap.ID)
+			}
+			if _, err = m.SaveUIPermissions(id, plugin.Fingerprint, state.Revision, caps); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatal("missing UI permission declaration")
+}
 func callableUI(t *testing.T, m *Manager) (*uiview.Session, string) {
 	t.Helper()
 	src := uiPackage(t, true, "0.1.0")
@@ -24,6 +44,7 @@ func callableUI(t *testing.T, m *Manager) (*uiview.Session, string) {
 	if _, err := m.Install(src, true); err != nil {
 		t.Fatal(err)
 	}
+	grantAllUI(t, m, "example.native")
 	s := openUI(t, m, "example.native")
 	if _, err := s.Message([]byte(`{"kind":"ready","version":2}`)); err != nil {
 		t.Fatal(err)
@@ -77,6 +98,7 @@ func TestUICommandsAndDataAreSessionBound(t *testing.T) {
 	if _, err := m.Upgrade(src, true); err != nil {
 		t.Fatal(err)
 	}
+	grantAllUI(t, m, "example.native")
 	next = openUI(t, m, "example.native")
 	next.Message([]byte(`{"kind":"ready","version":2}`))
 	if !strings.Contains(string(callUI(t, next, `{"method":"storage.get"}`)), "persisted") {

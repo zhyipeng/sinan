@@ -24,7 +24,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID|repair-system 目录|data|clear-data ID 检查指纹")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID|repair-system 目录|data|clear-data ID 检查指纹|ui-permissions|set-ui-permissions ID 包指纹 revision JSON数组")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -131,6 +131,21 @@ func run() error {
 		}
 		err = m.ClearPluginData(args[1], args[2])
 		result = "插件私有数据已清空"
+	case "ui-permissions":
+		if len(args) != 1 {
+			return errors.New("ui-permissions 不接受其他参数")
+		}
+		result, err = m.UIPermissions()
+	case "set-ui-permissions":
+		if len(args) != 5 {
+			return errors.New("set-ui-permissions 需要插件 ID、包指纹、revision 和权限 JSON 数组")
+		}
+		revision, parseErr := strconv.ParseUint(args[3], 10, 64)
+		var capabilities []string
+		if parseErr != nil || json.Unmarshal([]byte(args[4]), &capabilities) != nil || capabilities == nil {
+			return errors.New("权限参数格式无效")
+		}
+		result, err = m.SaveUIPermissions(args[1], args[2], revision, capabilities)
 	default:
 		return errors.New("未知操作")
 	}

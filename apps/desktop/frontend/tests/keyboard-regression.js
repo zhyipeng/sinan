@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan plugin data management regression');
+const task = await taskSpace('Sinan UI permissions regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -380,5 +380,27 @@ await page.waitForSelector('button[aria-label="清空 example.link 的数据"]')
 if(!await page.evaluate(()=>document.querySelector('[aria-label="清空 example.link 的数据"]').disabled))throw Error('unsafe file offered cleanup');
 console.log('PASS: data metadata, cancel, confirmation, changed-data rejection, installed/orphan cleanup, empty state and unsafe entry guards');
 console.log({dataScreenshot:await page.screenshot({path:'/tmp/sinan-plugin-data.png'})});
+// On-demand UI verification only; never part of make test.
+await page.click('loc=role:button[name="管理 UI 权限"]');
+await page.waitForSelector('input[aria-label="Fixture 运行命令：Alpha"]');
+if(await page.evaluate(()=>[...document.querySelectorAll('.permission-option input')].some(input=>input.checked)))throw Error('declaration automatically granted');
+await page.click('input[aria-label="Fixture 运行命令：Alpha"]');
+await page.click('button[aria-label="保存 Fixture 的 UI 权限"]');
+await page.waitForFunction(()=>window.navigationFixture.counts().permissionSaves===1);
+if(await page.evaluate(()=>document.querySelector('[aria-label="Fixture 读写私有数据"]').checked))throw Error('partial grant allowed storage');
+await page.click('input[aria-label="Fixture 读写私有数据"]');
+await page.evaluate(()=>window.navigationFixture.stalePermissionRevision());
+await page.click('button[aria-label="保存 Fixture 的 UI 权限"]');
+await page.waitForFunction(()=>document.querySelector('.plugin-permissions [role="alert"]')?.textContent.includes('已变化'));
+await page.click('loc=role:button[name="刷新权限"]');
+await page.waitForFunction(()=>!document.querySelector('[aria-label="保存 Fixture 的 UI 权限"]').disabled&&!document.querySelector('[aria-label="Fixture 读写私有数据"]').checked);
+await page.click('button[aria-label="取消勾选 Fixture 的全部 UI 权限"]');
+if(await page.evaluate(()=>window.navigationFixture.counts().permissionSaves)!==1)throw Error('unchecking saved without explicit action');
+await page.click('button[aria-label="保存 Fixture 的 UI 权限"]');
+await page.waitForFunction(()=>window.navigationFixture.counts().permissionSaves===2);
+await page.evaluate(()=>window.navigationFixture.mutatePermissionPackage());
+await page.click('loc=role:button[name="刷新权限"]');
+await page.waitForFunction(()=>document.querySelector('.permission-title small')?.textContent.includes('重新确认'));
+console.log('PASS: explicit/partial permissions, stale revision, checkbox drafts, revoke and changed package review');
 console.log(await page.snapshot());
 await task.finish({keep:[]});

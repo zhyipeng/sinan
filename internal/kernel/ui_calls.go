@@ -49,6 +49,9 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		if !slices.Contains(view.Permissions, "storage") {
 			return nil, errors.New("此视图未声明私有数据权限")
 		}
+		if !m.uiAllowed(p, view.ID+"/storage") {
+			return nil, errors.New("私有数据访问未授权，请在插件管理中设置 UI 权限")
+		}
 		var result any
 		if req.Method == "storage.get" {
 			result, err = m.documents.Get(p.manifest.ID)
@@ -60,9 +63,13 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		}
 		return marshalUIResult(result)
 	}
+	commandAllowed := m.uiAllowed(p, view.ID+"/command/"+req.CommandID)
 	m.mutationMu.Unlock()
 	if req.Method != "command.execute" || !slices.Contains(view.Commands, req.CommandID) {
 		return nil, errors.New("此视图未声明该命令")
+	}
+	if !commandAllowed {
+		return nil, errors.New("命令调用未授权，请在插件管理中设置 UI 权限")
 	}
 	// Calls route to the captured plugin instance; never resolve a replacement by ID.
 	process, err := p.ensureUIProcess(ctx, m.root)

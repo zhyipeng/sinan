@@ -233,3 +233,11 @@ storage.get / put 返回 `{revision, value}`；未保存时为 `{revision:0,valu
 PluginData() 返回私有文档元数据，不含正文；ClearPluginData(id, token) 仅清理该 ID 的固定文档，需要列表返回的最新文件状态指纹。数据有变化则要求重新检查并确认；成功后撤销该插件旧 HTML 会话，新页面看到空文档，避免旧自动保存重建数据。此接口不开放给 UI 桥 2。
 
 CLI：先退出持有相同根目录的宿主，运行 `sinanctl -plugins 路径 data` 查看，再显式运行 `sinanctl -plugins 路径 clear-data 插件ID 检查指纹`。UI 的清理入口位于插件管理底部，支持已卸载残留和损坏文档；符号链接及目录不会递归清理。设置、使用历史、插件包及缓存不受影响。详情见 [ADR 0030](adr/0030-plugin-data-management.md)。
+
+## 桥 2 的用户授权
+
+commands / storage 清单声明现在只是可申请能力，默认不批准。调用还要求 `$ui-permissions` 核心记录明确允许，且记录指纹与当前包内容完全一致。按 `view/command/commandId`、`view/storage` 分别授权；未授权返回 Promise 错误，不执行命令或读写文档。JSON 工具首次需在插件管理底部“UI 权限”逐项勾选并保存。
+
+可信管理 API 为 UIPermissions() / SaveUIPermissions(id, fingerprint, revision, capabilities)，不进入页面桥。保存支持版本冲突检查；成功变更关闭旧 HTML 页面，重新打开生效，私有文档保留。文件变更需先重载，新包重新确认；恢复完全相同已授权包字节可继续使用原授权。授权记录随核心配置保留，卸载后仅在重新安装的相同包字节匹配时适用。
+
+CLI：`sinanctl -plugins 路径 ui-permissions` 查看，随后显式使用 `set-ui-permissions 插件ID 包指纹 revision '["editor/command/format","editor/storage"]'` 保存。原生插件安装信任仍须独立确认。此机制只限制 UI 窄桥，不限制可信原生进程的系统访问。详见 [ADR 0031](adr/0031-explicit-ui-permissions.md)。

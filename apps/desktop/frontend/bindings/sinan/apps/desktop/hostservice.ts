@@ -151,6 +151,10 @@ export function SaveShortcut(value: string, revision: number): $CancellablePromi
     return $Call.ByID(2913582280, value, revision);
 }
 
+export function SaveUIPermissions(id: string, fingerprint: string, revision: number, capabilities: string[] | null): $CancellablePromise<kernel$0.UIPermissionState> {
+    return $Call.ByID(2058116116, id, fingerprint, revision, capabilities);
+}
+
 export function SetPluginEnabled(pluginID: string, enabled: boolean): $CancellablePromise<kernel$0.PluginInfo> {
     return $Call.ByID(448181795, pluginID, enabled);
 }
@@ -173,6 +177,10 @@ export function StartSearch(sequence: number, query: string): $CancellablePromis
 
 export function Stop(pluginID: string): $CancellablePromise<void> {
     return $Call.ByID(110346107, pluginID);
+}
+
+export function UIPermissions(): $CancellablePromise<kernel$0.UIPermissionState> {
+    return $Call.ByID(1580998567);
 }
 
 export function Uninstall(pluginID: string): $CancellablePromise<void> {
