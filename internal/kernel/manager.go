@@ -22,6 +22,7 @@ import (
 )
 
 type PluginInfo struct {
+	Protected       bool                      `json:"protected"`
 	UIViews         []protocol.UIView         `json:"uiViews,omitempty"`
 	Disabled        bool                      `json:"disabled"`
 	Changed         bool                      `json:"changed"`
@@ -204,7 +205,7 @@ func (p *plugin) info() PluginInfo {
 	if p.disabled {
 		state = "disabled"
 	}
-	return PluginInfo{UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	return PluginInfo{Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.
@@ -564,6 +565,9 @@ func (m *Manager) Stop(id string) error {
 }
 
 func (m *Manager) Uninstall(id string) error {
+	if protectedPlugin(id) {
+		return errors.New("系统插件不允许卸载")
+	}
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
 	if m.packageChangesBlocked(id) {

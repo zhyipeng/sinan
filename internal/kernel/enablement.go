@@ -31,11 +31,26 @@ func (m *Manager) loadEnablement() {
 			m.disabled[id] = true
 		}
 	}
+	// Ignore valid legacy disable entries for the now-protected system views.
+	// Preserve the source file; malformed policy still follows fail-closed handling.
+	for id := range m.disabled {
+		if protectedPlugin(id) {
+			delete(m.disabled, id)
+		}
+	}
+}
+
+// protectedPlugin is host policy, never a package-controlled manifest flag.
+func protectedPlugin(id string) bool {
+	return id == "system.settings" || id == "system.plugin-manager"
 }
 
 // SetPluginEnabled persists the desired state before changing the live instance.
 // Failure to save must leave the current process and policy unchanged.
 func (m *Manager) SetPluginEnabled(id string, enabled bool) (PluginInfo, error) {
+	if !enabled && protectedPlugin(id) {
+		return PluginInfo{}, errors.New("系统插件不允许禁用")
+	}
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
 	p, err := m.lookup(id)

@@ -30,8 +30,8 @@ let commandOpenArgs:unknown[]=[];
 let brokenName=false;
 let failEnablement=false;
 const plugin = {uiViews:[{id:'main',title:'',entry:'index.html',bridgeVersion:'1'},{id:'a'.repeat(64),entry:'other.html',bridgeVersion:'1'}],disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
-const settingsPlugin={disabled:false,...settingsManifest,kind:'declarative',state:'installed',commands:settingsManifest.contributes.commands};
-const managerPlugin={disabled:false,...managerManifest,kind:'declarative',state:'installed',commands:managerManifest.contributes.commands};
+const settingsPlugin={protected:true,disabled:false,...settingsManifest,kind:'declarative',state:'installed',commands:settingsManifest.contributes.commands};
+const managerPlugin={protected:true,disabled:false,...managerManifest,kind:'declarative',state:'installed',commands:managerManifest.contributes.commands};
 const appPlugin={disabled:false,id:'system.app-search',name:'应用检索',version:'0.4.0',kind:'process',state:'installed',commands:[],settings:[{id:'directories',title:'额外应用目录',type:'directory-list'}]};
 const canvas=document.createElement('canvas'); canvas.width=64; canvas.height=64;
 const icon=canvas.toDataURL('image/png');
@@ -56,6 +56,9 @@ const fixture = {
   completeWindowOpen(){completeWindow?.();},
   showLauncher(){window._wails.dispatchWailsEvent({name:'launcher:show',data:null});},
   failWindow(){window._wails.dispatchWailsEvent({name:'ui:closed',data:{pluginId:plugin.id,viewId:'main',failed:true}});},
+  // Simulate external damage/legacy policy, never an allowed management action.
+  disableManagerExternally() {managerPlugin.disabled=true;},
+  removeManagerExternally() {managerPresent=false;},
   failNextToggle() {failEnablement=true;},
   breakManager() { brokenName=true; },
   repairFixture() {brokenName=false;},
@@ -110,12 +113,14 @@ setTransport({async call(object,_method,_window,args){
     case 2575679692:clears++;return;
     case 110346107:plugin.state='deactivated';stops++;return;
     case 448181795: {
+      if([settingsPlugin.id,managerPlugin.id].includes(args.args[0])&&!args.args[1])throw new Error("系统插件不允许禁用");
       if(failEnablement){failEnablement=false;throw new Error('设置保存失败，请检查本地存储后重试');}
       const target=[plugin,settingsPlugin,managerPlugin,appPlugin].find(plugin=>plugin.id===args.args[0]);
       if(!target)throw new Error('插件不存在');
       target.disabled=!args.args[1];target.state=target.disabled?'disabled':'installed';return target;
     }
     case 147137039:
+      if([settingsPlugin.id,managerPlugin.id].includes(args.args[0]))throw new Error("系统插件不允许卸载");
       if(args.args[0]===managerManifest.id)managerPresent=false;else fixturePresent=false;
       uninstalls++;return;
     case 1301431035:

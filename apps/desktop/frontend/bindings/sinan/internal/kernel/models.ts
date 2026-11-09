@@ -20,6 +20,7 @@ export interface PackagePreview {
 }
 
 export interface PluginInfo {
+    "protected": boolean;
     "uiViews"?: protocol$0.UIView[] | null;
     "disabled": boolean;
     "changed": boolean;
