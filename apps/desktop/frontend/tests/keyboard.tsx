@@ -18,7 +18,7 @@ const commands: { id: string; title: string; execution?: string; uiView?:string;
 commands.push({id:'unregistered',title:'Unregistered',view:'external'});
 commands.push({id:'window',title:'Independent window',uiView:'main'});
 commands.push({ id:'application', title:'Application', execution:'direct' });
-let executions=0, dismissals=0, saves=0, clears=0, reloads=0, upgrades=0;
+let executions=0, dismissals=0, saves=0, clears=0, reloads=0, upgrades=0, detaches=0;
 let installedFingerprint="b".repeat(64), sourceFingerprint="a".repeat(64);
 let config={revision:0,values:{directories:[] as string[]}};
 let shortcut={shortcut:'Cmd+Space',active:'Cmd+Space',default:'Cmd+Space',revision:0,error:'',ready:true};
@@ -47,7 +47,7 @@ const fixture = {
   complete() { done=true; publish(); },
   refresh() { publish(); },
   mutatePackage() { sourceFingerprint="c".repeat(64); },
-  counts() { return {pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
+  counts() { return {detaches,pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
   enableUI(){uiEnabled=true;},
   nameView(){plugin.uiViews[0].title='输入视图';},
   readyWindows(){uiEnabled=true;plugin.changed=false;},
@@ -65,6 +65,10 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 3741028594:
+      detaches++;
+      window._wails.dispatchWailsEvent({name:'view:detached',data:null});
+      return;
     case 2354522669:
       if(!uiEnabled)throw new Error('独立插件窗口尚未启用');
       if(plugin.disabled||plugin.changed||args.args[0]!==plugin.id||args.args[1]!=='window')throw new Error('视图不可用');

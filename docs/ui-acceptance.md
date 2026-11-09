@@ -63,3 +63,15 @@ make ui-probe
 
 
 2026-11-09：临时原生实例已验证设置与插件管理的 Command + Shift + D 拆出、标题栏及关闭；管理页目录草稿与设置快捷键草稿保留，独立设置页可录入并保存快捷键、用 Escape 取消录入，关闭后新搜索面板仍能搜索。系统全局热键、真实三屏及全屏本轮未自动验收，仍需按上述步骤补测。
+
+
+## 呼出事件串窗回归
+
+拆出设置页或插件管理，保留未保存的输入。连续呼出/隐藏主搜索框，再搜索和打开其他界面：独立页应保持原界面和草稿；新主窗口应仍能正常搜索与拆出。该项修复覆盖 launcher:show 重置串窗和 view:detached 角色误广播。
+
+浏览器自动回归（另一个终端先运行前端 dev 服务）：
+
+```sh
+npm --prefix apps/desktop/frontend run dev
+npm --prefix apps/desktop/frontend run test:windows
+```

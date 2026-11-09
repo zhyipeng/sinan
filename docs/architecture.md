@@ -227,3 +227,8 @@ Command + Shift + D 或可信原生头部按钮在同一客体进程内迁移同
 设置和插件管理现可用同一 Command + Shift + D 或页头按钮拆出。宿主保留当前 Wails 窗口及其 WebView / React 树，将该窗口转换为有标题栏、可调整大小的独立工具窗口，再创建隐藏的新搜索面板接替主窗口角色。无需序列化设置草稿或重新挂载组件。主面板显隐、失焦隐藏与自动高度仅作用于新的主窗口；独立窗口失焦保持显示，关闭会释放。
 
 macOS 保留原 NSPanel 的非激活原生类型，移除浮动、跨 Space 及全屏辅助等主面板特征，避免在现有 NSPanel 上切换激活位造成 WindowServer 焦点标签不一致。Wails Bridge 仅在原有可信组件上下文中保留，第三方 HTML 仍走独立客体。调用者由 Wails 上下文中的真实窗口身份确认，快捷键录入按实际窗口校验焦点；禁用、卸载、重载或升级插件会关闭对应已拆出的可信窗口。见 [ADR 0023](adr/0023-trusted-view-detach.md)。
+
+
+### 窗口事件投递边界
+
+主窗口呼出与可信视图拆出属于窗口局部事件，使用目标 WebView 的 DispatchWailsEvent 定向投递。Wails WebviewWindow.EmitEvent 走应用事件总线，Sender 仅标识来源，不指定接收窗口，不能用于窗口角色切换。独立页面也以同步角色引用拒绝 launcher:show 重置，防止迟到或误广播事件清空当前工具状态。见 [ADR 0024](adr/0024-window-local-events.md)。

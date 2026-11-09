@@ -31,6 +31,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [detached, setDetached] = useState(false);
+  const detachedRef = useRef(false);
   const detaching = useRef(false);
   const [recovery, setRecovery] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -53,6 +54,9 @@ export default function App() {
       .catch(() => setError('无法连接桌面宿主，请重新启动司南。'));
     LauncherStatus().then(setShortcutError).catch(() => {});
     const reset = () => {
+      // This listener is registered once; read the current role synchronously.
+      // A stale/broadcast launcher event must never reset a detached tool.
+      if (detachedRef.current) return;
       generation.current++;
       setRecovery(false); setActive(undefined); setQuery(''); setSelection({ key: '', manual: false });
       setInput(''); setOutput(''); setError(''); setBusy(false);
@@ -61,7 +65,7 @@ export default function App() {
       requestAnimationFrame(() => searchRef.current?.focus());
     };
     const offShow = Events.On('launcher:show', reset);
-    const offDetached = Events.On('view:detached', () => setDetached(true));
+    const offDetached = Events.On('view:detached', () => { detachedRef.current = true; setDetached(true); });
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
     return () => { offShow(); offShortcut(); offDetached(); };
   }, []);
@@ -114,7 +118,7 @@ export default function App() {
     setError('');
     try {
       await DetachTrustedView(active.plugin.id, active.command.id);
-      setDetached(true);
+      detachedRef.current = true; setDetached(true);
     } catch { setError('拆出失败，请重试。'); }
     finally { detaching.current = false; }
   }

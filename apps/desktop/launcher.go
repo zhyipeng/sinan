@@ -64,7 +64,8 @@ func (l *launcher) showLocked() {
 	}
 	l.window.Show()
 	l.window.Focus()
-	l.window.EmitEvent("launcher:show")
+	// EmitEvent broadcasts through the application bus; Sender is not a target.
+	l.window.DispatchWailsEvent(&application.CustomEvent{Name: "launcher:show", Sender: "kernel.launcher"})
 }
 
 func (l *launcher) resize(window *application.WebviewWindow, height int) {
@@ -194,7 +195,7 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	window.SetAlwaysOnTop(false)
 	window.SetResizable(true)
 	application.InvokeSync(func() { platform.DetachPanel(window.NativeWindow()) })
-	window.EmitEvent("view:detached")
+	window.DispatchWailsEvent(&application.CustomEvent{Name: "view:detached", Sender: "kernel.views"})
 	window.Show()
 	window.Focus()
 	return nil

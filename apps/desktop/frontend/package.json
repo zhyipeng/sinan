@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:keyboard": "ego-browser nodejs < tests/keyboard-regression.js"
+    "test:keyboard": "ego-browser nodejs < tests/keyboard-regression.js",
+    "test:windows": "ego-browser nodejs < tests/window-events-regression.js"
   },
   "dependencies": {
     "@wailsio/runtime": "3.0.0",
