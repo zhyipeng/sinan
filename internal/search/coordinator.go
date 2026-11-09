@@ -68,6 +68,9 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 	results := map[string]Item{}
 	providers := []provider{}
 	for _, plugin := range snapshot.Plugins {
+		if ctx.Err() != nil {
+			return
+		}
 		if plugin.Disabled {
 			continue
 		}
@@ -75,8 +78,11 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 			if command.SearchOnly {
 				continue
 			}
-			haystack := strings.ToLower(strings.Join(append([]string{plugin.Name, command.Title}, command.Keywords...), " "))
-			if !strings.Contains(haystack, strings.ToLower(query)) {
+			if ctx.Err() != nil {
+				return
+			}
+			fields := append([]string{plugin.Name, command.Title}, command.Keywords...)
+			if !commandTextMatches(fields, query) {
 				continue
 			}
 			score := .85
