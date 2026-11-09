@@ -58,7 +58,7 @@ export default function Shortcut({ bridge }: { bridge: ShortcutBridge }) {
       await bridge.record(true);
       if (!alive.current) return;
       recordingRef.current = true; setRecording(true);
-    } catch { if (alive.current) setError('无法开始录入，请重试。'); }
+    } catch (error) { if (alive.current) setError(error instanceof Error ? error.message : '无法开始录入，请重试。'); }
     finally { if (alive.current) setPending(false); }
   }
   async function save() {

@@ -92,3 +92,9 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .management-toolbar { justify-content: space-between; color: var(--muted); font-size: 12px; }
 .management-recovery { margin-top: 18px; text-align: right; font-size: 11px; color: var(--muted); }
 .recovery-actions { margin-top: 12px; }
+
+.detached { max-height: none; height: 100vh; }
+.detached .tool { display: flex; flex-direction: column; height: 100%; }
+.detached .view-header { flex-shrink: 0; }
+.detached .settings-body, .detached .management-body { flex: 1; min-height: 0; max-height: none; }
+.detach-button { color: var(--muted); font-size: 18px; }

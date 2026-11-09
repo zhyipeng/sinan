@@ -4,7 +4,7 @@ import { pluginViews } from './pluginViews';
 import Recovery from './Recovery';
 import PluginViewBoundary from './PluginViewBoundary';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
-import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenPluginCommand } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenPluginCommand, DetachTrustedView, CloseTrustedView } from '../bindings/sinan/apps/desktop/hostservice';
 
 type Command = { uiView?: string; view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
 type Plugin = { disabled?: boolean; changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
@@ -30,6 +30,8 @@ export default function App() {
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [detached, setDetached] = useState(false);
+  const detaching = useRef(false);
   const [recovery, setRecovery] = useState(false);
   const [connected, setConnected] = useState(false);
   const [shortcutError, setShortcutError] = useState('');
@@ -59,8 +61,9 @@ export default function App() {
       requestAnimationFrame(() => searchRef.current?.focus());
     };
     const offShow = Events.On('launcher:show', reset);
+    const offDetached = Events.On('view:detached', () => setDetached(true));
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
-    return () => { offShow(); offShortcut(); };
+    return () => { offShow(); offShortcut(); offDetached(); };
   }, []);
 
   useEffect(() => {
@@ -105,6 +108,26 @@ export default function App() {
   }, [query, connected, recovery, active, data]);
 
   const ActiveView = active?.command.view ? pluginViews[`${active.plugin.id}/${active.command.view}`] : undefined;
+  async function detachView() {
+    if (!active || !ActiveView || detached || detaching.current) return;
+    detaching.current = true;
+    setError('');
+    try {
+      await DetachTrustedView(active.plugin.id, active.command.id);
+      setDetached(true);
+    } catch { setError('拆出失败，请重试。'); }
+    finally { detaching.current = false; }
+  }
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat || !event.metaKey || !event.shiftKey || event.altKey || event.ctrlKey || event.code !== 'KeyD' || !ActiveView || detached) return;
+      event.preventDefault();
+      void detachView();
+    };
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  }, [active, ActiveView, detached]);
+
 
   const selected = Math.max(0, commands.findIndex(item => item.key === selection.key));
   useEffect(() => {
@@ -139,6 +162,7 @@ export default function App() {
   const managerPlugin = installedManager?.disabled ? undefined : installedManager;
   const managerCommand = managerPlugin?.commands.find(command => command.id === 'open' && command.view === 'manager');
   function openRecovery() {
+    if (detached) { void CloseTrustedView(); return; }
     generation.current++; setActive(undefined); setRecovery(true); setBusy(false); setOutput(''); setError('');
   }
   function openManager() {
@@ -153,10 +177,11 @@ export default function App() {
   }, [connected, managerPlugin, managerCommand]);
   useEffect(() => {
     if (active?.command.view && !data.plugins.some(plugin => !plugin.disabled && plugin.id === active.plugin.id && plugin.commands.some(command => command.id === active.command.id && command.view === active.command.view))) {
+      if (detached) { void CloseTrustedView(); return; }
       generation.current++; setActive(undefined); setBusy(false); setOutput('');
       if (active.plugin.id === 'system.plugin-manager') setRecovery(true);
     }
-  }, [data, active]);
+  }, [data, active, detached]);
 
   function choose(index: number) {
     const item = commands[index];
@@ -186,7 +211,7 @@ export default function App() {
     if (plugin && command) { setActive({ plugin, command }); setInput(item.input); setOutput(''); setError(''); }
   }
 
-  return <main ref={shellRef} className="shell"
+  return <main ref={shellRef} className={`shell${detached ? " detached" : ""}`}
     onPointerEnter={event => { pointerPosition.current = { x: event.screenX, y: event.screenY }; }}
     onPointerMove={event => {
       const previous = pointerPosition.current;
@@ -202,7 +227,7 @@ export default function App() {
       <div className="view-header"><button className="back" onClick={() => { setRecovery(false); setError(''); }} aria-label="返回搜索">←</button><h1>恢复入口</h1></div>
       <Recovery available={!!managerCommand} disabled={!!installedManager?.disabled} diagnostics={data.diagnostics} shortcutError={shortcutError} onRefresh={reload} onOpen={openManager}/>
     </section> : active ? <section className="tool">
-      <div className="view-header"><button className="back" aria-label="返回搜索" onClick={() => { generation.current++; setBusy(false); setActive(undefined); setOutput(''); setError(''); }}>←</button><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}</div>
+      <div className="view-header"><button className="back" aria-label={detached ? "关闭窗口" : "返回搜索"} onClick={() => { if (detached) { void CloseTrustedView(); return; } generation.current++; setBusy(false); setActive(undefined); setOutput(''); setError(''); }}>{detached ? '×' : '←'}</button><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}{ActiveView && !detached && <button className="detach-button" aria-label="独立窗口" title="独立窗口（Command + Shift + D）" onClick={() => void detachView()}>↗</button>}</div>
       <>{ActiveView ? <PluginViewBoundary key={`${active.plugin.id}/${active.command.id}`} onRecover={openRecovery}><ActiveView plugins={data.plugins} onChanged={syncPlugins} onRecover={openRecovery} /></PluginViewBoundary> : <div className="tool-body">
         <form onSubmit={event => {
           event.preventDefault();

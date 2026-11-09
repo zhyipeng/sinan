@@ -36,6 +36,18 @@ export function ClearHistory(): $CancellablePromise<void> {
     return $Call.ByID(2575679692);
 }
 
+export function CloseTrustedView(): $CancellablePromise<void> {
+    return $Call.ByID(456120721);
+}
+
+/**
+ * DetachTrustedView rotates the Shell role, preserving the original trusted WebView.
+ * Identity is resolved against installed commands and the bundled component allowlist.
+ */
+export function DetachTrustedView(pluginID: string, commandID: string): $CancellablePromise<void> {
+    return $Call.ByID(3741028594, pluginID, commandID);
+}
+
 export function Execute(pluginID: string, commandID: string, input: string): $CancellablePromise<protocol$0.CommandResult> {
     return $Call.ByID(2263823638, pluginID, commandID, input);
 }

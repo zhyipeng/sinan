@@ -17,15 +17,17 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
-	ui             *uiwindows.Controller
-	uiError        string
-	shortcuts      *shortcutController
-	probeEnabled   bool
-	manager        *kernel.Manager
-	launcher       *launcher
-	searchMu       sync.Mutex
-	searchSequence uint64
-	searchCancel   context.CancelFunc
+	ui              *uiwindows.Controller
+	uiError         string
+	shortcuts       *shortcutController
+	probeEnabled    bool
+	manager         *kernel.Manager
+	launcher        *launcher
+	recordMu        sync.Mutex
+	recordingWindow *application.WebviewWindow
+	searchMu        sync.Mutex
+	searchSequence  uint64
+	searchCancel    context.CancelFunc
 }
 
 func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
@@ -42,18 +44,24 @@ func (h *HostService) Install(directory string, trustNative bool) (kernel.Plugin
 func (h *HostService) Execute(pluginID, commandID, input string) (protocol.CommandResult, error) {
 	return h.manager.Execute(context.Background(), pluginID, commandID, input)
 }
-func (h *HostService) Stop(pluginID string) error      { return h.manager.Stop(pluginID) }
-func (h *HostService) Uninstall(pluginID string) error { return h.manager.Uninstall(pluginID) }
+func (h *HostService) Stop(pluginID string) error { return h.manager.Stop(pluginID) }
+func (h *HostService) Uninstall(pluginID string) error {
+	err := h.manager.Uninstall(pluginID)
+	if err == nil && h.launcher != nil {
+		h.launcher.closePlugin(pluginID)
+	}
+	return err
+}
 
-func (h *HostService) ResizeLauncher(height int) {
+func (h *HostService) ResizeLauncher(ctx context.Context, height int) {
 	if h.launcher != nil {
-		h.launcher.resize(height)
+		h.launcher.resize(h.launcher.caller(ctx), height)
 	}
 }
 
-func (h *HostService) HideLauncher() {
+func (h *HostService) HideLauncher(ctx context.Context) {
 	if h.launcher != nil {
-		h.launcher.window.Hide()
+		h.launcher.hide(h.launcher.caller(ctx))
 	}
 }
 func (h *HostService) LauncherStatus() string {
@@ -65,7 +73,14 @@ func (h *HostService) LauncherStatus() string {
 
 // StartSearch belongs to the trusted Shell. Sequence numbers also reject
 // out-of-order Wails invocations before they can supersede a newer query.
-func (h *HostService) StartSearch(sequence uint64, query string) {
+func (h *HostService) StartSearch(ctx context.Context, sequence uint64, query string) {
+	if h.launcher == nil {
+		return
+	}
+	window := h.launcher.caller(ctx)
+	if !h.launcher.isMain(window) {
+		return
+	}
 	h.searchMu.Lock()
 	if sequence <= h.searchSequence {
 		h.searchMu.Unlock()
@@ -82,13 +97,16 @@ func (h *HostService) StartSearch(sequence uint64, query string) {
 	go coordinator.Query(ctx, strconv.FormatUint(sequence, 10), query, func(update search.Update) {
 		h.searchMu.Lock()
 		defer h.searchMu.Unlock()
-		if h.searchSequence == sequence && ctx.Err() == nil && h.launcher != nil {
-			h.launcher.window.DispatchWailsEvent(&application.CustomEvent{Name: "search:update", Data: update, Sender: "kernel.search"})
+		if h.searchSequence == sequence && ctx.Err() == nil && h.launcher.isMain(window) {
+			window.DispatchWailsEvent(&application.CustomEvent{Name: "search:update", Data: update, Sender: "kernel.search"})
 		}
 	})
 }
 
-func (h *HostService) CancelSearch(sequence uint64) {
+func (h *HostService) CancelSearch(ctx context.Context, sequence uint64) {
+	if h.launcher == nil || !h.launcher.isMain(h.launcher.caller(ctx)) {
+		return
+	}
 	h.searchMu.Lock()
 	defer h.searchMu.Unlock()
 	if sequence == h.searchSequence && h.searchCancel != nil {
@@ -133,7 +151,7 @@ func (h *HostService) SavePluginSettings(pluginID string, revision uint64, value
 	h.cancelSearch()
 	result, err := h.manager.SavePluginSettings(pluginID, revision, values)
 	if err == nil && h.launcher != nil {
-		h.launcher.window.DispatchWailsEvent(&application.CustomEvent{Name: "settings:changed", Data: map[string]any{"pluginId": pluginID, "revision": result.Revision}, Sender: "kernel.settings"})
+		h.launcher.dispatch(&application.CustomEvent{Name: "settings:changed", Data: map[string]any{"pluginId": pluginID, "revision": result.Revision}, Sender: "kernel.settings"})
 	}
 	return result, err
 }
@@ -145,12 +163,20 @@ func (h *HostService) PreviewPackage(directory string) (kernel.PackagePreview, e
 func (h *HostService) ApplyPackage(directory string, trustNative bool, fingerprint, installedFingerprint string) (kernel.PluginInfo, error) {
 	h.cancelSearch()
 	defer h.cancelSearch()
-	return h.manager.ApplyPackage(directory, trustNative, fingerprint, installedFingerprint)
+	result, err := h.manager.ApplyPackage(directory, trustNative, fingerprint, installedFingerprint)
+	if err == nil && h.launcher != nil {
+		h.launcher.closePlugin(result.ID)
+	}
+	return result, err
 }
 func (h *HostService) Reload(pluginID string) (kernel.PluginInfo, error) {
 	h.cancelSearch()
 	defer h.cancelSearch()
-	return h.manager.Reload(pluginID)
+	result, err := h.manager.Reload(pluginID)
+	if err == nil && h.launcher != nil {
+		h.launcher.closePlugin(pluginID)
+	}
+	return result, err
 }
 
 func (h *HostService) ShortcutSettings() (ShortcutState, error) {
@@ -165,27 +191,54 @@ func (h *HostService) SaveShortcut(value string, revision uint64) (ShortcutState
 	}
 	return h.shortcuts.Save(value, revision)
 }
-func (h *HostService) RecordShortcut(enabled bool) error {
-	if h.shortcuts == nil {
-		return fmt.Errorf("此运行模式不支持快捷键录入")
+func (h *HostService) RecordShortcut(ctx context.Context, enabled bool) error {
+	if h.shortcuts == nil || h.launcher == nil {
+		return errors.New("此运行模式不支持快捷键录入")
 	}
-	if enabled && h.launcher != nil && (!h.launcher.window.IsVisible() || !h.launcher.window.IsFocused()) {
-		return fmt.Errorf("窗口未聚焦，快捷键录入已取消")
+	window := h.launcher.caller(ctx)
+	if window == nil {
+		return errors.New("窗口不可用")
+	}
+	h.recordMu.Lock()
+	defer h.recordMu.Unlock()
+	if !enabled && h.recordingWindow != window {
+		return nil
+	}
+	if enabled && (!window.IsVisible() || !window.IsFocused()) {
+		return errors.New("窗口未聚焦，快捷键录入已取消")
 	}
 	if err := h.shortcuts.Record(enabled); err != nil {
 		return err
 	}
-	if enabled && h.launcher != nil && (!h.launcher.window.IsVisible() || !h.launcher.window.IsFocused()) {
-		_ = h.shortcuts.Record(false)
-		return fmt.Errorf("窗口未聚焦，快捷键录入已取消")
+	if enabled {
+		h.recordingWindow = window
+		if !window.IsVisible() || !window.IsFocused() {
+			h.recordingWindow = nil
+			_ = h.shortcuts.Record(false)
+			return errors.New("窗口未聚焦，快捷键录入已取消")
+		}
+	} else {
+		h.recordingWindow = nil
 	}
 	return nil
+}
+func (h *HostService) stopRecording(window *application.WebviewWindow) {
+	h.recordMu.Lock()
+	defer h.recordMu.Unlock()
+	if h.shortcuts != nil && h.recordingWindow == window {
+		h.recordingWindow = nil
+		_ = h.shortcuts.Record(false)
+	}
 }
 
 func (h *HostService) SetPluginEnabled(pluginID string, enabled bool) (kernel.PluginInfo, error) {
 	h.cancelSearch()
 	defer h.cancelSearch()
-	return h.manager.SetPluginEnabled(pluginID, enabled)
+	result, err := h.manager.SetPluginEnabled(pluginID, enabled)
+	if err == nil && !enabled && h.launcher != nil {
+		h.launcher.closePlugin(pluginID)
+	}
+	return result, err
 }
 
 // OpenPluginView is only bound to the trusted Shell; the child gets no Wails bridge.
@@ -220,4 +273,39 @@ func (h *HostService) showMain() {
 		}
 	}
 	h.launcher.show()
+}
+
+// DetachTrustedView rotates the Shell role, preserving the original trusted WebView.
+// Identity is resolved against installed commands and the bundled component allowlist.
+func (h *HostService) DetachTrustedView(ctx context.Context, pluginID, commandID string) error {
+	if h.launcher == nil {
+		return errors.New("窗口不可用")
+	}
+	title, key, err := trustedView(h.manager.Snapshot(), pluginID, commandID)
+	if err != nil {
+		return err
+	}
+	return h.launcher.detach(h.launcher.caller(ctx), title, key)
+}
+func trustedView(snapshot kernel.Snapshot, pluginID, commandID string) (string, string, error) {
+	for _, plugin := range snapshot.Plugins {
+		if plugin.ID != pluginID || plugin.Disabled {
+			continue
+		}
+		for _, command := range plugin.Commands {
+			key := plugin.ID + "/" + command.View
+			if command.ID == commandID && (key == "system.settings/settings" || key == "system.plugin-manager/manager") {
+				return command.Title, key, nil
+			}
+		}
+	}
+	return "", "", errors.New("此插件界面不支持拆出")
+}
+func (h *HostService) CloseTrustedView(ctx context.Context) {
+	if h.launcher == nil {
+		return
+	}
+	if window := h.launcher.caller(ctx); window != nil && !h.launcher.isMain(window) {
+		window.Close()
+	}
 }

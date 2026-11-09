@@ -8,6 +8,18 @@ package platform
 #include <CoreGraphics/CoreGraphics.h>
 #import <Cocoa/Cocoa.h>
 
+static void sinanDetachPanel(void *pointer) {
+    NSWindow *window = (NSWindow *)pointer;
+    window.titleVisibility = NSWindowTitleVisible;
+    window.titlebarAppearsTransparent = NO;
+    window.collectionBehavior = NSWindowCollectionBehaviorDefault;
+    window.movableByWindowBackground = NO;
+    if ([window isKindOfClass:NSPanel.class]) {
+        ((NSPanel *)window).floatingPanel = NO;
+        ((NSPanel *)window).hidesOnDeactivate = NO;
+    }
+}
+
 static CGDirectDisplayID sinanCursorDisplay(void) {
     CGEventRef event = CGEventCreate(NULL);
     if (event == NULL) return kCGNullDirectDisplay;
@@ -51,7 +63,10 @@ static SinanWorkArea sinanScreenWorkArea(CGDirectDisplayID displayID) {
 */
 import "C"
 
-import "strconv"
+import (
+	"strconv"
+	"unsafe"
+)
 
 // CursorScreenID returns the display containing the pointer, using the same
 // CGDirectDisplayID identity as Wails. This avoids mixing Cocoa, Quartz and DIP
@@ -73,4 +88,13 @@ func ScreenWorkArea(id string) (WorkArea, bool) {
 	}
 	area := C.sinanScreenWorkArea(C.CGDirectDisplayID(number))
 	return WorkArea{X: int(area.x), Y: int(area.y), Width: int(area.width), Height: int(area.height)}, bool(area.found)
+}
+
+// DetachPanel keeps the original NSPanel/WebView, but removes launcher-only
+// presentation. Keeping its nonactivating style avoids changing WindowServer
+// activation tags on an already-created NSPanel. Caller runs on AppKit main thread.
+func DetachPanel(window unsafe.Pointer) {
+	if window != nil {
+		C.sinanDetachPanel(window)
+	}
 }

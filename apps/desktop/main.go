@@ -4,6 +4,7 @@ import (
 	"embed"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -100,37 +101,56 @@ func run() error {
 			cleanupAcceptance()
 		},
 	})
-	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: "launcher", Title: "司南", Width: launcherWidth, Height: launcherMinHeight,
-		MinWidth: launcherWidth, MinHeight: launcherMinHeight,
-		Frameless: true, DisableResize: true, AlwaysOnTop: true,
-		HideOnFocusLost: true, HideOnEscape: true,
-		InitialPosition: application.WindowCentered,
-		Mac: application.MacWindow{
-			// A non-activating panel can take keyboard focus over another app's
-			// fullscreen Space without activating Sinan and switching desktops.
-			WindowClass: application.MacWindowClassPanel,
-			PanelPreferences: application.MacPanelPreferences{
-				NonActivating: true,
+	host.launcher = &launcher{detached: map[uint]trustedWindow{}}
+	var shellSequence uint
+	newShell := func(url string, hidden bool) *application.WebviewWindow {
+		shellSequence++
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name: fmt.Sprintf("shell-%d", shellSequence), Title: "司南", Width: launcherWidth, Height: launcherMinHeight,
+			MinWidth: launcherWidth, MinHeight: launcherMinHeight,
+			Frameless: true, DisableResize: true, AlwaysOnTop: true,
+			Hidden:          hidden,
+			InitialPosition: application.WindowCentered,
+			Mac: application.MacWindow{
+				// A non-activating panel can take keyboard focus over another app's
+				// fullscreen Space without activating Sinan and switching desktops.
+				WindowClass: application.MacWindowClassPanel,
+				PanelPreferences: application.MacPanelPreferences{
+					NonActivating: true,
+				},
+				WindowLevel: application.MacWindowLevelFloating,
+				CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
+					application.MacWindowCollectionBehaviorFullScreenAuxiliary,
+				TitleBar: application.MacTitleBar{Hide: true},
 			},
-			WindowLevel: application.MacWindowLevelFloating,
-			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
-				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
-			TitleBar: application.MacTitleBar{Hide: true},
-		},
-		BackgroundColour: application.NewRGB(246, 247, 251), URL: appURL,
-	})
-	host.launcher = &launcher{window: window}
-	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
-		event.Cancel()
-		window.Hide()
-	})
-	window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) {
-		host.cancelSearch()
-		if host.shortcuts != nil {
-			go func() { _ = host.shortcuts.Record(false) }()
-		}
-	})
+			BackgroundColour: application.NewRGB(246, 247, 251), URL: url,
+		})
+		window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+			if host.launcher.isMain(window) {
+				event.Cancel()
+				window.Hide()
+			} else {
+				host.launcher.forget(window)
+			}
+			host.stopRecording(window)
+		})
+		window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) {
+			if host.launcher.isMain(window) {
+				host.cancelSearch()
+				window.Hide()
+			}
+			host.stopRecording(window)
+		})
+		window.RegisterKeyBinding("escape", func(_ application.Window) {
+			if host.launcher.isMain(window) {
+				window.Hide()
+			}
+		})
+		return window
+	}
+	window := newShell(appURL, false)
+	host.launcher.window = window
+	host.launcher.newWindow = func() *application.WebviewWindow { return newShell("/", true) }
 	if *pluginUI && !*uiProbe {
 		executable, err := os.Executable()
 		if runtime.GOOS != "darwin" {
@@ -143,7 +163,7 @@ func run() error {
 					go host.showMain()
 				}
 				if !event.Detached {
-					window.DispatchWailsEvent(&application.CustomEvent{Name: "ui:closed", Data: event, Sender: "kernel.ui"})
+					host.launcher.dispatch(&application.CustomEvent{Name: "ui:closed", Data: event, Sender: "kernel.ui"})
 				}
 			})
 			if err != nil {
@@ -157,7 +177,7 @@ func run() error {
 	if !*uiProbe {
 		tray := configureTray(app, host.showMain)
 		host.shortcuts = newShortcutController(manager, app.GlobalShortcut, host.toggleMain, func(value string) {
-			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
+			host.launcher.dispatch(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
 		}, func(state ShortcutState) {
 			host.launcher.setShortcutError(state.Error)
 			if *acceptance {
@@ -165,7 +185,7 @@ func run() error {
 			} else {
 				tray.SetTooltip("司南 · " + state.Shortcut)
 			}
-			window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
+			host.launcher.dispatch(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
 		})
 		// Register after startup so native conflicts are returned synchronously.
 		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) { host.shortcuts.Start() })

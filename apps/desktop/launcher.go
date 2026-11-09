@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -14,11 +17,18 @@ const (
 )
 
 // launcher owns only native Shell behavior. Plugin business remains in the runtime.
+type trustedWindow struct {
+	window *application.WebviewWindow
+	key    string
+}
+
 type launcher struct {
 	window        *application.WebviewWindow
 	mu            sync.Mutex
 	shortcutError string
 	screenID      string
+	detached      map[uint]trustedWindow
+	newWindow     func() *application.WebviewWindow
 }
 
 func (l *launcher) show() {
@@ -57,9 +67,12 @@ func (l *launcher) showLocked() {
 	l.window.EmitEvent("launcher:show")
 }
 
-func (l *launcher) resize(height int) {
+func (l *launcher) resize(window *application.WebviewWindow, height int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if window == nil || l.window != window {
+		return
+	}
 	height = max(launcherMinHeight, min(launcherMaxHeight, height))
 	x, y := l.window.Position()
 	if area, ok := screenWorkArea(l.screenID); ok {
@@ -104,4 +117,85 @@ func configureTray(app *application.App, show func()) *application.SystemTray {
 	menu.Add("退出司南").OnClick(func(_ *application.Context) { app.Quit() })
 	tray.SetMenu(menu)
 	return tray
+}
+
+func (l *launcher) isMain(window application.Window) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.window != nil && l.window == window
+}
+func (l *launcher) forget(window application.Window) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.detached, window.ID())
+}
+func (l *launcher) caller(ctx context.Context) *application.WebviewWindow {
+	window, _ := ctx.Value(application.WindowKey).(*application.WebviewWindow)
+	if window == nil {
+		return nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.window == window {
+		return window
+	}
+	if entry, ok := l.detached[window.ID()]; ok && entry.window == window {
+		return window
+	}
+	return nil
+}
+func (l *launcher) dispatch(event *application.CustomEvent) {
+	l.mu.Lock()
+	windows := []*application.WebviewWindow{l.window}
+	for _, entry := range l.detached {
+		windows = append(windows, entry.window)
+	}
+	l.mu.Unlock()
+	for _, window := range windows {
+		if window != nil {
+			window.DispatchWailsEvent(event)
+		}
+	}
+}
+func (l *launcher) closePlugin(pluginID string) {
+	l.mu.Lock()
+	var windows []*application.WebviewWindow
+	for _, entry := range l.detached {
+		if strings.HasPrefix(entry.key, pluginID+"/") {
+			windows = append(windows, entry.window)
+		}
+	}
+	l.mu.Unlock()
+	for _, window := range windows {
+		window.Close()
+	}
+}
+func (l *launcher) hide(window *application.WebviewWindow) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if window != nil && l.window == window {
+		window.Hide()
+	}
+}
+func (l *launcher) detach(window *application.WebviewWindow, title, key string) error {
+	l.mu.Lock()
+	if window == nil || window != l.window || l.newWindow == nil {
+		l.mu.Unlock()
+		return errors.New("当前界面无法拆出")
+	}
+	// Keep the existing WebView and React tree. Only the search role is replaced.
+	replacement := l.newWindow()
+	l.detached[window.ID()] = trustedWindow{window: window, key: key}
+	l.window = replacement
+	l.mu.Unlock()
+	window.RegisterKeyBinding("escape", nil)
+	window.SetFrameless(false)
+	window.SetTitle(title)
+	window.SetAlwaysOnTop(false)
+	window.SetResizable(true)
+	application.InvokeSync(func() { platform.DetachPanel(window.NativeWindow()) })
+	window.EmitEvent("view:detached")
+	window.Show()
+	window.Focus()
+	return nil
 }
