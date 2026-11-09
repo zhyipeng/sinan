@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import PluginData,{type DataBridge} from './PluginData';
 
 export type ManagedPlugin = {protected?: boolean; id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string;title?:string}[] | null};
 export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]; uiEnabled?: boolean};
 export type PackagePreview = {id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean};
-export type ManagementBridge = {
+export type ManagementBridge = DataBridge & {
   refresh(): Promise<ManagedSnapshot>;
   stop(id: string): Promise<void>;
   uninstall(id: string): Promise<void>;
@@ -91,5 +92,6 @@ export default function PluginManager({bridge, onChanged, onRecover}: {bridge: M
     {error&&<p className="error" role="alert">{error}</p>}
     {notice&&<p className="settings-notice" role="status">{notice}</p>}
     <div className="management-recovery"><button type="button" onClick={onRecover}>恢复入口</button></div>
+    <PluginData bridge={bridge} disabled={busy} snapshot={data} />
   </div>;
 }

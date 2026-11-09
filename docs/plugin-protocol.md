@@ -224,6 +224,12 @@ await writeData(doc.revision, { text: input });
 
 SDK 文件需复制到插件 ui/；它只包装 Promise 请求，不包含 Wails Bridge。对应请求为 command.execute / storage.get / storage.put，调用不接受插件 ID、路径或额外字段。身份来自宿主 Session；配置、安装、Shell、其他插件和任意后端 RPC 不可访问。每会话在途最多 1 个、每分钟 120 次、500 ms 预算，请求 64 KiB、响应 192 KiB。SDK 最多排队 8 个调用。
 
-storage.get / put 返回 `{revision, value}`；未保存时为 `{revision:0,value:null}`。每插件一个最大 32 KiB JSON 值；put 必须携带当前 revision，冲突要求重新读取，损坏文件拒绝覆盖。包外数据在升级/卸载后保留，暂不提供清除接口。页面关闭可能发生写入已提交但回执丢失，重开应读取当前版本。命令超时或撤销沿用强制终止后端，其他会话应重新打开。
+storage.get / put 返回 `{revision, value}`；未保存时为 `{revision:0,value:null}`。每插件一个最大 32 KiB JSON 值；put 必须携带当前 revision，冲突要求重新读取，损坏文件拒绝覆盖。包外数据在升级/卸载后保留，清理仅由可信管理入口提供，不向页面开放。页面关闭可能发生写入已提交但回执丢失，重开应读取当前版本。命令超时或撤销沿用强制终止后端，其他会话应重新打开。
 
 实现与限制见 [ADR 0029](adr/0029-ui-calls-private-data-json-tool.md)。原生后端协议 API 仍为 1。
+
+## 私有数据管理（可信宿主）
+
+PluginData() 返回私有文档元数据，不含正文；ClearPluginData(id, token) 仅清理该 ID 的固定文档，需要列表返回的最新文件状态指纹。数据有变化则要求重新检查并确认；成功后撤销该插件旧 HTML 会话，新页面看到空文档，避免旧自动保存重建数据。此接口不开放给 UI 桥 2。
+
+CLI：先退出持有相同根目录的宿主，运行 `sinanctl -plugins 路径 data` 查看，再显式运行 `sinanctl -plugins 路径 clear-data 插件ID 检查指纹`。UI 的清理入口位于插件管理底部，支持已卸载残留和损坏文档；符号链接及目录不会递归清理。设置、使用历史、插件包及缓存不受影响。详情见 [ADR 0030](adr/0030-plugin-data-management.md)。

@@ -24,7 +24,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID|repair-system 目录")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID|repair-system 目录|data|clear-data ID 检查指纹")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -120,6 +120,17 @@ func run() error {
 			return errors.New("enable / disable 需要插件 ID")
 		}
 		result, err = m.SetPluginEnabled(args[1], args[0] == "enable")
+	case "data":
+		if len(args) != 1 {
+			return errors.New("data 不接受其他参数")
+		}
+		result, err = m.PluginData()
+	case "clear-data":
+		if len(args) != 3 {
+			return errors.New("clear-data 需要插件 ID 和 data 列表中的检查指纹")
+		}
+		err = m.ClearPluginData(args[1], args[2])
+		result = "插件私有数据已清空"
 	default:
 		return errors.New("未知操作")
 	}

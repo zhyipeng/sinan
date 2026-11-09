@@ -3,6 +3,7 @@
 
 export type {
     PackagePreview,
+    PluginDataInfo,
     PluginInfo,
     Snapshot
 } from "./models.js";

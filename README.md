@@ -178,3 +178,7 @@ make dev-ui
 使用 `make dev-ui` 在开发实例中安装并打开 `tools.json`，搜索 JSON 即可进入。支持格式化、压缩、错误行列、保留大整数和草稿保存；Command/Ctrl + Enter 格式化，加 Shift 压缩。拆出窗口使用设置中的窗口独立快捷键。
 
 也可先 `make build json-plugin`，退出使用目标目录的宿主后，用 `bin/sinanctl -plugins 插件目录 -trust-native install bin/plugins/json-tool` 安装，再以 `-plugin-ui` 启动桌面宿主。原生后端需显式信任，独立进程不是安全沙箱。草稿显示“已保存”后才确认落盘，单插件文档最大 32 KiB。完整边界见 [ADR 0029](docs/adr/0029-ui-calls-private-data-json-tool.md)。
+
+### 插件私有数据管理
+
+插件管理底部的“插件数据”可查看私有文档占用，清理已安装或卸载后保留的数据。清理须二次确认，会关闭该插件 HTML 页面，保留设置、历史、包和缓存；文件变化后需重新确认。CLI 对应 `data`、`clear-data ID 检查指纹`，先退出使用同目录的桌面宿主。详见 [ADR 0030](docs/adr/0030-plugin-data-management.md)。

@@ -379,3 +379,18 @@ func (h *HostService) RepairSystemPlugin(directory, fingerprint, installedFinger
 	}
 	return result, err
 }
+
+func (h *HostService) PluginData() ([]kernel.PluginDataInfo, error) {
+	return h.manager.PluginData()
+}
+func (h *HostService) ClearPluginData(pluginID, token string) error {
+	h.cancelSearch()
+	defer h.cancelSearch()
+	if err := h.manager.ClearPluginData(pluginID, token); err != nil {
+		return err
+	}
+	if h.launcher != nil {
+		h.launcher.closePlugin(pluginID)
+	}
+	return nil
+}

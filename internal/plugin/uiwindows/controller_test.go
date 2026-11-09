@@ -740,3 +740,63 @@ window.webkit.messageHandlers.sinan.postMessage({kind:'close'});
 		}
 	}
 }
+
+func TestNativeHostDataCleanupRevokesAutosave(t *testing.T) {
+	if nativeGuest == "" {
+		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
+	}
+	source := t.TempDir()
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(source, "ui"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	mf := manifest.Manifest{ID: "example.writer", Name: "Writer", Version: "0.1.0", APIVersion: "1", Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{Commands: []manifest.Command{{ID: "open", Title: "Writer", UIView: "main"}}, UIViews: []protocol.UIView{{ID: "main", Entry: "index.html", BridgeVersion: "2", Permissions: []string{"storage"}}}}}
+	data, _ := json.Marshal(mf)
+	os.WriteFile(filepath.Join(source, "manifest.json"), data, 0600)
+	os.WriteFile(filepath.Join(source, "ui", "index.html"), []byte(`<!doctype html><script src="writer.js"></script>`), 0600)
+	script := `window.webkit.messageHandlers.sinan.postMessage({kind:'ready',version:2});
+const call=body=>window.webkit.messageHandlers.sinanCall.postMessage(body);
+async function save(){try{const doc=await call({method:'storage.get'});await call({method:'storage.put',revision:doc.revision,value:{text:'fixture'}});}catch{}setTimeout(save,100);}
+void save();`
+	os.WriteFile(filepath.Join(source, "ui", "writer.js"), []byte(script), 0600)
+	m, err := kernel.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	if _, err = m.Install(source, false); err != nil {
+		t.Fatal(err)
+	}
+	session, err := m.OpenUIView(context.Background(), "example.writer", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	process, err := uiprocess.Start(context.Background(), session, uiprocess.Options{Executable: nativeGuest, Lifetime: 6 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer process.Stop()
+	cleared := false
+	for until := time.Now().Add(3 * time.Second); time.Now().Before(until); {
+		rows, err := m.PluginData()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 1 && m.ClearPluginData(rows[0].ID, rows[0].Token) == nil {
+			cleared = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !cleared {
+		t.Fatal("active writer could not be cleared")
+	}
+	result := process.Wait()
+	if result.Err != nil || session.Active() {
+		t.Fatal("cleanup did not revoke native writer", result.Err)
+	}
+	rows, err := m.PluginData()
+	if err != nil || len(rows) != 0 {
+		t.Fatal("autosave recreated cleared document", err)
+	}
+}

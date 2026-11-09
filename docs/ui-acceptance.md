@@ -111,3 +111,15 @@ npm --prefix apps/desktop/frontend run test:windows
 5. 仅在临时目录构造 revision 冲突或损坏数据文件：保存失败保留输入并提示，不能静默覆盖文件；显式“载入已存草稿”恢复已保存版本。读取失败仍可格式化，暂停自动写入。
 
 可重复原生自动化：`SINAN_NATIVE_UI_TEST=1 go test -race ./internal/plugin/uiwindows -run TestNativeHostJSONPlugin`（使用本机 Go 1.26 工具链及项目 macOS 编译标志）。浏览器 UI 夹具：运行 `node plugins/json-tool/tests/serve.mjs`，再执行 `ego-browser nodejs < plugins/json-tool/tests/ui-regression.js`；该夹具不验证真实桥安全边界。
+
+## 插件私有数据管理
+
+仅用临时/开发实例验收，不清理日常数据：
+
+1. JSON 工具输入内容，等待草稿已保存。在插件管理底部展开“插件数据”，应显示插件、文档字节数；不会展示正文。
+2. 点击清空，确认区应滚入视野并默认聚焦取消；取消后数据和页面保留，焦点回到原按钮。
+3. 在确认前让 JSON 再保存一次，旧确认应拒绝；列表刷新后重新确认才能清空。清空后旧 HTML 页面关闭，重新打开 JSON 得到空草稿，不会自动回写旧内容。
+4. 卸载普通插件后仍能看到其私有文档，标记“未安装”；确认后可删除残留。损坏包未注册同样标记未安装，不能据此判断包目录已卸载。
+5. 仅在临时目录模拟损坏 JSON、超大普通文件、符号链接和目录：前两者可清理，后两者按钮禁用，不递归删除或修改目标文件。设置和插件管理仍不能禁用、卸载。
+
+数据占用仅统计私有 JSON 文档的逻辑字节，不含设置、使用历史、包或缓存；文件异常或权限不足不能被当作数据已清空。CLI 的 data 列表与 clear-data 操作也仅限该文档。

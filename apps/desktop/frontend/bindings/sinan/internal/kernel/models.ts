@@ -19,6 +19,15 @@ export interface PackagePreview {
     "changed": boolean;
 }
 
+export interface PluginDataInfo {
+    "id": string;
+    "bytes": number;
+    "corrupt": boolean;
+    "token": string;
+    "name": string;
+    "installed": boolean;
+}
+
 export interface PluginInfo {
     "protected": boolean;
     "uiViews"?: protocol$0.UIView[] | null;

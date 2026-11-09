@@ -36,6 +36,10 @@ export function ClearHistory(): $CancellablePromise<void> {
     return $Call.ByID(2575679692);
 }
 
+export function ClearPluginData(pluginID: string, token: string): $CancellablePromise<void> {
+    return $Call.ByID(1111664535, pluginID, token);
+}
+
 export function CloseTrustedView(): $CancellablePromise<void> {
     return $Call.ByID(456120721);
 }
@@ -80,6 +84,10 @@ export function OpenPluginCommand(pluginID: string, commandID: string): $Cancell
  */
 export function OpenPluginView(pluginID: string, viewID: string): $CancellablePromise<void> {
     return $Call.ByID(188677181, pluginID, viewID);
+}
+
+export function PluginData(): $CancellablePromise<kernel$0.PluginDataInfo[] | null> {
+    return $Call.ByID(3637179584);
 }
 
 /**

@@ -98,3 +98,16 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .detached .view-header { flex-shrink: 0; }
 .detached .settings-body, .detached .management-body { flex: 1; min-height: 0; max-height: none; }
 .detach-button { color: var(--muted); font-size: 18px; }
+
+/* Data management follows the existing rows, typography and blue focus style. */
+.plugin-data { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.data-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.data-toolbar h2 { margin: 0; font-size: 14px; font-weight: 550; }
+.data-toolbar small, .data-row small, .data-confirm small { display: block; color: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.data-toolbar button, .data-row button { font-size: 12px; flex-shrink: 0; }
+.data-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 12px 0; }
+.data-row > div { min-width: 0; }
+.data-row strong { font-size: 13px; overflow-wrap: anywhere; }
+.data-confirm { padding: 12px; background: #fff6f2; border: 1px solid #f1d3c8; border-radius: 7px; margin-top: 12px; }
+.data-confirm p { margin: 0 0 5px; font-size: 13px; overflow-wrap: anywhere; }
+.data-confirm > div { display: flex; justify-content: flex-end; margin-top: 10px; }
