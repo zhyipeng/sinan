@@ -55,10 +55,12 @@ make dev
 ```sh
 make build       # bin/sinan、bin/sinanctl
 make package     # macOS: bin/Sinan.app（本地未签名应用包）
-make test        # 包含真实子进程的竞态测试
+make test        # 无弹窗回归：前端构建与 Go 竞态测试，包含无界面子进程
 ```
 
-键盘导航的浏览器回归需要本机 `ego-browser` CLI：先运行 `npm --prefix apps/desktop/frontend run dev`，再在另一终端运行 `npm --prefix apps/desktop/frontend run test:keyboard`。固定测试页控制慢结果到达时机，覆盖搜索未结束时的上下键、同批次增量更新、鼠标静止、结果插入和回车打开选中项；不会连接真实插件。
+`make test` 强制关闭真实 WebView 测试，不受外部 `SINAN_NATIVE_UI_TEST=1` 影响。真实桌面 UI、原生探测和浏览器交互回归均移出日常回归，仅在明确要求 UI 验证时单独运行。
+
+按需运行的键盘导航浏览器回归需要本机 `ego-browser` CLI：先运行 `npm --prefix apps/desktop/frontend run dev`，再在另一终端运行 `npm --prefix apps/desktop/frontend run test:keyboard`。固定测试页控制慢结果到达时机，覆盖搜索未结束时的上下键、同批次增量更新、鼠标静止、结果插入和回车打开选中项；不会连接真实插件。
 
 前端资源嵌入宿主，修改后用 `make build` 或 `make dev` 重新构建。当前尚未配置 Wails 热重载工作流；仅打开前端 Vite 页面无法调用桌面宿主。
 
