@@ -526,3 +526,84 @@ func TestAttachedPanelBackReturnsToSearch(t *testing.T) {
 		t.Fatal("back left main panel attached")
 	}
 }
+
+func installNextView(t *testing.T, m *kernel.Manager, missing bool) {
+	t.Helper()
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "ui"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if !missing {
+		if err := os.WriteFile(filepath.Join(root, "ui", "index.html"), []byte("fixture"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mf := manifest.Manifest{ID: "example.next", Name: "Next", Version: "0.1.0", APIVersion: "1", Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{Commands: []manifest.Command{{ID: "open", Title: "Next", UIView: "main"}}, UIViews: []protocol.UIView{{ID: "main", Entry: "index.html", BridgeVersion: "1"}}}}
+	data, _ := json.Marshal(mf)
+	if err := os.WriteFile(filepath.Join(root, "manifest.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Install(root, false); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestFailedPanelReplacementKeepsPreviousSession(t *testing.T) {
+	for _, phase := range []string{"resource", "startup"} {
+		t.Run(phase, func(t *testing.T) {
+			m := installed(t, "")
+			installNextView(t, m, phase == "resource")
+			c, events := controller(t, m, "wait-revoke")
+			if err := c.Open("example.ui", "main"); err != nil {
+				t.Fatal(err)
+			}
+			c.mu.Lock()
+			previous := c.panel
+			if phase == "startup" {
+				c.options.Args = []string{"silent"}
+				c.options.StartupTimeout = 150 * time.Millisecond
+			}
+			c.mu.Unlock()
+			if err := c.Open("example.next", "main"); err == nil {
+				t.Fatal("broken candidate opened")
+			}
+			c.mu.Lock()
+			same := c.panel == previous
+			c.mu.Unlock()
+			if !same || !previous.session.Active() {
+				t.Fatal("failed candidate retired previous page")
+			}
+			if handled, err := c.Main(false); !handled || err != nil {
+				t.Fatal("previous page no longer accepts focus", err)
+			}
+			select {
+			case event := <-events:
+				t.Fatalf("failed replacement closed previous guest: %s", event.PluginID)
+			default:
+			}
+		})
+	}
+}
+func TestSuccessfulPanelReplacementRetiresOnlyPreviousAttachedPage(t *testing.T) {
+	m := installed(t, "")
+	installNextView(t, m, false)
+	c, events := controller(t, m, "wait-revoke")
+	if err := c.Open("example.ui", "main"); err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	previous := c.panel
+	c.mu.Unlock()
+	if err := c.Open("example.next", "main"); err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	current := c.panel
+	c.mu.Unlock()
+	if current == previous || previous.session.Active() || !current.session.Active() {
+		t.Fatal("replacement did not commit")
+	}
+	event := waitEvent(t, events, 3*time.Second)
+	if event.PluginID != "example.ui" || event.ReturnToSearch || event.Failed {
+		t.Fatal("old page exit disturbed committed page")
+	}
+}

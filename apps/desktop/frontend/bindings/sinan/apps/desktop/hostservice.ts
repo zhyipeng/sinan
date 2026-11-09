@@ -98,6 +98,13 @@ export function PreviewPackage(directory: string): $CancellablePromise<kernel$0.
 }
 
 /**
+ * System repair is a trusted Shell operation; it is not exposed to UI guests.
+ */
+export function PreviewSystemRepair(directory: string): $CancellablePromise<kernel$0.PackagePreview> {
+    return $Call.ByID(599706841, directory);
+}
+
+/**
  * Diagnostic output contains booleans only; no guest data or filesystem paths.
  */
 export function RecordIsolationProbe(report: $models.IsolationReport, rejected: boolean): $CancellablePromise<void> {
@@ -114,6 +121,10 @@ export function Refresh(): $CancellablePromise<kernel$0.Snapshot> {
 
 export function Reload(pluginID: string): $CancellablePromise<kernel$0.PluginInfo> {
     return $Call.ByID(3444025306, pluginID);
+}
+
+export function RepairSystemPlugin(directory: string, fingerprint: string, installedFingerprint: string): $CancellablePromise<kernel$0.PluginInfo> {
+    return $Call.ByID(3812136400, directory, fingerprint, installedFingerprint);
 }
 
 export function ResizeLauncher(height: number): $CancellablePromise<void> {

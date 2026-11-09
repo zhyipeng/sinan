@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ApplyPackage, PreviewPackage, SetPluginEnabled } from '../bindings/sinan/apps/desktop/hostservice';
+import { RepairSystemPlugin, PreviewSystemRepair, SetPluginEnabled } from '../bindings/sinan/apps/desktop/hostservice';
 import type { PackagePreview } from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 
 // Minimal recovery is always bundled with the Shell and does not require an
@@ -26,18 +26,17 @@ export default function Recovery({available,disabled,diagnostics,shortcutError,o
       event.preventDefault();
       void perform(async()=>{
         if(!preview){
-          const next=await PreviewPackage(directory);
-          if(next.id!=='system.plugin-manager'||next.kind!=='declarative')throw new Error('请选择声明式的 system.plugin-manager 插件包。');
+          const next=await PreviewSystemRepair(directory);
           if(alive.current)setPreview(next);
         }else if(preview.changed){
           try{
-            await ApplyPackage(directory,false,preview.fingerprint,preview.installedFingerprint);
-            if(alive.current){setDirectory('');setNotice('插件管理已恢复。');}
+            await RepairSystemPlugin(directory,preview.fingerprint,preview.installedFingerprint);
+            if(alive.current){setDirectory('');setNotice('系统插件已修复。');}
           }finally{if(alive.current)setPreview(undefined);}
         }
       });
     }}>
-      <label htmlFor="recovery-directory">恢复插件管理</label>
+      <label htmlFor="recovery-directory">修复系统插件</label>
       <div className="install-row"><input id="recovery-directory" value={directory} disabled={busy} spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" onChange={event=>{setDirectory(event.target.value);setPreview(undefined);setError('');setNotice('');}} placeholder="插件目录的绝对路径" required/><button className="primary" disabled={busy||!directory.trim()||preview&&!preview.changed}>{!preview?'检查':preview.changed?'恢复':'无需更新'}</button></div>
       {preview&&<div className="package-preview" role="status"><strong>{preview.name}</strong><span>{preview.version}</span></div>}
     </form>

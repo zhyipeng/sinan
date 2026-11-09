@@ -197,3 +197,9 @@ document.querySelector('#close').addEventListener('click', () => send({ kind: 'c
 宿主解析当前声明后按绑定复用活动客体，启动中的相同请求共享启动结果。私有 focus / focused 控制按待确认编号关联，不进入页面桥，也不携带查询输入。聚焦确认有 2 秒等待预算，超时不关闭健康窗口；尚有未确认请求时拒绝追加。活动窗口名额已满仍可复用，撤销或包变化则拒绝旧句柄。
 
 首次打开在鼠标所在显示器可用区域居中；聚焦已有窗口保持位置，并恢复最小化状态。后端 API 和页面桥仍为 1；私有通道扩展需同步构建宿主与客体。见 [ADR 0021](adr/0021-window-focus-title-and-placement.md)。
+
+## 核心恢复接口
+
+可信 Shell 的 `PreviewSystemRepair(directory)` / `RepairSystemPlugin(directory, fingerprint, installedFingerprint)` 专用于恢复设置和插件管理的声明式组件包。此处 installedFingerprint 表示预览时实际目录字节（允许清单损坏），目录不存在时为空；与普通升级预览中的注册实例基线不同。双方字节改变都必须重新检查。CLI 可在桌面宿主退出、释放目录独占后运行 `sinanctl -plugins 路径 repair-system 本地系统插件目录`。普通卸载和禁用保护不变，HTML 页面桥不获得此接口。
+
+后端与 UI 客体直接进程退出不再等待后代持有的 stderr；不保证回收任意后代进程。HTML 候选页打开失败保留先前附着页面，成功后才撤销原会话。详见 [ADR 0028](adr/0028-core-recovery-and-lifecycle.md)。

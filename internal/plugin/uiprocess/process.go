@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,7 +93,10 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	cmd.Env = []string{"LANG=en_US.UTF-8"}
 	cmd.Stdin = inRead
 	cmd.Stdout = outWrite
-	cmd.Stderr = io.Discard
+	// nil routes stderr directly to the OS null device. io.Discard would
+	// create a copy goroutine whose pipe can be held open by descendants.
+	cmd.Stderr = nil
+	cmd.WaitDelay = 500 * time.Millisecond
 	if err = cmd.Start(); err != nil {
 		inRead.Close()
 		inWrite.Close()

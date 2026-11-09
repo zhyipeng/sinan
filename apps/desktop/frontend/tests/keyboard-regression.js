@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan configurable detach shortcut regression');
+const task = await taskSpace('Sinan core capability fixes regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -204,10 +204,10 @@ await page.click('button[aria-label="返回搜索"]');
 await page.waitForSelector('button[aria-label="管理插件"]');
 await page.click('button[aria-label="管理插件"]');
 await page.waitForSelector('.recovery');
-// Recovery only accepts the declarative management package, not arbitrary/native packages.
+// System repair rejects arbitrary/native packages before review.
 await page.fill('#recovery-directory','/tmp/sinan-fixture-package');
 await page.click('loc=role:button[name="检查"]');
-await page.waitForFunction(()=>document.querySelector('.recovery [role="alert"]')?.textContent.includes('system.plugin-manager'));
+await page.waitForFunction(()=>document.querySelector('.recovery [role="alert"]')?.textContent.includes('声明式组件包'));
 await page.fill('#recovery-directory','/tmp/sinan-manager-package');
 await page.click('loc=role:button[name="检查"]');
 await page.waitForSelector('.package-preview');

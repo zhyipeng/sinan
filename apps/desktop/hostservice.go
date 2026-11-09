@@ -365,3 +365,17 @@ func (h *HostService) startDetachShortcuts() {
 		h.detachShortcuts.publish()
 	}
 }
+
+// System repair is a trusted Shell operation; it is not exposed to UI guests.
+func (h *HostService) PreviewSystemRepair(directory string) (kernel.PackagePreview, error) {
+	return h.manager.PreviewSystemRepair(directory)
+}
+func (h *HostService) RepairSystemPlugin(directory, fingerprint, installedFingerprint string) (kernel.PluginInfo, error) {
+	h.cancelSearch()
+	defer h.cancelSearch()
+	result, err := h.manager.RepairSystemPlugin(directory, fingerprint, installedFingerprint)
+	if err == nil && h.launcher != nil {
+		h.launcher.closePlugin(result.ID)
+	}
+	return result, err
+}

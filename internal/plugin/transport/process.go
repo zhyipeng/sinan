@@ -32,7 +32,10 @@ func Start(path, dir string) (*Process, error) {
 	cmd.Dir = dir
 	// Do not forward the host's environment or log arbitrary plugin stderr.
 	cmd.Env = []string{"LANG=en_US.UTF-8"}
-	cmd.Stderr = io.Discard
+	// nil routes stderr directly to the OS null device. io.Discard would
+	// create a copy goroutine whose pipe can be held open by descendants.
+	cmd.Stderr = nil
+	cmd.WaitDelay = 500 * time.Millisecond
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, errors.New("无法创建插件输入管道")

@@ -24,7 +24,7 @@ func run() error {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID")
+		return errors.New("用法: sinanctl [-plugins 路径] [-trust-native] list|install 目录|uninstall ID|run ID 命令 [输入]|search 查询|clear-history|settings ID|set-settings ID revision JSON|inspect 目录|upgrade 目录|reload ID|enable ID|disable ID|repair-system 目录")
 	}
 	m, err := kernel.New(*root)
 	if err != nil {
@@ -101,6 +101,15 @@ func run() error {
 			return errors.New("upgrade 需要插件目录")
 		}
 		result, err = m.Upgrade(args[1], *trusted)
+	case "repair-system":
+		if len(args) != 2 {
+			return errors.New("repair-system 需要系统插件目录")
+		}
+		var preview kernel.PackagePreview
+		preview, err = m.PreviewSystemRepair(args[1])
+		if err == nil {
+			result, err = m.RepairSystemPlugin(args[1], preview.Fingerprint, preview.InstalledFingerprint)
+		}
 	case "reload":
 		if len(args) != 2 {
 			return errors.New("reload 需要插件 ID")

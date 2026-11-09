@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +15,22 @@ import (
 
 func main() {
 	mode := os.Args[1]
+	if mode == "stderr-leaf" {
+		time.Sleep(time.Minute)
+		return
+	}
+	if mode == "stderr-child" {
+		executable, _ := os.Executable()
+		child := exec.Command(executable, "stderr-leaf")
+		child.Stderr = os.Stderr
+		if child.Start() != nil {
+			os.Exit(18)
+		}
+		if os.WriteFile(os.Args[2], []byte(strconv.Itoa(child.Process.Pid)), 0600) != nil {
+			_ = child.Process.Kill()
+			os.Exit(19)
+		}
+	}
 	if mode == "crash" {
 		os.Exit(7)
 	}
@@ -78,7 +96,7 @@ func main() {
 		time.Sleep(time.Minute)
 		return
 	}
-	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" || mode == "wait-shortcut" {
+	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" || mode == "wait-shortcut" || mode == "stderr-child" {
 		done := make(chan struct{})
 		c.OnRevoke(func() { close(done) })
 		delayed := false

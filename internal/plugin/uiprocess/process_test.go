@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -328,5 +329,36 @@ func TestLiveDetachShortcutUpdatesKeepSessionAndRejectStaleRevision(t *testing.T
 	result := p.Wait()
 	if result.Err != nil || string(result.Report) != `{"shortcut":"Ctrl+Alt+F19"}` {
 		t.Fatal("renderer missed live preference update", result.Err)
+	}
+}
+
+func TestStopDoesNotWaitForDescendantStderr(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "child.pid")
+	opts := options("stderr-child")
+	opts.Args = append(opts.Args, pidFile)
+	var process *Process
+	t.Cleanup(func() {
+		data, _ := os.ReadFile(pidFile)
+		pid, _ := strconv.Atoi(string(data))
+		if pid > 0 {
+			if child, err := os.FindProcess(pid); err == nil {
+				_ = child.Kill()
+			}
+		}
+		if process != nil {
+			process.Stop()
+		}
+	})
+	var err error
+	process, err = Start(context.Background(), session(t), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { process.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("UI reaping waited for descendant stderr")
 	}
 }

@@ -132,6 +132,12 @@ setTransport({async call(object,_method,_window,args){
       if([settingsPlugin.id,managerPlugin.id].includes(args.args[0]))throw new Error("系统插件不允许卸载");
       if(args.args[0]===managerManifest.id)managerPresent=false;else fixturePresent=false;
       uninstalls++;return;
+    case 599706841:
+      if(args.args[0]!=='/tmp/sinan-manager-package')throw new Error('仅支持设置或插件管理的声明式组件包');
+      return {id:managerManifest.id,name:managerManifest.name,version:'0.1.0',kind:'declarative',installedVersion:managerPresent?'0.1.0':'',fingerprint:'d'.repeat(64),installedFingerprint:managerPresent?'e'.repeat(64):'',changed:true};
+    case 3812136400:
+      if(args.args[0]!=='/tmp/sinan-manager-package'||args.args[1]!=='d'.repeat(64)||args.args[2]!== (managerPresent?'e'.repeat(64):''))throw new Error('插件文件已变化，请重新检查后修复');
+      managerPresent=true;managerRestores++;return managerPlugin;
     case 1301431035:
       if(args.args[0]==='/tmp/sinan-manager-package')return {id:managerManifest.id,name:managerManifest.name,version:'0.1.0',kind:'declarative',installedVersion:managerPresent?'0.1.0':'',fingerprint:'d'.repeat(64),installedFingerprint:managerPresent?'e'.repeat(64):'',changed:true};
       return {id:plugin.id,name:plugin.name,version:'0.2.0',kind:'process',installedVersion:plugin.version,fingerprint:sourceFingerprint,installedFingerprint,changed:plugin.version!=='0.2.0'};

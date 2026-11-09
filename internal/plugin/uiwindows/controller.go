@@ -79,6 +79,8 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 	var session *uiview.Session
 	var owned *windowEntry
 	var key string
+	var previous *windowEntry
+	candidateStarted := false
 	defer func() {
 		if !transferred {
 			if session != nil {
@@ -95,6 +97,14 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 				owned.err = err
 				close(owned.ready)
 				c.mu.Unlock()
+			}
+			if candidateStarted && previous != nil {
+				c.mu.Lock()
+				restore := !c.closed && c.panel == previous && previous.attached
+				c.mu.Unlock()
+				if restore && previous.session.Active() {
+					_ = previous.process.Focus()
+				}
 			}
 			c.active.Done()
 		}
@@ -136,23 +146,11 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		}
 		return existing.process.Focus()
 	}
-	previous := c.panel
+	previous = c.panel
 	owned = &windowEntry{ready: make(chan struct{}), attached: c.options.Panel}
-	if owned.attached {
-		c.panel = owned
-	}
 	c.opening[key] = owned
 	c.mu.Unlock()
-	if previous != nil && previous != owned {
-		select {
-		case <-previous.ready:
-			if previous.session != nil {
-				previous.session.Revoke()
-			}
-		case <-c.ctx.Done():
-			return errors.New("UI 运行时已关闭")
-		}
-	}
+
 	session, err = prepare(c.ctx)
 	if err != nil {
 		return err
@@ -180,6 +178,7 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		}
 		return true
 	}
+	candidateStarted = true
 	process, err := uiprocess.Start(c.ctx, session, options)
 	if err != nil {
 		return err
@@ -197,9 +196,17 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		_ = process.SetDetachShortcut(shortcut, revision)
 	}
 	c.mu.Lock()
+	var retired *windowEntry
+	if owned.attached {
+		retired = c.panel
+		c.panel = owned
+	}
 	close(owned.ready)
 	c.mu.Unlock()
 	transferred = true
+	if retired != nil && retired != owned {
+		retired.session.Revoke()
+	}
 	go func() {
 		result := process.Wait()
 		var report *struct {
