@@ -26,7 +26,7 @@ func TestUIViewDeclarations(t *testing.T) {
 		func(m *Manifest) { m.Contributes.UIViews[0].ID = "" },
 		func(m *Manifest) { m.Contributes.UIViews[0].ID = strings.Repeat("a", 65) },
 		func(m *Manifest) { m.Contributes.UIViews[0].BridgeVersion = "" },
-		func(m *Manifest) { m.Contributes.UIViews[0].BridgeVersion = "2" },
+		func(m *Manifest) { m.Contributes.UIViews[0].BridgeVersion = "99" },
 		func(m *Manifest) { m.Contributes.UIViews[0].Title = "   " },
 		func(m *Manifest) { m.Contributes.UIViews[0].Title = "line\nbreak" },
 		func(m *Manifest) { m.Contributes.UIViews[0].Title = strings.Repeat("窗", 65) },
@@ -108,5 +108,36 @@ func TestIndependentViewCommandBinding(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUIRequestCapabilitiesAreExplicit(t *testing.T) {
+	m := uiManifest()
+	m.Contributes.UIViews[0].BridgeVersion = "2"
+	m.Contributes.UIViews[0].Permissions = []string{"storage"}
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	m.Contributes.UIViews[0].BridgeVersion = "1"
+	if m.Validate() == nil {
+		t.Fatal("legacy permissions accepted")
+	}
+	m.Contributes.UIViews[0].BridgeVersion = "2"
+	m.Contributes.UIViews[0].Commands = []string{"hello"}
+	if m.Validate() == nil {
+		t.Fatal("declarative command call accepted")
+	}
+	m.Runtime = Runtime{Kind: "process", Entry: "plugin"}
+	m.Contributes.Commands[0].Message = ""
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	m.Contributes.UIViews[0].Commands = []string{"missing"}
+	if m.Validate() == nil {
+		t.Fatal("missing command accepted")
+	}
+	m.Contributes.UIViews[0].Commands = []string{"hello", "hello"}
+	if m.Validate() == nil {
+		t.Fatal("duplicate allowed command")
 	}
 }

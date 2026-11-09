@@ -15,6 +15,7 @@ void sinanUIControlRevoke(SinanUIControl *control);
 void sinanUIControlFree(SinanUIControl *control);
 SinanUIProbeReport sinanUIProbe(const char *metadataJSON, const char *targetURL, unsigned long long handle, SinanUIControl *control);
 extern char *sinanUISessionResource(unsigned long long handle, char *url);
+extern char *sinanUISessionCall(unsigned long long handle, char *json, int length);
 extern int sinanUISessionMessage(unsigned long long handle, char *json, int length);
 extern void sinanUISessionRevoke(unsigned long long handle);
 extern int sinanUIProbeDisable(unsigned long long handle);

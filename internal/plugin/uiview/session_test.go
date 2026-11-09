@@ -117,7 +117,7 @@ func TestSessionRejectsMissingOrIncompatibleUIBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, mutate := range []func(*Binding){
-		func(b *Binding) { b.ViewID = "" }, func(b *Binding) { b.ViewID = "../main" }, func(b *Binding) { b.BridgeVersion = "" }, func(b *Binding) { b.BridgeVersion = "2" },
+		func(b *Binding) { b.ViewID = "" }, func(b *Binding) { b.ViewID = "../main" }, func(b *Binding) { b.BridgeVersion = "" }, func(b *Binding) { b.BridgeVersion = "99" },
 	} {
 		binding := s.Binding()
 		mutate(&binding)

@@ -1,15 +1,29 @@
 package protocol
 
+import "encoding/json"
+
 // UIBridgeVersion versions the narrow page bridge, independently of backend RPC.
 const UIBridgeVersion = "1"
+const UIRequestBridgeVersion = "2"
 
-// UIView declares resources only. It does not grant host capabilities or make
-// an HTML command available in the trusted Shell. Permissions default to none;
-// this first bridge version rejects every nonempty permission request.
+func SupportedUIBridge(v string) bool { return v == UIBridgeVersion || v == UIRequestBridgeVersion }
+
+// UIView declares a fixed resource entry. Bridge 1 accepts no capabilities;
+// bridge 2 explicitly allows same-plugin backend commands and private storage.
 type UIView struct {
+	Commands      []string `json:"commands,omitempty"`
 	Title         string   `json:"title,omitempty"`
 	ID            string   `json:"id"`
 	Entry         string   `json:"entry"`
 	BridgeVersion string   `json:"bridgeVersion"`
 	Permissions   []string `json:"permissions,omitempty"`
+}
+
+// UIRequest has no caller identity or path; authority comes from the host session.
+type UIRequest struct {
+	Method    string          `json:"method"`
+	CommandID string          `json:"commandId,omitempty"`
+	Input     string          `json:"input,omitempty"`
+	Revision  uint64          `json:"revision,omitempty"`
+	Value     json.RawMessage `json:"value,omitempty"`
 }

@@ -169,3 +169,32 @@ func sinanUIDetachShortcut(handle C.ulonglong) (result *C.char) {
 	}
 	return nil
 }
+
+//export sinanUISessionCall
+func sinanUISessionCall(handle C.ulonglong, data *C.char, length C.int) (result *C.char) {
+	defer func() {
+		if recover() != nil {
+			result = nil
+		}
+	}()
+	if length < 0 || length > uiview.MaxCallBytes {
+		return nil
+	}
+	binding := bindingFor(handle)
+	if !binding.session.Active() {
+		return nil
+	}
+	caller, ok := binding.session.(interface {
+		Call([]byte) (json.RawMessage, error)
+	})
+	if !ok {
+		return nil
+	}
+	value, err := caller.Call(C.GoBytes(unsafe.Pointer(data), length))
+	if err != nil {
+		value, _ = json.Marshal(map[string]string{"error": err.Error()})
+	} else {
+		value, _ = json.Marshal(map[string]json.RawMessage{"result": value})
+	}
+	return C.CString(string(value))
+}

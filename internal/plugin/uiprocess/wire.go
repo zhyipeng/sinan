@@ -19,6 +19,7 @@ const maxRequests = 256
 const maxResourceBytes = 8 << 20
 
 type Init struct {
+	BridgeVersion  string `json:"bridgeVersion,omitempty"`
 	DetachShortcut string `json:"detachShortcut,omitempty"`
 	Panel          bool   `json:"panel,omitempty"`
 	Title          string `json:"title,omitempty"`
@@ -39,6 +40,8 @@ type request struct {
 	Report       json.RawMessage `json:"report,omitempty"`
 }
 type response struct {
+	Result         json.RawMessage  `json:"result,omitempty"`
+	Error          string           `json:"error,omitempty"`
 	DetachShortcut string           `json:"detachShortcut,omitempty"`
 	Kind           string           `json:"kind"`
 	ID             uint64           `json:"id,omitempty"`
@@ -92,10 +95,12 @@ func decode(data []byte, out any) error {
 	return nil
 }
 func writeFrame(writer io.Writer, value any) error {
-	data, err := json.Marshal(value)
-	if err != nil || len(data)+1 >= maxFrameBytes {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil || buffer.Len() >= maxFrameBytes {
 		return errors.New("UI 管道消息超过限制")
 	}
-	_, err = writer.Write(append(data, '\n'))
+	_, err := writer.Write(buffer.Bytes())
 	return err
 }

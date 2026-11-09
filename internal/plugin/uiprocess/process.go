@@ -113,7 +113,7 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	go p.wait()
 	go func() {
 		p.exchange.Lock()
-		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
+		err := writeFrame(p.input, Init{Kind: "init", Version: 1, BridgeVersion: session.Binding().BridgeVersion, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
 		p.exchange.Unlock()
 		if err != nil {
 			p.fail("UI 初始化写入失败")
@@ -218,7 +218,7 @@ func (p *Process) serve() {
 			p.fail("UI 管道协议无效")
 			return
 		}
-		if req.Kind != "focused" {
+		if req.Kind != "focused" && req.Kind != "call" {
 			requests++
 			if requests > maxRequests {
 				p.fail("UI 请求预算耗尽")
@@ -293,6 +293,19 @@ func (p *Process) serve() {
 			res.Action = action
 			if action == uiview.Ready {
 				p.readyOnce.Do(func() { close(p.ready) })
+			}
+		case "call":
+			if !hello || req.Version != 0 || req.URL != "" || len(req.Message) > uiview.MaxCallBytes || len(req.Report) > 0 {
+				invalid = true
+				break
+			}
+			// Call is bounded by the session deadline; no caller-supplied identity.
+			result, err := p.session.Call(context.Background(), req.Message)
+			res.OK = true
+			if err != nil {
+				res.Error = err.Error()
+			} else {
+				res.Result = result
 			}
 		case "revoke":
 			if !hello || req.Version != 0 || req.URL != "" || len(req.Message) > 0 || len(req.Report) > 0 {

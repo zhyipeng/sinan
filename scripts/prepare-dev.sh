@@ -23,3 +23,10 @@ if [ ! -d .sinan-dev/plugins/system.plugin-manager ]; then
 else
   ./bin/sinanctl -plugins .sinan-dev/plugins upgrade plugins/system-plugin-manager
 fi
+
+make json-plugin
+if [ ! -d .sinan-dev/plugins/tools.json ]; then
+  ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install bin/plugins/json-tool
+else
+  ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native upgrade bin/plugins/json-tool
+fi

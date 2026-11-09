@@ -95,7 +95,7 @@ make ui-probe
 
 该命令依次检查正常关闭、消息洪泛、禁用插件，以及脚本调用错误、JavaScript 卡死、可响应慢页面六种模式。它把编译进程序的固定测试夹具安装到独立临时根目录，使用非持久 WKWebView、自定义资源 Scheme 和导航决策代理，不读取日常插件目录。父进程持有内核会话，独立客体进程通过会话专属 stdio 管道逐次读取资源，不复制整包资源。启动须完成管道与页面握手，撤销后通知退出，超时强制终止并回收。每次自动关闭验证窗口，只输出固定诊断字段；正常模式接受 close，洪泛模式 `budgetRevoked=true`，禁用模式 `lifecycleRevoked=true`；各模式均应退出 0，且旧资源和消息都被拒绝，`separateProcess`、`childReaped`、`startupHandshake` 和 `eventLoopResponsive` 均为 true。正对照 HTTP 服务可访问，客体的网络和导航尝试不得到达该服务。故障模式额外输出 `failure=script-error` 或 `failure=unresponsive`，检查会话失效后在同一内核打开正常客体；慢页面须完成原生响应探测后正常关闭。故障与响应预算见 [ADR 0016](docs/adr/0016-ui-renderer-failure-probes.md)。命令目前要求 macOS+cgo，基础验证见 [ADR 0012](docs/adr/0012-native-ui-boundary-probe.md)，会话接入见 [ADR 0013](docs/adr/0013-ui-session-revocation.md)，进程监督见 [ADR 0014](docs/adr/0014-ui-guest-supervision.md)。
 
-可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和空权限列表；内核准备接口只接受已声明视图 ID。Shell 不加载第三方 HTML；开发期可通过插件管理打开独立窗口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
+可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和受限能力（桥 1 无权限，桥 2 可显式声明本插件命令与私有文档）；内核准备接口只接受已声明视图 ID。Shell 不加载第三方 HTML；开发期可通过插件管理打开独立窗口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
 
 内核会话准备接口固定读取已安装包的 `ui/` 子目录，绑定插件实例、包指纹、声明视图 ID 和桥版本，资源加载前后检查包内容。停止、禁用、重载、升级、卸载、配置保存及检测到包文件变化时撤销会话；回退相同包也不会让旧句柄复活。外部文件变化在刷新或打开会话等校验点发现，尚无文件监听。每插件最多 4 个、每宿主最多 16 个活动会话，此接口不暴露给 Wails 或插件进程。
 
@@ -172,3 +172,9 @@ make dev-ui
 升级回退只覆盖当前升级事务；重载不会撤销直接编辑过的文件，设置等可信组件代码修改仍需重建宿主。完整边界与中断恢复见 [ADR 0007](docs/adr/0007-plugin-upgrade-and-reload.md)。
 
 启用策略位于核心设置文件的保留命名空间 `$plugins`，插件设置接口不可读写。写入失败时保持当前状态；启用策略或整个设置文件损坏、无法读取时阻止插件激活并保留文件，需离线修复后重启，不会自动覆盖或重置为全部启用。
+
+### JSON 格式化插件
+
+使用 `make dev-ui` 在开发实例中安装并打开 `tools.json`，搜索 JSON 即可进入。支持格式化、压缩、错误行列、保留大整数和草稿保存；Command/Ctrl + Enter 格式化，加 Shift 压缩。拆出窗口使用设置中的窗口独立快捷键。
+
+也可先 `make build json-plugin`，退出使用目标目录的宿主后，用 `bin/sinanctl -plugins 插件目录 -trust-native install bin/plugins/json-tool` 安装，再以 `-plugin-ui` 启动桌面宿主。原生后端需显式信任，独立进程不是安全沙箱。草稿显示“已保存”后才确认落盘，单插件文档最大 32 KiB。完整边界见 [ADR 0029](docs/adr/0029-ui-calls-private-data-json-tool.md)。

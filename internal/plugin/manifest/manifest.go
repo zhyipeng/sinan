@@ -116,7 +116,7 @@ func (m Manifest) Validate() error {
 			return errors.New("UI 视图标题无效")
 		}
 
-		if !ValidViewID(view.ID) || views[view.ID] || !ValidUIEntry(view.Entry) || view.BridgeVersion != protocol.UIBridgeVersion || len(view.Permissions) != 0 {
+		if !ValidViewID(view.ID) || views[view.ID] || !ValidUIEntry(view.Entry) || !protocol.SupportedUIBridge(view.BridgeVersion) || !validUICapabilities(view, m) {
 			return errors.New("UI 视图声明无效、版本不兼容或请求了不支持的权限")
 		}
 		views[view.ID] = true
@@ -199,4 +199,30 @@ func Executable(dir string, m Manifest) (string, error) {
 		return "", errors.New("插件入口不是可执行文件")
 	}
 	return path, nil
+}
+
+func validUICapabilities(view protocol.UIView, mf Manifest) bool {
+	if view.BridgeVersion == protocol.UIBridgeVersion {
+		return len(view.Commands) == 0 && len(view.Permissions) == 0
+	}
+	if len(view.Permissions) > 1 || (len(view.Permissions) == 1 && view.Permissions[0] != "storage") || len(view.Commands) > 16 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, id := range view.Commands {
+		if seen[id] || mf.Runtime.Kind != "process" {
+			return false
+		}
+		seen[id] = true
+		found := false
+		for _, cmd := range mf.Contributes.Commands {
+			if cmd.ID == id && cmd.View == "" && cmd.UIView == "" {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

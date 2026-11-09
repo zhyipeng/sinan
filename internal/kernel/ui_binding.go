@@ -44,7 +44,7 @@ func (m *Manager) resolveUIViewLocked(ctx context.Context, id, viewID string) (u
 	}
 	var binding uiview.Binding
 	for _, view := range p.manifest.Contributes.UIViews {
-		if view.ID == viewID && view.BridgeVersion == protocol.UIBridgeVersion && len(view.Permissions) == 0 {
+		if view.ID == viewID && protocol.SupportedUIBridge(view.BridgeVersion) {
 			binding = uiview.Binding{PluginID: id, Fingerprint: p.fingerprint, ViewID: viewID, BridgeVersion: view.BridgeVersion, Title: uiWindowTitle(p.manifest.Name, view.Title)}
 			break
 		}

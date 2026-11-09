@@ -68,7 +68,7 @@ static void positionPanel(NSWindow *window) {
     [window setFrame:frame display:YES];
 }
 
-@interface SinanUIProbe : NSObject <WKNavigationDelegate, WKUIDelegate, WKURLSchemeHandler, WKScriptMessageHandler, NSWindowDelegate>
+@interface SinanUIProbe : NSObject <WKNavigationDelegate, WKUIDelegate, WKURLSchemeHandler, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, NSWindowDelegate>
 @property unsigned long long handle;
 @property SinanUIControl *control;
 @property NSString *entry;
@@ -92,6 +92,8 @@ static void positionPanel(NSWindow *window) {
 @property NSUInteger navigationDenials;
 @property NSUInteger rejected;
 @property NSUInteger messages;
+@property NSUInteger pendingCalls;
+@property NSInteger bridgeVersion;
 @property NSDictionary *guestReport;
 @property SinanUIFailure failure;
 @property BOOL heartbeatPending;
@@ -192,8 +194,7 @@ static void positionPanel(NSWindow *window) {
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error { [self fail:SinanUIFailureNavigation]; }
 - (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error { [self fail:SinanUIFailureNavigation]; }
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message {
-    // This handler exists only in the development host. It has no filesystem,
-    // command execution, settings or other Wails/host API to dispatch to.
+    // Lifecycle/probe messages remain separate from the opt-in request bridge.
     if (self.bridgeRevoked || self.revoked) return;
     if (++self.messages > 32) {
         self.bridgeRevoked = YES;
@@ -208,7 +209,7 @@ static void positionPanel(NSWindow *window) {
     if (![NSJSONSerialization isValidJSONObject:body]) { self.rejected++; return; }
     NSData *encoded = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
     if (!encoded || encoded.length > 4096) { self.rejected++; return; }
-    if ([body[@"kind"] isEqual:@"ready"] && body.count == 2 && !self.ready && [body[@"version"] isKindOfClass:NSNumber.class] && CFGetTypeID((__bridge CFTypeRef)body[@"version"]) != CFBooleanGetTypeID() && [body[@"version"] doubleValue] == 1) {
+    if ([body[@"kind"] isEqual:@"ready"] && body.count == 2 && !self.ready && [body[@"version"] isKindOfClass:NSNumber.class] && CFGetTypeID((__bridge CFTypeRef)body[@"version"]) != CFBooleanGetTypeID() && [body[@"version"] doubleValue] == self.bridgeVersion) {
         if (sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length) != 1) { self.rejected++; return; }
         self.ready = YES;
         if (!self.probe) return;
@@ -244,6 +245,25 @@ static void positionPanel(NSWindow *window) {
     }
     self.rejected++;
 }
+- (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message replyHandler:(void (^)(id, NSString *))replyHandler {
+    if (self.done || self.revoked || !self.ready || self.bridgeVersion != 2 || self.pendingCalls >= 1 || !message.frameInfo.isMainFrame || ![message.frameInfo.request.URL.absoluteString isEqual:self.entry] || ![message.body isKindOfClass:NSDictionary.class] || ![NSJSONSerialization isValidJSONObject:message.body]) { replyHandler(nil, @"UI 调用不可用"); return; }
+    NSData *encoded = [NSJSONSerialization dataWithJSONObject:message.body options:0 error:nil];
+    if (!encoded || encoded.length > 65536) { replyHandler(nil,@"UI 请求超过 64 KiB"); return; }
+    self.pendingCalls++;
+    unsigned long long handle = self.handle;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0), ^{
+        char *raw = sinanUISessionCall(handle,(char *)encoded.bytes,(int)encoded.length);
+        NSDictionary *response = nil;
+        if (raw) { NSData *data = [NSData dataWithBytes:raw length:strlen(raw)]; response = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil]; free(raw); }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.pendingCalls--;
+            if (self.done || self.revoked) replyHandler(nil,@"UI 会话已关闭");
+            else if (![response isKindOfClass:NSDictionary.class]) replyHandler(nil,@"UI 调用失败");
+            else if (response[@"error"]) replyHandler(nil,response[@"error"]);
+            else replyHandler(response[@"result"],nil);
+        });
+    });
+}
 @end
 
 SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, unsigned long long handle, SinanUIControl *control) {
@@ -257,6 +277,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         [NSApp finishLaunching];
         SinanUIProbe *delegate = [SinanUIProbe new];
         delegate.entry = bundle[@"entry"];
+        delegate.bridgeVersion = [bundle[@"bridgeVersion"] isEqual:@"2"] ? 2 : 1;
         delegate.probe = [bundle[@"probe"] boolValue];
         delegate.attached = [bundle[@"panel"] boolValue] && !delegate.probe;
         delegate.detachShortcut = @"Shift+Cmd+D";
@@ -268,6 +289,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistentDataStore;
         [configuration setURLSchemeHandler:delegate forURLScheme:@"sinan-plugin"];
         [configuration.userContentController addScriptMessageHandler:delegate name:@"sinan"];
+        if (delegate.bridgeVersion == 2) [configuration.userContentController addScriptMessageHandlerWithReply:delegate contentWorld:WKContentWorld.pageWorld name:@"sinanCall"];
         WKWebView *view = [[WKWebView alloc] initWithFrame:(delegate.probe ? NSMakeRect(0,0,560,240) : NSMakeRect(0,0,640,480)) configuration:configuration];
         delegate.view = view;
         view.navigationDelegate = delegate;
@@ -438,6 +460,13 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         result.lifecycleRevoked = delegate.lifecycleRevoked;
         sinanUISessionRevoke(handle);
         // Late WebKit callbacks cannot dereference the Go handle after return.
+        // Drain already-admitted work before releasing the Go handle. The private
+        // client has a one-second deadline; revocation unblocks pending calls.
+        delegate.done = YES;
+        [configuration.userContentController removeScriptMessageHandlerForName:@"sinanCall" contentWorld:WKContentWorld.pageWorld];
+        while (delegate.pendingCalls > 0) {
+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+        }
         delegate.handle = 0;
         [view stopLoading];
         [configuration.userContentController removeScriptMessageHandlerForName:@"sinan"];

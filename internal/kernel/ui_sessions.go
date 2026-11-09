@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -62,7 +63,7 @@ func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string) (*uiv
 			break
 		}
 	}
-	if declaration == nil || declaration.BridgeVersion != protocol.UIBridgeVersion || len(declaration.Permissions) != 0 {
+	if declaration == nil || !protocol.SupportedUIBridge(declaration.BridgeVersion) {
 		p.mu.Unlock()
 		return nil, errors.New("UI 视图未声明、版本不兼容或权限不受支持")
 	}
@@ -108,6 +109,9 @@ func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string) (*uiv
 	if err != nil {
 		return nil, err
 	}
+	session.ConfigureCaller(func(ctx context.Context, req protocol.UIRequest) (json.RawMessage, error) {
+		return m.callUIView(ctx, p, session, *declaration, req)
+	})
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.removed || p.disabled || p.changed || epoch != p.viewEpoch {

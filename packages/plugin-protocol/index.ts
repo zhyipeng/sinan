@@ -14,3 +14,7 @@ export interface CancelParams { id: number }
 export interface SearchParams { providerId: string; query: string; limit: number }
 export interface SearchItem { icon?: string; id: string; title: string; subtitle?: string; commandId: string; input?: string; score: number }
 export interface SearchResult { items: SearchItem[] }
+
+export interface UIView { id:string; entry:string; title?:string; bridgeVersion:'1'|'2'; commands?:string[]; permissions?:'storage'[] }
+export type UIRequest = {method:'command.execute';commandId:string;input:string} | {method:'storage.get'} | {method:'storage.put';revision:number;value:unknown};
+export interface PluginDocument<T=unknown> {revision:number;value:T|null}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"sinan/internal/plugin/uiview"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 // Client is the trusted renderer's proxy. Authority and resource bytes stay in
@@ -42,7 +43,7 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 		return nil, errors.New("UI 初始化管道已关闭")
 	}
 	var init Init
-	if decode(scanner.Bytes(), &init) != nil || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP || len(init.DetachShortcut) > 128 {
+	if decode(scanner.Bytes(), &init) != nil || (init.BridgeVersion != "" && !protocol.SupportedUIBridge(init.BridgeVersion)) || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP || len(init.DetachShortcut) > 128 {
 		return nil, errors.New("UI 初始化消息无效")
 	}
 	c := &Client{focusRequests: make(chan Control, 1), init: init, detachShortcut: init.DetachShortcut, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
@@ -52,6 +53,9 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 		for scanner.Scan() {
 			var frame response
 			if decode(scanner.Bytes(), &frame) != nil {
+				return
+			}
+			if (len(frame.Result) > 0 || frame.Error != "") && frame.Kind != "reply" {
 				return
 			}
 			if frame.Kind == "detach-shortcut" {
@@ -266,4 +270,21 @@ func (c *Client) DetachShortcut() string {
 		return "Shift+Cmd+D"
 	}
 	return c.detachShortcut
+}
+
+func (c *Client) Call(data []byte) (json.RawMessage, error) {
+	if len(data) > uiview.MaxCallBytes {
+		return nil, errors.New("UI 请求超过限制")
+	}
+	frame, err := c.call(request{Kind: "call", Message: data}, false)
+	if err != nil {
+		return nil, err
+	}
+	if frame.Error != "" {
+		return nil, errors.New(frame.Error)
+	}
+	if len(frame.Result) > uiview.MaxCallResultBytes || !json.Valid(frame.Result) {
+		return nil, errors.New("UI 响应无效")
+	}
+	return frame.Result, nil
 }

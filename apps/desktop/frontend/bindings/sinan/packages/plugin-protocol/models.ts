@@ -7,11 +7,11 @@ export interface CommandResult {
 }
 
 /**
- * UIView declares resources only. It does not grant host capabilities or make
- * an HTML command available in the trusted Shell. Permissions default to none;
- * this first bridge version rejects every nonempty permission request.
+ * UIView declares a fixed resource entry. Bridge 1 accepts no capabilities;
+ * bridge 2 explicitly allows same-plugin backend commands and private storage.
  */
 export interface UIView {
+    "commands"?: string[] | null;
     "title"?: string;
     "id": string;
     "entry": string;

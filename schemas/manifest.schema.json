@@ -217,15 +217,21 @@
                 "description": "相对于包内 ui/ 的规范 HTML 路径；禁止 URL、转义、符号链接。"
               },
               "bridgeVersion": {
-                "const": "1"
+                "enum": [
+                  "1",
+                  "2"
+                ]
               },
               "permissions": {
                 "type": "array",
-                "maxItems": 0,
+                "maxItems": 1,
+                "uniqueItems": true,
                 "items": {
-                  "type": "string"
+                  "enum": [
+                    "storage"
+                  ]
                 },
-                "description": "默认无权限，当前桥拒绝所有非空请求；不继承原生后端用途声明。"
+                "description": "仅桥 2 可显式声明 storage；按插件隔离，默认不开放。"
               },
               "title": {
                 "type": "string",
@@ -238,8 +244,39 @@
                   }
                 ],
                 "description": "可选显示标题；省略时使用插件名称。"
+              },
+              "commands": {
+                "type": "array",
+                "maxItems": 16,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "description": "桥 2 的同插件后端命令白名单；须引用已声明的非视图命令。"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "bridgeVersion": {
+                      "const": "1"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "commands": {
+                      "maxItems": 0
+                    },
+                    "permissions": {
+                      "maxItems": 0
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       }

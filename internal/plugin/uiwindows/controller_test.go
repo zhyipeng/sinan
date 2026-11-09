@@ -607,3 +607,136 @@ func TestSuccessfulPanelReplacementRetiresOnlyPreviousAttachedPage(t *testing.T)
 		t.Fatal("old page exit disturbed committed page")
 	}
 }
+
+func TestNativeHostJSONPluginCallsAndDraftRestart(t *testing.T) {
+	if nativeGuest == "" {
+		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
+	}
+	source := t.TempDir()
+	if err := os.CopyFS(source, os.DirFS("../../../plugins/json-tool")); err != nil {
+		t.Fatal(err)
+	}
+	bridge, err := os.ReadFile("../../../packages/plugin-sdk/ui/index.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(source, "ui", "bridge.js"), bridge, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Mkdir(filepath.Join(source, "backend"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = exec.Command("go", "build", "-o", filepath.Join(source, "backend", "plugin"), "../../../plugins/json-tool/cmd").Run(); err != nil {
+		t.Fatal("build JSON backend", err)
+	}
+	entry, err := os.ReadFile(filepath.Join(source, "ui", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry = append(entry, []byte(`<script type="module" src="acceptance.js"></script>`)...)
+	if err = os.WriteFile(filepath.Join(source, "ui", "index.html"), entry, 0600); err != nil {
+		t.Fatal(err)
+	}
+	script := `
+const call=request=>window.webkit.messageHandlers.sinanCall.postMessage(request);
+let phase="load";
+try {
+const wait=async predicate=>{const end=Date.now()+4000;while(!predicate()){if(Date.now()>end)throw Error('test condition');await new Promise(r=>setTimeout(r,20));}};
+const field=document.querySelector('#editor'),status=document.querySelector('#status');
+const compact='{"n":900719925474099312345,"a":[2,1],"markup":"'+'<>&'.repeat(10000)+'"}';
+await wait(()=>!field.disabled);
+if(window._wails||window.__WAILS__)throw Error('full bridge exposed');
+for(const request of [{method:'storage.get',pluginId:'system.settings'},{method:'command.execute',commandId:'open',input:''}]){
+ let rejected=false;try{await call(request);}catch{rejected=true;}if(!rejected)throw Error('authority escaped');
+}
+if(field.value){if(field.value!==compact)throw Error('draft changed');}
+else{
+ field.value=compact;field.dispatchEvent(new Event('input'));
+ phase='format';
+ document.querySelector('#format').click();
+ await wait(()=>field.value.includes('\n')&&status.textContent==='草稿已保存');
+ if(!field.value.includes('900719925474099312345'))throw Error('number precision lost');
+ // Native reparenting intentionally has no page-visible resize/event contract.
+ // Let the Go side detach after the first durable save, then exercise RPC again.
+ await new Promise(resolve=>setTimeout(resolve,800));
+ if(!field.value.includes('900719925474099312345'))throw Error('detach lost input');
+ phase='compact after detach';
+ document.querySelector('#compact').click();
+ await wait(()=>field.value===compact&&status.textContent==='草稿已保存');
+ phase='invalid input';
+ field.value='{oops';field.dispatchEvent(new Event('input'));document.querySelector('#format').click();
+ await wait(()=>!document.querySelector('#error').hidden);
+ if(field.value!=='{oops')throw Error('invalid input lost');
+ field.value=compact;field.dispatchEvent(new Event('input'));
+ await wait(()=>status.textContent==='草稿已保存');
+}
+} catch(reason) {
+ const doc=await call({method:'storage.get'});
+ await call({method:'storage.put',revision:doc.revision,value:{testFailure:phase,testError:String(reason)}});
+}
+window.webkit.messageHandlers.sinan.postMessage({kind:'close'});
+`
+	if err = os.WriteFile(filepath.Join(source, "ui", "acceptance.js"), []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	for pass := 0; pass < 2; pass++ {
+		m, err := kernel.New(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass == 0 {
+			if _, err = m.Install(source, true); err != nil {
+				m.Close()
+				t.Fatal(err)
+			}
+		}
+		session, err := m.OpenUICommand(context.Background(), "tools.json", "open")
+		if err != nil {
+			m.Close()
+			t.Fatal(err)
+		}
+		process, err := uiprocess.Start(context.Background(), session, uiprocess.Options{Executable: nativeGuest, Lifetime: 10 * time.Second, Panel: true, WindowAction: func(action string) bool { return action == "detach" }})
+		if err != nil {
+			m.Close()
+			t.Fatal(err)
+		}
+		if pass == 0 {
+			until := time.Now().Add(4 * time.Second)
+			draft := filepath.Join(root, ".sinan-state", "data", "tools.json.json")
+			for time.Now().Before(until) {
+				if _, err := os.Stat(draft); err == nil {
+					break
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			if err = process.Detach(); err != nil {
+				process.Stop()
+				m.Close()
+				t.Fatal("detach JSON editor", err)
+			}
+		}
+		result := process.Wait()
+		docBytes, _ := os.ReadFile(filepath.Join(root, ".sinan-state", "data", "tools.json.json"))
+		var diagnostic struct {
+			Value struct {
+				TestFailure string
+				TestError   string
+			}
+		}
+		_ = json.Unmarshal(docBytes, &diagnostic)
+		if diagnostic.Value.TestFailure != "" {
+			m.Close()
+			t.Fatalf("JSON test phase %s: %s", diagnostic.Value.TestFailure, diagnostic.Value.TestError)
+		}
+		m.Close()
+		var report struct {
+			Detached      bool
+			CloseReceived bool
+			Failure       string
+		}
+		if result.Err != nil || json.Unmarshal(result.Report, &report) != nil || !report.CloseReceived || report.Failure != "" || (pass == 0 && !report.Detached) {
+			t.Fatalf("JSON UI pass %d failed: %v", pass, result.Err)
+		}
+	}
+}

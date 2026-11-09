@@ -253,3 +253,7 @@ macOS 保留原 NSPanel 的非激活原生类型，移除浮动、跨 Space 及�
 ## 核心异常恢复补充
 
 退出监督现避免后代继承 stderr 拖住直接进程回收；设置和插件管理提供独立的内容指纹绑定修复事务，普通禁用、卸载限制保持；HTML 主面板在候选准备成功后才替换原会话。实现边界见 [ADR 0028](adr/0028-core-recovery-and-lifecycle.md)。
+
+## UI 业务交互首版
+
+UI 桥 2 增加按会话、实例和清单白名单约束的本插件后端命令调用，以及显式声明的插件私有 JSON 文档；桥 1 保持 ready / close。首个实用 HTML 插件为 tools.json，格式化与压缩由 Go 插件后端执行，草稿由核心按插件持久化。没有增加完整 Wails Bridge、任意路径访问或通用权限授权器，独立进程仍不等同 OS 沙箱。详见 [ADR 0029](adr/0029-ui-calls-private-data-json-tool.md)。

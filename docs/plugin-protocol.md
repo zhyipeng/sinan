@@ -124,7 +124,7 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 
 内核 `OpenUIView(ctx, pluginId, viewId)` 供宿主窗口控制器和内部开发验证使用，读取已安装包固定的 `ui/` 子目录；它不是 Wails 方法或进程 RPC，不会因为某个页面提交插件 ID 就授予会话。
 
-会话由宿主对象身份确定归属，绑定已安装实例、指纹、声明的视图 ID 和桥版本，仅支持资源读取、单次 `{"kind":"ready","version":1}` 及 `{"kind":"close"}`。额外/重复字段、重复握手、其他动作和页面自报身份被拒绝。消息上限 4 KiB、每会话最多 32 条，超限撤销；最多每插件 4 个、每宿主 16 个活动会话。
+会话由宿主对象身份确定归属，绑定已安装实例、指纹、声明的视图 ID 和桥版本。桥 1 仅支持资源读取、单次 `{"kind":"ready","version":1}` 及 `{"kind":"close"}`。额外/重复字段、重复握手、其他动作和页面自报身份被拒绝。消息上限 4 KiB、每会话最多 32 条，超限撤销；最多每插件 4 个、每宿主 16 个活动会话。
 
 生命周期操作和检测到包变化时撤销会话。旧句柄随后不能读取资源、重放消息或因重装/回退到相同指纹而复活。原生验证宿主每次 Scheme 请求都通过该会话，不保存整包资源副本；父进程立即拒绝后续资源与消息，子进程通过异步通知关闭原生入口，超时终止回收。此前交付的字节不能收回。开发验证通过会话专属 stdio 管道接入独立原生客体：管道不接受页面选择归属，支持 hello / ready、逐次资源读取、撤销和退出回收；这不是插件后端 RPC，也未开放执行、设置等 Host API。帧、请求次数、累计资源和运行时长均受预算限制。进程监督细节见 [ADR 0014](adr/0014-ui-guest-supervision.md)，桌面开发入口见 [ADR 0017](adr/0017-desktop-plugin-windows.md)，面向公共分发的 API 仍待完善。stdio API 1 保持不变。详见 [ADR 0013](adr/0013-ui-session-revocation.md)。
 
@@ -143,7 +143,7 @@ Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供
 
 此片段属于 `contributes`，完整插件仍需遵循已有命令要求。`id` 为插件内唯一的 1–64 字符小写贡献 ID；`entry` 相对于固定 `ui/`，限 256 个 ASCII 字符、最多 8 个目录层级、规范 `.html` 路径，拒绝绝对路径、URL、转义、反斜线、查询、片段和 `.` / `..` 路径段。资源存在性、类型、体积与符号链接由打开会话时检查。资源授权范围仍是同一插件的整个 `ui/` 快照，不是视图级目录隔离，包内敏感文件不得放入该目录。
 
-`bridgeVersion` 必填，目前只支持字符串 `"1"`；它独立于后端 `apiVersion` 和私有客体管道版本，不协商降级。`permissions` 省略或空数组表示无 Host API 权限；任何非空值都会拒绝整个声明，不静默忽略，不继承顶层原生插件的应用用途声明。允许读本插件 UI 资源、一次 ready 和 close；执行、设置、文件、网络、剪贴板等页面请求仍不受支持。
+`bridgeVersion` 必填，支持字符串 `"1"` 与 `"2"`；它独立于后端 `apiVersion` 和私有客体管道版本，不协商降级。桥 1 的 permissions 必须省略或为空，只允许资源读取、ready / close。桥 2 可显式声明本插件 commands 白名单和 storage，具体契约见文末“UI 桥 2”。两者均不继承顶层原生插件用途声明，设置、文件、网络、剪贴板请求继续不受支持。
 
 只有宿主能按声明 ID 创建会话，不能通过入口路径或页面自报身份创建。声明缺失、版本不支持、资源不可用、插件禁用或包改变均拒绝；升级移除视图后旧句柄失效。`packages/plugin-protocol/ui.go` 定义声明类型，`schemas/manifest.schema.json` 提供静态结构约束，Go 校验额外检查 ID 唯一和可信组件冲突。
 
@@ -156,7 +156,7 @@ Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供
 
 宿主只运行自身目录的固定 `sinan-ui-host`，不会运行包内指定的 UI 程序。窗口控制器复用同一插件/视图，首次等待 ready 后返回；关闭后可重新打开，包变更和启用状态仍由内核会话控制。退出宿主时取消启动并等待所有客体回收，再释放内核。helper 缺失或平台不支持时返回诊断并保留 Shell。客体异步退出事件 `ui:closed` 只发送给可信 Shell，字段为 pluginId / viewId / failed，不传播页面错误原文。
 
-普通客体只有 ready / close，桥接消息依然受限；关闭原生窗口也撤销会话。不执行固定测试函数，不处理 report / revoke 探测动作，没有 8 秒探测期限；开发窗口在父进程侧暂设 1 小时总期限，响应超时策略继续生效。非持久存储、资源归属、CSP、导航拒绝与进程预算沿用此前边界，额外拒绝 JS 对话框、原生文件选择器和媒体采集请求。没有 CPU/内存硬配额或操作系统沙箱。
+桥 1 普通客体只有 ready / close；桥 2 增加按声明授权的命令与私有文档调用，桥接消息依然受限；关闭原生窗口也撤销会话。不执行固定测试函数，不处理 report / revoke 探测动作，没有 8 秒探测期限；开发窗口在父进程侧暂设 1 小时总期限，响应超时策略继续生效。非持久存储、资源归属、CSP、导航拒绝与进程预算沿用此前边界，额外拒绝 JS 对话框、原生文件选择器和媒体采集请求。没有 CPU/内存硬配额或操作系统沙箱。
 
 
 普通 macOS 开发页面可在初始化完成后发送 ready，由用户操作发送 close：
@@ -185,7 +185,7 @@ document.querySelector('#close').addEventListener('click', () => send({ kind: 'c
 
 用户选择结果后，可信 Shell 调用 `OpenPluginCommand(pluginId, commandId)`。内核在同一变更锁中解析已安装包的当前绑定，并沿用启用状态、包指纹、资源和会话检查；前端不能为命令覆盖视图。普通 Execute（包括 CLI run）拒绝此类命令；打开视图不调用后端 execute。搜索 Provider 的激活规则保持不变。
 
-成功启动才隐藏面板，失败保留搜索；启动期间重新呼出面板后，迟到结果不能隐藏新面板。开发开关仍默认关闭，未启用时拒绝打开。同一视图的命令别名和管理入口共同去重，重复打开复用并聚焦同一窗口，保留输入和位置。输入参数暂不传给页面，UI 仍只能 ready / close。
+成功启动才隐藏面板，失败保留搜索；启动期间重新呼出面板后，迟到结果不能隐藏新面板。开发开关仍默认关闭，未启用时拒绝打开。同一视图的命令别名和管理入口共同去重，重复打开复用并聚焦同一窗口，保留输入和位置。搜索输入参数暂不传给页面；桥 1 只能 ready / close，桥 2 的显式调用见文末。
 
 旧宿主拒绝未知 uiView 字段，后端 API 1 和 UI 桥版本不变。详见 [ADR 0020](adr/0020-search-opens-independent-views.md)。
 
@@ -203,3 +203,27 @@ document.querySelector('#close').addEventListener('click', () => send({ kind: 'c
 可信 Shell 的 `PreviewSystemRepair(directory)` / `RepairSystemPlugin(directory, fingerprint, installedFingerprint)` 专用于恢复设置和插件管理的声明式组件包。此处 installedFingerprint 表示预览时实际目录字节（允许清单损坏），目录不存在时为空；与普通升级预览中的注册实例基线不同。双方字节改变都必须重新检查。CLI 可在桌面宿主退出、释放目录独占后运行 `sinanctl -plugins 路径 repair-system 本地系统插件目录`。普通卸载和禁用保护不变，HTML 页面桥不获得此接口。
 
 后端与 UI 客体直接进程退出不再等待后代持有的 stderr；不保证回收任意后代进程。HTML 候选页打开失败保留先前附着页面，成功后才撤销原会话。详见 [ADR 0028](adr/0028-core-recovery-and-lifecycle.md)。
+
+## UI 桥 2：本插件命令与私有数据
+
+现同时支持桥 1 和桥 2。旧页面仍使用 ready version 1；新页面显式声明：
+
+```json
+{"id":"editor","entry":"index.html","bridgeVersion":"2","commands":["format","compact"],"permissions":["storage"]}
+```
+
+commands 必须引用同插件已声明的非视图进程命令，最多 16 项，不可重复。permissions 可省略，唯一支持值为 storage，桥 1 禁止两类能力。宿主不继承原生用途声明为页面权限。ready version 2 后，可用 `packages/plugin-sdk/ui/index.js`：
+
+```js
+import { ready, execute, readData, writeData } from './bridge.js';
+ready();
+const { text } = await execute('format', input);
+const doc = await readData();
+await writeData(doc.revision, { text: input });
+```
+
+SDK 文件需复制到插件 ui/；它只包装 Promise 请求，不包含 Wails Bridge。对应请求为 command.execute / storage.get / storage.put，调用不接受插件 ID、路径或额外字段。身份来自宿主 Session；配置、安装、Shell、其他插件和任意后端 RPC 不可访问。每会话在途最多 1 个、每分钟 120 次、500 ms 预算，请求 64 KiB、响应 192 KiB。SDK 最多排队 8 个调用。
+
+storage.get / put 返回 `{revision, value}`；未保存时为 `{revision:0,value:null}`。每插件一个最大 32 KiB JSON 值；put 必须携带当前 revision，冲突要求重新读取，损坏文件拒绝覆盖。包外数据在升级/卸载后保留，暂不提供清除接口。页面关闭可能发生写入已提交但回执丢失，重开应读取当前版本。命令超时或撤销沿用强制终止后端，其他会话应重新打开。
+
+实现与限制见 [ADR 0029](adr/0029-ui-calls-private-data-json-tool.md)。原生后端协议 API 仍为 1。

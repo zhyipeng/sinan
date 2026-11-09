@@ -1,4 +1,4 @@
-.PHONY: setup bindings frontend build package run dev demo test ui-probe dev-ui ui-acceptance
+.PHONY: json-plugin setup bindings frontend build package run dev demo test ui-probe dev-ui ui-acceptance
 
 ifeq ($(shell go env GOOS),darwin)
 export CGO_CFLAGS += -mmacosx-version-min=12.0
@@ -65,3 +65,11 @@ ui-probe:
 # Disposable environment: never prepares or installs into .sinan-dev.
 ui-acceptance: build
 	./bin/sinan -ui-acceptance -acceptance-packages "$(CURDIR)/plugins"
+
+# A real process plugin with an isolated UI; never imports HTML into the Shell.
+json-plugin:
+	mkdir -p bin/plugins/json-tool/backend bin/plugins/json-tool/ui
+	cp plugins/json-tool/manifest.json bin/plugins/json-tool/manifest.json
+	cp plugins/json-tool/ui/* bin/plugins/json-tool/ui/
+	cp packages/plugin-sdk/ui/index.js bin/plugins/json-tool/ui/bridge.js
+	go build -o bin/plugins/json-tool/backend/plugin ./plugins/json-tool/cmd

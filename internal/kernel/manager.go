@@ -58,6 +58,7 @@ type plugin struct {
 }
 
 type Manager struct {
+	documents          *storage.Documents
 	views              map[*uiview.Session]struct{} // Accessed under mutationMu.
 	disabled           map[string]bool              // Accessed under mutationMu.
 	enablementErr      error
@@ -93,6 +94,7 @@ func New(root string) (*Manager, error) {
 		return nil, err
 	}
 	m := &Manager{blockedUpgrades: map[string]bool{}, lease: lease, root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
+	m.documents = storage.OpenDocuments(filepath.Join(abs, ".sinan-state", "data"))
 	m.loadEnablement()
 	m.startupDiagnostics = m.recoverUpgrades()
 	m.Refresh()
@@ -356,6 +358,18 @@ func (m *Manager) current(id string, p *plugin) bool {
 func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Process, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.ensureProcessLocked(ctx, root)
+}
+
+func (p *plugin) ensureUIProcess(ctx context.Context, root string) (*transport.Process, error) {
+	if !p.mu.TryLock() {
+		return nil, errors.New("插件正在切换，请稍后重试")
+	}
+	defer p.mu.Unlock()
+	return p.ensureProcessLocked(ctx, root)
+}
+
+func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transport.Process, error) {
 	if p.removed {
 		return nil, errors.New("插件已移除")
 	}
