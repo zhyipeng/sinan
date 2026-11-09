@@ -18,6 +18,7 @@ type Control struct {
 }
 
 type Client struct {
+	detachShortcut   string
 	focusRequests    chan Control
 	init             Init
 	reader           io.ReadCloser
@@ -41,16 +42,28 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 		return nil, errors.New("UI 初始化管道已关闭")
 	}
 	var init Init
-	if decode(scanner.Bytes(), &init) != nil || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP {
+	if decode(scanner.Bytes(), &init) != nil || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP || len(init.DetachShortcut) > 128 {
 		return nil, errors.New("UI 初始化消息无效")
 	}
-	c := &Client{focusRequests: make(chan Control, 1), init: init, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
+	c := &Client{focusRequests: make(chan Control, 1), init: init, detachShortcut: init.DetachShortcut, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
 	go func() {
 		var focusSequence uint64
 		defer c.Close()
 		for scanner.Scan() {
 			var frame response
 			if decode(scanner.Bytes(), &frame) != nil {
+				return
+			}
+			if frame.Kind == "detach-shortcut" {
+				if frame.ID != 0 || frame.OK || frame.Resource != nil || frame.Action != 0 || len(frame.DetachShortcut) == 0 || len(frame.DetachShortcut) > 128 {
+					return
+				}
+				c.mu.Lock()
+				c.detachShortcut = frame.DetachShortcut
+				c.mu.Unlock()
+				continue
+			}
+			if frame.DetachShortcut != "" {
 				return
 			}
 			if frame.Kind == "revoke" && frame.ID == 0 && !frame.OK && frame.Resource == nil && frame.Action == 0 {
@@ -244,4 +257,13 @@ func (c *Client) WindowAction(action string) error {
 func (c *Client) Focused(id uint64) error {
 	_, err := c.call(request{Kind: "focused", Control: id}, false)
 	return err
+}
+
+func (c *Client) DetachShortcut() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.detachShortcut == "" {
+		return "Shift+Cmd+D"
+	}
+	return c.detachShortcut
 }

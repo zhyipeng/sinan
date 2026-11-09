@@ -10,6 +10,10 @@ import (
 const launcherPreferencesNamespace = "$launcher"
 
 func (m *Manager) LauncherPreferences() (storage.SettingsSnapshot, error) {
+	return m.hostShortcutPreferences(launcherPreferencesNamespace)
+}
+
+func (m *Manager) hostShortcutPreferences(namespace string) (storage.SettingsSnapshot, error) {
 	m.mu.Lock()
 	closed := m.closed
 	m.mu.Unlock()
@@ -19,9 +23,12 @@ func (m *Manager) LauncherPreferences() (storage.SettingsSnapshot, error) {
 	if err := m.settings.Error(); err != nil {
 		return storage.SettingsSnapshot{}, err
 	}
-	return m.settings.Get(launcherPreferencesNamespace), nil
+	return m.settings.Get(namespace), nil
 }
 func (m *Manager) SaveLauncherPreferences(revision uint64, shortcut string) (storage.SettingsSnapshot, error) {
+	return m.saveHostShortcutPreferences(launcherPreferencesNamespace, revision, shortcut)
+}
+func (m *Manager) saveHostShortcutPreferences(namespace string, revision uint64, shortcut string) (storage.SettingsSnapshot, error) {
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
 	m.mu.Lock()
@@ -33,5 +40,13 @@ func (m *Manager) SaveLauncherPreferences(revision uint64, shortcut string) (sto
 	if shortcut == "" || len(shortcut) > 128 {
 		return storage.SettingsSnapshot{}, errors.New("快捷键格式无效")
 	}
-	return m.settings.Update(launcherPreferencesNamespace, revision, map[string][]string{"shortcut": {shortcut}})
+	return m.settings.Update(namespace, revision, map[string][]string{"shortcut": {shortcut}})
+}
+
+// WindowPreferences are host-owned, separate from plugin settings and launcher revisions.
+func (m *Manager) WindowPreferences() (storage.SettingsSnapshot, error) {
+	return m.hostShortcutPreferences("$window")
+}
+func (m *Manager) SaveWindowPreferences(revision uint64, shortcut string) (storage.SettingsSnapshot, error) {
+	return m.saveHostShortcutPreferences("$window", revision, shortcut)
 }

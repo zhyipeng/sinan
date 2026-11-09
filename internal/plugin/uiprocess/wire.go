@@ -19,13 +19,14 @@ const maxRequests = 256
 const maxResourceBytes = 8 << 20
 
 type Init struct {
-	Panel       bool   `json:"panel,omitempty"`
-	Title       string `json:"title,omitempty"`
-	Kind        string `json:"kind"`
-	Version     int    `json:"version"`
-	Entry       string `json:"entry"`
-	CSP         string `json:"csp"`
-	ProbeTarget string `json:"probeTarget,omitempty"`
+	DetachShortcut string `json:"detachShortcut,omitempty"`
+	Panel          bool   `json:"panel,omitempty"`
+	Title          string `json:"title,omitempty"`
+	Kind           string `json:"kind"`
+	Version        int    `json:"version"`
+	Entry          string `json:"entry"`
+	CSP            string `json:"csp"`
+	ProbeTarget    string `json:"probeTarget,omitempty"`
 }
 type request struct {
 	WindowAction string          `json:"windowAction,omitempty"`
@@ -38,11 +39,12 @@ type request struct {
 	Report       json.RawMessage `json:"report,omitempty"`
 }
 type response struct {
-	Kind     string           `json:"kind"`
-	ID       uint64           `json:"id,omitempty"`
-	OK       bool             `json:"ok,omitempty"`
-	Action   uiview.Action    `json:"action,omitempty"`
-	Resource *uiview.Resource `json:"resource,omitempty"`
+	DetachShortcut string           `json:"detachShortcut,omitempty"`
+	Kind           string           `json:"kind"`
+	ID             uint64           `json:"id,omitempty"`
+	OK             bool             `json:"ok,omitempty"`
+	Action         uiview.Action    `json:"action,omitempty"`
+	Resource       *uiview.Resource `json:"resource,omitempty"`
 }
 
 func newScanner(reader io.Reader) *bufio.Scanner {

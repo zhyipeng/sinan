@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"sinan/internal/kernel"
 	"sinan/internal/storage"
 )
 
@@ -130,5 +131,43 @@ func TestShortcutReleaseFailureAndRecording(t *testing.T) {
 	case <-toggled:
 		t.Fatal("inactive shortcut toggled launcher")
 	default:
+	}
+}
+
+func TestDetachShortcutLocalSaveConflictAndPersistence(t *testing.T) {
+	manager, err := kernel.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close()
+	local := newShortcutControllerWithDefault(windowPreferences{manager}, localShortcutRegistry{}, nil, nil, nil, defaultDetachShortcut())
+	local.Start()
+	launcher, _, _ := shortcutFixture()
+	h := &HostService{shortcuts: launcher, detachShortcuts: local}
+	if _, err := h.SaveDetachShortcut(launcher.State().Shortcut, 0); err == nil {
+		t.Fatal("same launcher/detach key accepted")
+	}
+	before := local.State()
+	saved, err := h.SaveDetachShortcut("Ctrl+Alt+F19", before.Revision)
+	if err != nil || saved.Active != "Ctrl+Alt+F19" {
+		t.Fatal("local save failed", err)
+	}
+	if _, err := h.SaveShortcut("Ctrl+Alt+F19", launcher.State().Revision); err == nil {
+		t.Fatal("launcher overwrote detach binding")
+	}
+	if _, err := h.SaveDetachShortcut("Ctrl+Alt+K", before.Revision); err == nil {
+		t.Fatal("stale window overwrote shortcut")
+	}
+	if _, err := h.SaveDetachShortcut("Shift+D", saved.Revision); err == nil {
+		t.Fatal("invalid chord accepted")
+	}
+	loaded := newShortcutControllerWithDefault(windowPreferences{manager}, localShortcutRegistry{}, nil, nil, nil, defaultDetachShortcut())
+	loaded.Start()
+	if loaded.State().Active != saved.Active {
+		t.Fatal("binding was not persisted")
+	}
+	result, err := h.SaveDetachShortcut(saved.Default, saved.Revision)
+	if err != nil || result.Active != saved.Default {
+		t.Fatal("default restore failed", err)
 	}
 }

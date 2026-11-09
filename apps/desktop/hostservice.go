@@ -17,17 +17,19 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
-	ui              *uiwindows.Controller
-	uiError         string
-	shortcuts       *shortcutController
-	probeEnabled    bool
-	manager         *kernel.Manager
-	launcher        *launcher
-	recordMu        sync.Mutex
-	recordingWindow *application.WebviewWindow
-	searchMu        sync.Mutex
-	searchSequence  uint64
-	searchCancel    context.CancelFunc
+	ui               *uiwindows.Controller
+	uiError          string
+	shortcuts        *shortcutController
+	detachShortcuts  *shortcutController
+	shortcutConfigMu sync.Mutex
+	probeEnabled     bool
+	manager          *kernel.Manager
+	launcher         *launcher
+	recordMu         sync.Mutex
+	recordingWindow  *application.WebviewWindow
+	searchMu         sync.Mutex
+	searchSequence   uint64
+	searchCancel     context.CancelFunc
 }
 
 func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
@@ -186,6 +188,11 @@ func (h *HostService) ShortcutSettings() (ShortcutState, error) {
 	return h.shortcuts.State(), nil
 }
 func (h *HostService) SaveShortcut(value string, revision uint64) (ShortcutState, error) {
+	h.shortcutConfigMu.Lock()
+	defer h.shortcutConfigMu.Unlock()
+	if err := shortcutConflict(value, h.detachShortcuts); err != nil {
+		return ShortcutState{}, err
+	}
 	if h.shortcuts == nil {
 		return ShortcutState{}, fmt.Errorf("此运行模式不支持快捷键设置")
 	}
@@ -307,5 +314,54 @@ func (h *HostService) CloseTrustedView(ctx context.Context) {
 	}
 	if window := h.launcher.caller(ctx); window != nil && !h.launcher.isMain(window) {
 		window.Close()
+	}
+}
+
+func shortcutConflict(value string, other *shortcutController) error {
+	normalized, err := normalizeShortcut(value)
+	if err != nil {
+		return err
+	}
+	if other != nil {
+		state := other.State()
+		if normalized == state.Shortcut || normalized == state.Active {
+			return errors.New("呼出与窗口独立快捷键不能相同")
+		}
+	}
+	return nil
+}
+func (h *HostService) DetachShortcutSettings() (ShortcutState, error) {
+	if h.detachShortcuts == nil {
+		return ShortcutState{}, errors.New("窗口快捷键尚未就绪")
+	}
+	return h.detachShortcuts.State(), nil
+}
+func (h *HostService) SaveDetachShortcut(value string, revision uint64) (ShortcutState, error) {
+	h.shortcutConfigMu.Lock()
+	defer h.shortcutConfigMu.Unlock()
+	if h.detachShortcuts == nil {
+		return ShortcutState{}, errors.New("窗口快捷键尚未就绪")
+	}
+	if err := shortcutConflict(value, h.shortcuts); err != nil {
+		return ShortcutState{}, err
+	}
+	return h.detachShortcuts.Save(value, revision)
+}
+
+func (h *HostService) captureShortcut(value string) {
+	h.recordMu.Lock()
+	window := h.recordingWindow
+	h.recordMu.Unlock()
+	if window != nil {
+		window.DispatchWailsEvent(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
+	}
+}
+func (h *HostService) startDetachShortcuts() {
+	h.detachShortcuts.Start()
+	if err := shortcutConflict(h.detachShortcuts.State().Shortcut, h.shortcuts); err != nil {
+		h.detachShortcuts.mu.Lock()
+		h.detachShortcuts.state.Error = err.Error()
+		h.detachShortcuts.mu.Unlock()
+		h.detachShortcuts.publish()
 	}
 }

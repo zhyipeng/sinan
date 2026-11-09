@@ -22,6 +22,7 @@ let executions=0, dismissals=0, saves=0, clears=0, reloads=0, upgrades=0, detach
 let installedFingerprint="b".repeat(64), sourceFingerprint="a".repeat(64);
 let config={revision:0,values:{directories:[] as string[]}};
 let shortcut={shortcut:'Cmd+Space',active:'Cmd+Space',default:'Cmd+Space',revision:0,error:'',ready:true};
+let detachShortcut={shortcut:'Shift+Cmd+D',active:'Shift+Cmd+D',default:'Shift+Cmd+D',revision:0,error:'',ready:true};
 let recording=false;
 let managerPresent=true, fixturePresent=true, managerRestores=0, stops=0, uninstalls=0;
 let uiEnabled=false, openedViews=0, commandWindows=0, failWindowOpen=false, deferWindow=false;
@@ -47,7 +48,7 @@ const fixture = {
   complete() { done=true; publish(); },
   refresh() { publish(); },
   mutatePackage() { sourceFingerprint="c".repeat(64); },
-  counts() { return {detaches,pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
+  counts() { return {detachShortcut,detaches,pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
   enableUI(){uiEnabled=true;},
   nameView(){plugin.uiViews[0].title='输入视图';},
   readyWindows(){uiEnabled=true;plugin.changed=false;},
@@ -68,6 +69,13 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 4262640395:return detachShortcut;
+    case 1332948311:
+      if(args.args[0]===shortcut.shortcut)throw new Error('呼出与窗口独立快捷键不能相同');
+      if(args.args[1]!==detachShortcut.revision)throw new Error('快捷键已变化');
+      detachShortcut={...detachShortcut,shortcut:args.args[0],active:args.args[0],revision:detachShortcut.revision+1};
+      queueMicrotask(()=>window._wails.dispatchWailsEvent({name:'detach-shortcut:changed',data:detachShortcut}));
+      return detachShortcut;
     case 3741028594:
       detaches++;
       window._wails.dispatchWailsEvent({name:'view:detached',data:null});
@@ -88,6 +96,7 @@ setTransport({async call(object,_method,_window,args){
     case 3261602732:return shortcut;
     case 851920844:recording=Boolean(args.args[0]);return;
     case 2913582280:
+      if(args.args[0]===detachShortcut.shortcut)throw new Error('呼出与窗口独立快捷键不能相同');
       if(args.args[1]!==shortcut.revision)throw new Error('快捷键设置已变化');
       if(args.args[0]==='Ctrl+Alt+K')throw new Error('快捷键可能已被系统或其他应用占用；原快捷键保持不变。');
       shortcut={...shortcut,shortcut:args.args[0],active:args.args[0],revision:shortcut.revision+1};

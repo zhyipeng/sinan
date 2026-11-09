@@ -152,3 +152,20 @@ func sinanUIFocused(handle C.ulonglong, id C.ulonglong) (result C.int) {
 	}
 	return 0
 }
+
+//export sinanUIDetachShortcut
+func sinanUIDetachShortcut(handle C.ulonglong) (result *C.char) {
+	defer func() {
+		if recover() != nil {
+			result = nil
+		}
+	}()
+	binding := bindingFor(handle)
+	if !binding.session.Active() {
+		return nil
+	}
+	if client, ok := binding.session.(interface{ DetachShortcut() string }); ok {
+		return C.CString(client.DetachShortcut())
+	}
+	return nil
+}

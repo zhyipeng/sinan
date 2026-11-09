@@ -32,16 +32,17 @@ type windowEntry struct {
 }
 
 type Controller struct {
-	manager *kernel.Manager
-	options uiprocess.Options
-	onExit  func(Event)
-	ctx     context.Context
-	cancel  context.CancelFunc
-	mu      sync.Mutex
-	panel   *windowEntry
-	closed  bool
-	opening map[string]*windowEntry
-	active  sync.WaitGroup
+	preferenceRevision uint64
+	manager            *kernel.Manager
+	options            uiprocess.Options
+	onExit             func(Event)
+	ctx                context.Context
+	cancel             context.CancelFunc
+	mu                 sync.Mutex
+	panel              *windowEntry
+	closed             bool
+	opening            map[string]*windowEntry
+	active             sync.WaitGroup
 }
 
 func New(manager *kernel.Manager, executable string, onExit func(Event)) (*Controller, error) {
@@ -160,7 +161,9 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 		return errors.New("插件已变化，请重试")
 	}
 	owned.session = session
+	c.mu.Lock()
 	options := c.options
+	c.mu.Unlock()
 	options.WindowAction = func(action string) bool {
 		c.mu.Lock()
 		if c.closed || !owned.attached || c.panel != owned {
@@ -187,6 +190,13 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 	}
 	c.mu.Lock()
 	owned.process = process
+	// Never write a pipe under c.mu: window-action callbacks take this mutex.
+	shortcut, revision := c.options.DetachShortcut, c.preferenceRevision
+	c.mu.Unlock()
+	if shortcut != "" {
+		_ = process.SetDetachShortcut(shortcut, revision)
+	}
+	c.mu.Lock()
 	close(owned.ready)
 	c.mu.Unlock()
 	transferred = true
@@ -246,4 +256,24 @@ func (c *Controller) Main(toggle bool) (bool, error) {
 		return true, entry.process.Toggle()
 	}
 	return true, entry.process.Focus()
+}
+
+func (c *Controller) SetDetachShortcut(value string) {
+	if len(value) == 0 || len(value) > 128 {
+		return
+	}
+	c.mu.Lock()
+	c.preferenceRevision++
+	revision := c.preferenceRevision
+	c.options.DetachShortcut = value
+	var processes []*uiprocess.Process
+	for _, entry := range c.opening {
+		if entry.process != nil {
+			processes = append(processes, entry.process)
+		}
+	}
+	c.mu.Unlock()
+	for _, process := range processes {
+		_ = process.SetDetachShortcut(value, revision)
+	}
 }

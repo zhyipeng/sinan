@@ -109,7 +109,10 @@ func normalizeShortcut(value string) (string, error) {
 	return strings.Join(append(result, key), "+"), nil
 }
 func newShortcutController(preferences shortcutPreferences, registry shortcutRegistry, toggle func(), captured func(string), changed func(ShortcutState)) *shortcutController {
-	c := &shortcutController{registry: registry, preferences: preferences, toggle: toggle, captured: captured, changed: changed, state: ShortcutState{Default: defaultShortcut(), Shortcut: defaultShortcut()}}
+	return newShortcutControllerWithDefault(preferences, registry, toggle, captured, changed, defaultShortcut())
+}
+func newShortcutControllerWithDefault(preferences shortcutPreferences, registry shortcutRegistry, toggle func(), captured func(string), changed func(ShortcutState), fallback string) *shortcutController {
+	c := &shortcutController{registry: registry, preferences: preferences, toggle: toggle, captured: captured, changed: changed, state: ShortcutState{Default: fallback, Shortcut: fallback}}
 	saved, err := preferences.LauncherPreferences()
 	if err != nil {
 		c.state.Error = "无法读取快捷键配置，暂用默认快捷键。"

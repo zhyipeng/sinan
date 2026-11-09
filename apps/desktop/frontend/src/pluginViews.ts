@@ -5,7 +5,7 @@ import { createElement, type ComponentType } from 'react';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled } from '../bindings/sinan/apps/desktop/hostservice';
+import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -28,6 +28,16 @@ function normalize(value: {revision: number; values: Record<string, string[] | n
 }
 let recordingQueue: Promise<void> = Promise.resolve();
 export const settingsBridge: SettingsBridge = {
+  detachShortcut: {
+    async load() { return await DetachShortcutSettings(); },
+    async save(value, revision) { return await SaveDetachShortcut(value, revision); },
+    record(enabled) { recordingQueue = recordingQueue.catch(() => {}).then(() => RecordShortcut(enabled)).then(() => {}); return recordingQueue; },
+    subscribe(changed, captured) {
+      const offState = Events.On('detach-shortcut:changed', event => changed(event.data as ShortcutState));
+      const offCaptured = Events.On('shortcut:recorded', event => captured(event.data as string));
+      return () => { offState(); offCaptured(); };
+    },
+  },
   shortcut: {
     async load() { return await ShortcutSettings(); },
     async save(value, revision) { return await SaveShortcut(value, revision); },

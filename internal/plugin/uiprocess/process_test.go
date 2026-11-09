@@ -301,3 +301,32 @@ func TestWindowActionRequiresPanelRole(t *testing.T) {
 		t.Fatal("non-panel window action was not rejected")
 	}
 }
+
+func TestLiveDetachShortcutUpdatesKeepSessionAndRejectStaleRevision(t *testing.T) {
+	s := session(t)
+	opts := options("wait-shortcut")
+	opts.DetachShortcut = "Shift+Cmd+D"
+	p, err := Start(context.Background(), s, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop()
+	pid := p.PID()
+	if err := p.SetDetachShortcut("Ctrl+Alt+F19", 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SetDetachShortcut("Shift+Cmd+D", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Focus(); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Active() || pid != p.PID() {
+		t.Fatal("updating shortcut replaced session")
+	}
+	p.Stop()
+	result := p.Wait()
+	if result.Err != nil || string(result.Report) != `{"shortcut":"Ctrl+Alt+F19"}` {
+		t.Fatal("renderer missed live preference update", result.Err)
+	}
+}

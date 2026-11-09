@@ -237,3 +237,10 @@ macOS 保留原 NSPanel 的非激活原生类型，移除浮动、跨 Space 及�
 ### 系统界面插件保护
 
 按用户指令，内核固定保护 system.settings 和 system.plugin-manager，拒绝 Uninstall 与 SetPluginEnabled(false)，管理界面根据只读 protected 元数据隐藏对应操作。保护由宿主策略决定，不接受插件 manifest 自行开启或关闭。有效历史禁用列表中的这两个 ID 在加载时被忽略，其他插件状态保留，启动不重写原始配置；配置损坏仍沿用默认拒绝策略。启用、重载和升级继续可用，缺失或损坏的包仍需恢复机制。见 [ADR 0025](adr/0025-protected-system-views.md)。
+
+
+### 自定义窗口独立快捷键
+
+设置插件在呼出快捷键后提供窗口独立快捷键，默认 macOS 为 Command + Shift + D。它是当前插件页的局部按键，不注册系统全局热键；支持按键录入、恢复默认和保存。宿主使用独立的 $window 命名空间及修订号保存，并拒绝与呼出键相同的组合。录入时保持焦点与窗口归属检查。
+
+可信页面按保存后的组合匹配；独立 HTML 客体通过私有初始化数据及 detach-shortcut 配置帧接收更新，不重建页面。更新带有宿主侧单调修订，避免启动或通知并发导致旧值覆盖新值；父进程向管道写入时不持有窗口控制器锁。页面桥不增加任何消息能力，详见 [ADR 0026](adr/0026-configurable-detach-shortcut.md)。

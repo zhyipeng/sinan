@@ -78,7 +78,7 @@ func main() {
 		time.Sleep(time.Minute)
 		return
 	}
-	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" {
+	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" || mode == "wait-shortcut" {
 		done := make(chan struct{})
 		c.OnRevoke(func() { close(done) })
 		delayed := false
@@ -98,7 +98,11 @@ func main() {
 					os.Exit(16)
 				}
 			case <-done:
-				if c.Finish(json.RawMessage(`{"revoked":true}`)) != nil {
+				report := json.RawMessage(`{"revoked":true}`)
+				if mode == "wait-shortcut" {
+					report, _ = json.Marshal(map[string]string{"shortcut": c.DetachShortcut()})
+				}
+				if c.Finish(report) != nil {
 					os.Exit(11)
 				}
 				return

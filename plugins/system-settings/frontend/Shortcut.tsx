@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type ShortcutState = { shortcut: string; active: string; default: string; revision: number; error: string; ready: boolean };
 export type ShortcutBridge = {
@@ -7,10 +7,10 @@ export type ShortcutBridge = {
   record(enabled: boolean): Promise<void>;
   subscribe(changed: (state: ShortcutState) => void, captured: (key: string) => void): () => void;
 };
-function format(value: string) {
+export function formatShortcut(value: string) {
   return value.split('+').map(key => ({ Cmd: 'Command', Alt: /mac/i.test(navigator.platform) ? 'Option' : 'Alt', Super: 'Super', Space: 'Space' }[key] ?? key)).join(' + ');
 }
-function keyCombination(event: KeyboardEvent): string | undefined {
+export function keyCombination(event: {code: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean}): string | undefined {
   const code = event.code;
   let key = /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit[0-9]$/.test(code) ? code.slice(5) : /^F([1-9]|1[0-9]|20)$/.test(code) ? code : undefined;
   key ??= ({ Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Home: 'Home', End: 'End', PageUp: 'Page Up', PageDown: 'Page Down', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right' } as Record<string, string>)[code];
@@ -19,7 +19,7 @@ function keyCombination(event: KeyboardEvent): string | undefined {
   const modifiers = [event.ctrlKey && 'Ctrl', event.altKey && 'Alt', event.shiftKey && 'Shift', event.metaKey && (/mac/i.test(navigator.platform) ? 'Cmd' : 'Super')].filter(Boolean);
   return [...modifiers, key].join('+');
 }
-export default function Shortcut({ bridge }: { bridge: ShortcutBridge }) {
+export default function Shortcut({ bridge, title = "呼出快捷键" }: { bridge: ShortcutBridge; title?: string }) {
   const [state, setState] = useState<ShortcutState>();
   const [draft, setDraft] = useState('');
   const [recording, setRecording] = useState(false);
@@ -70,10 +70,10 @@ export default function Shortcut({ bridge }: { bridge: ShortcutBridge }) {
     } catch (error) { if (alive.current) setError(error instanceof Error ? error.message : '快捷键保存失败，请重试。'); }
     finally { if (alive.current) setPending(false); }
   }
-  return <section className="settings-shortcut">
-    <h2>呼出快捷键</h2>
+  return <section className="settings-shortcut" aria-label={title}>
+    <h2>{title}</h2>
     <div className="shortcut-controls">
-      <button ref={recorder} type="button" className={`shortcut-recorder ${recording ? 'recording' : ''}`} aria-label="录入呼出快捷键" aria-pressed={recording} disabled={pending || !state?.ready} onClick={() => void start()} onBlur={() => { if (recordingRef.current) stop(); }} onKeyDown={event => {
+      <button ref={recorder} type="button" className={`shortcut-recorder ${recording ? 'recording' : ''}`} aria-label={`录入${title}`} aria-pressed={recording} disabled={pending || !state?.ready} onClick={() => void start()} onBlur={() => { if (recordingRef.current) stop(); }} onKeyDown={event => {
         if (!recordingRef.current || event.nativeEvent.isComposing) return;
         if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey) { stop(); return; }
         event.preventDefault(); event.stopPropagation();
@@ -81,11 +81,11 @@ export default function Shortcut({ bridge }: { bridge: ShortcutBridge }) {
         if (['Meta', 'Control', 'Alt', 'Shift'].includes(event.key)) return;
         const value = keyCombination(event);
         if (value) capture(value); else setError('请同时按下 Command、Ctrl 或 Alt 与一个标准按键。');
-      }}>{recording ? '请按组合键…' : draft ? format(draft) : '正在读取…'}</button>
+      }}>{recording ? '请按组合键…' : draft ? formatShortcut(draft) : '正在读取…'}</button>
       <button type="button" disabled={pending || !state} onClick={() => { stop(); dirty.current = true; setDraft(state!.default); setError(''); setNotice(''); }}>恢复默认</button>
-      <button type="button" className="primary" disabled={pending || recording || !state?.ready || draft === state.shortcut && draft === state.active && !state.error} onClick={() => void save()}>{pending ? '处理中…' : '保存快捷键'}</button>
+      <button type="button" className="primary" disabled={pending || recording || !state?.ready || draft === state.shortcut && draft === state.active && !state.error} onClick={() => void save()}>{pending ? '处理中…' : title === '呼出快捷键' ? '保存快捷键' : `保存${title}`}</button>
     </div>
-    <p className="settings-note">点击左侧后按下组合键，保存后立即生效</p>
+    <p className="settings-note">{title === "窗口独立快捷键" ? "在插件页内生效，保存后立即应用" : "点击左侧后按下组合键，保存后立即生效"}</p>
     {recording && <button type="button" className="shortcut-cancel" onClick={stop}>取消录入</button>}
     {(error || state?.error) && <p className="error" role="alert">{error || state?.error}</p>}
     {notice && <p className="settings-notice" role="status">{notice}</p>}

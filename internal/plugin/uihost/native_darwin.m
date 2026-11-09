@@ -14,6 +14,40 @@ SinanUIControl *sinanUIControlNew(void) {
 void sinanUIControlRevoke(SinanUIControl *control) { atomic_store(&control->revoked, true); }
 void sinanUIControlFree(SinanUIControl *control) { free(control); }
 
+static BOOL matchesDetachKey(unsigned short keyCode, NSEventModifierFlags modifiers, NSString *shortcut) {
+    NSArray<NSString *> *parts = [shortcut componentsSeparatedByString:@"+"];
+    NSDictionary *codes = @{@"A":@0, @"S":@1, @"D":@2, @"F":@3, @"H":@4, @"G":@5, @"Z":@6, @"X":@7, @"C":@8, @"V":@9, @"B":@11, @"Q":@12, @"W":@13, @"E":@14, @"R":@15, @"Y":@16, @"T":@17, @"1":@18, @"2":@19, @"3":@20, @"4":@21, @"6":@22, @"5":@23, @"9":@25, @"7":@26, @"8":@28, @"0":@29, @"O":@31, @"U":@32, @"I":@34, @"P":@35, @"Enter":@36, @"L":@37, @"J":@38, @"K":@40, @"N":@45, @"M":@46, @"Tab":@48, @"Space":@49, @"Backspace":@51, @"Delete":@117, @"Home":@115, @"End":@119, @"Page Up":@116, @"Page Down":@121, @"Left":@123, @"Right":@124, @"Down":@125, @"Up":@126, @"F1":@122, @"F2":@120, @"F3":@99, @"F4":@118, @"F5":@96, @"F6":@97, @"F7":@98, @"F8":@100, @"F9":@101, @"F10":@109, @"F11":@103, @"F12":@111, @"F13":@105, @"F14":@107, @"F15":@113, @"F16":@106, @"F17":@64, @"F18":@79, @"F19":@80, @"F20":@90};
+    NSNumber *code = codes[parts.lastObject];
+    if (!code || keyCode != code.unsignedShortValue) return NO;
+    NSEventModifierFlags expected = 0;
+    for (NSUInteger i=0; i+1<parts.count; i++) {
+        NSString *part = parts[i];
+        if ([part isEqual:@"Cmd"]) expected |= NSEventModifierFlagCommand;
+        else if ([part isEqual:@"Ctrl"]) expected |= NSEventModifierFlagControl;
+        else if ([part isEqual:@"Alt"]) expected |= NSEventModifierFlagOption;
+        else if ([part isEqual:@"Shift"]) expected |= NSEventModifierFlagShift;
+        else return NO;
+    }
+    NSEventModifierFlags mask = NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption | NSEventModifierFlagControl;
+    return expected != 0 && (modifiers & mask) == expected;
+}
+int sinanUIDetachKeyMatches(char *shortcut, unsigned short keyCode, unsigned long modifiers) {
+    @autoreleasepool { return matchesDetachKey(keyCode, modifiers, [NSString stringWithUTF8String:shortcut]); }
+}
+static BOOL matchesDetachShortcut(NSEvent *event, NSString *shortcut, NSWindow *window) {
+    if (event.type != NSEventTypeKeyDown || event.isARepeat) return NO;
+    id responder = window.firstResponder;
+    if ([responder respondsToSelector:@selector(hasMarkedText)] && [(id<NSTextInputClient>)responder hasMarkedText]) return NO;
+    return matchesDetachKey(event.keyCode, event.modifierFlags, shortcut);
+}
+static NSString *detachLabel(NSString *shortcut) {
+    NSDictionary *symbols = @{@"Cmd":@"⌘", @"Ctrl":@"⌃", @"Alt":@"⌥", @"Shift":@"⇧"};
+    NSMutableString *label = [NSMutableString stringWithString:@"独立 "];
+    for (NSString *part in [shortcut componentsSeparatedByString:@"+"])
+        [label appendString:symbols[part] ?: part];
+    return label;
+}
+
 @interface SinanMainPanel : NSPanel
 @end
 @implementation SinanMainPanel
@@ -43,6 +77,8 @@ static void positionPanel(NSWindow *window) {
 @property WKWebView *view;
 @property BOOL probe;
 @property BOOL attached;
+@property NSString *detachShortcut;
+@property NSButton *detachButton;
 @property BOOL detachRequested;
 @property BOOL backRequested;
 @property BOOL initialNavigation;
@@ -223,6 +259,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         delegate.entry = bundle[@"entry"];
         delegate.probe = [bundle[@"probe"] boolValue];
         delegate.attached = [bundle[@"panel"] boolValue] && !delegate.probe;
+        delegate.detachShortcut = @"Shift+Cmd+D";
         delegate.handle = handle;
         delegate.control = control;
         delegate.csp = bundle[@"csp"];
@@ -261,7 +298,8 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
             title.frame = NSMakeRect(80,493,350,22);
             title.autoresizingMask = NSViewMinYMargin;
             [container addSubview:title];
-            NSButton *detach = [NSButton buttonWithTitle:@"独立 ⌘⇧D" target:delegate action:@selector(detachPanel:)];
+            NSButton *detach = [NSButton buttonWithTitle:detachLabel(delegate.detachShortcut) target:delegate action:@selector(detachPanel:)];
+            delegate.detachButton = detach;
             detach.frame = NSMakeRect(548,490,120,28);
             detach.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
             [container addSubview:detach];
@@ -302,9 +340,19 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                 // NSRunLoop alone renders initial WebKit content but leaves the
                 // window unresponsive to WindowServer, keyboard and mouse input.
                 NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.02] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (delegate.attached) {
+                    char *value = sinanUIDetachShortcut(handle);
+                    if (value) {
+                        NSString *shortcut = [NSString stringWithUTF8String:value];
+                        free(value);
+                        if (shortcut && ![shortcut isEqual:delegate.detachShortcut]) {
+                            delegate.detachShortcut = shortcut;
+                            delegate.detachButton.title = detachLabel(shortcut);
+                        }
+                    }
+                }
                 if (event) {
-                    NSEventModifierFlags modifiers = event.modifierFlags & (NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption | NSEventModifierFlagControl);
-                    if (delegate.attached && event.type == NSEventTypeKeyDown && modifiers == (NSEventModifierFlagCommand | NSEventModifierFlagShift) && [event.charactersIgnoringModifiers.lowercaseString isEqual:@"d"])
+                    if (delegate.attached && matchesDetachShortcut(event, delegate.detachShortcut, window))
                         delegate.detachRequested = YES;
                     else [NSApp sendEvent:event];
                     if (event.type == NSEventTypeApplicationDefined && event.subtype == marker) eventLoopResponsive = YES;

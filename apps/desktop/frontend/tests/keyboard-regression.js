@@ -1,5 +1,5 @@
 // Run against `npm run dev`; requires the local ego-browser CLI.
-const task = await taskSpace('Sinan protected system plugin regression');
+const task = await taskSpace('Sinan configurable detach shortcut regression');
 console.log({taskSpaceId:task.spaceId});
 const page = task.page('p1');
 const query = 'input[aria-label="搜索命令"]';
@@ -123,7 +123,7 @@ await page.click(recorder);
 await page.waitForFunction(()=>document.querySelector('[aria-label="录入呼出快捷键"]').getAttribute('aria-pressed')==='true');
 await page.evaluate(()=>window.navigationFixture.captureShortcut());
 await page.waitForFunction(()=>document.querySelector('[aria-label="录入呼出快捷键"]').getAttribute('aria-pressed')==='false');
-await page.click('loc=role:button[name="恢复默认"]');
+await page.click('section[aria-label="呼出快捷键"] button:text-is("恢复默认")');
 await page.click('loc=role:button[name="保存快捷键"]');
 await page.waitForFunction(()=>window.navigationFixture.counts().shortcut.active==='Cmd+Space'&&!window.navigationFixture.counts().recording);
 console.log('PASS: shortcut recording, invalid chord, conflict retention, save, reopen, Escape, active hotkey capture and restore default');
@@ -305,5 +305,49 @@ console.log('PASS: trusted view render failure leaves recovery available');
 console.log({recoveryScreenshot:await page.screenshot({path:'/tmp/sinan-recovery.png'})});
 console.log('PASS: direct action executes once and dismisses without opening a command form');
 console.log('PASS: pending navigation, same-batch update, stable keys, pointer intent, completion and Enter');
+
+// Both keyboard rows share the recorder but keep independent revisions and values.
+await page.goto('http://127.0.0.1:9245/tests/keyboard.html');
+async function openSettings() {
+  await page.fill(query,'settings');
+  await page.waitForSelector('.command');
+  await page.click('.command');
+  await page.waitForSelector('button[aria-label="录入窗口独立快捷键"]');
+}
+await openSettings();
+const detachRecorder='button[aria-label="录入窗口独立快捷键"]';
+const detachSave='loc=role:button[name="保存窗口独立快捷键"]';
+await page.click(detachRecorder);
+await page.waitForFunction(()=>document.querySelector('[aria-label="录入窗口独立快捷键"]').getAttribute('aria-pressed')==='true');
+await page.evaluate(()=>window.navigationFixture.captureShortcut());
+await page.click(detachSave);
+await page.waitForFunction(()=>document.querySelector('section[aria-label="窗口独立快捷键"] [role="alert"]')?.textContent.includes('不能相同'));
+if(await page.evaluate(()=>window.navigationFixture.counts().detachShortcut.revision)!==0)throw new Error('conflict changed saved detach key');
+await page.click(detachRecorder);
+await page.keyboard.press('Control+Alt+Shift+U');
+if(await page.evaluate(()=>window.navigationFixture.counts().detaches)!==0)throw new Error('recording triggered detach');
+await page.click(detachSave);
+await page.waitForFunction(()=>window.navigationFixture.counts().detachShortcut.active==='Ctrl+Alt+Shift+U');
+await page.evaluate(()=>window.navigationFixture.showLauncher());
+await openSettings();
+await page.waitForFunction(()=>document.querySelector('[aria-label="录入窗口独立快捷键"]')?.textContent.includes('U'));
+await page.click('section[aria-label="窗口独立快捷键"] button:text-is("恢复默认")');
+await page.click(detachSave);
+await page.waitForFunction(()=>window.navigationFixture.counts().detachShortcut.active==='Shift+Cmd+D');
+await page.click(detachRecorder);
+await page.keyboard.press('Control+Alt+Shift+U');
+await page.click(detachSave);
+await page.waitForFunction(()=>window.navigationFixture.counts().detachShortcut.active==='Ctrl+Alt+Shift+U');
+// Assigning the same key to the global launcher must also be rejected.
+await page.click('button[aria-label="录入呼出快捷键"]');
+await page.keyboard.press('Control+Alt+Shift+U');
+await page.click('loc=role:button[name="保存快捷键"]');
+await page.waitForFunction(()=>document.querySelector('section[aria-label="呼出快捷键"] [role="alert"]')?.textContent.includes('不能相同'));
+await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'D',code:'KeyD',metaKey:true,shiftKey:true,bubbles:true})));
+if(await page.evaluate(()=>window.navigationFixture.counts().detaches)!==0)throw new Error('old default still detached');
+await page.keyboard.press('Control+Alt+Shift+U');
+await page.waitForSelector('.shell.detached');
+if(await page.evaluate(()=>window.navigationFixture.counts().detaches)!==1)throw new Error('new chord did not detach exactly once');
+console.log('PASS: custom detach recording, two-way conflicts, restore default, reopen, old-key removal and live new-key action');
 console.log(await page.snapshot());
 await task.finish({keep:[]});

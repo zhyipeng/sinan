@@ -56,3 +56,10 @@ func runNative(data []byte, target string, session Session, disable func() error
 	}
 	return Report{Detached: r.detached != 0, TogglesHandled: int(r.togglesHandled), FocusHandled: int(r.focusHandled), EventLoopResponsive: r.eventLoopResponsive != 0, Failure: failure, HeartbeatCompleted: r.heartbeatCompleted != 0, Ready: r.ready != 0, BindingsAbsent: r.bindingsAbsent != 0, StorageIsolated: r.storageIsolated != 0, OwnResourceLoaded: r.ownResourceLoaded != 0, ForeignResourceBlocked: r.foreignResourceBlocked != 0, NavigationBlocked: r.navigationBlocked != 0, NetworkBlocked: r.networkBlocked != 0, InvalidMessageRejected: r.invalidMessageRejected != 0, CloseReceived: r.closeReceived != 0, BudgetRevoked: r.budgetRevoked != 0, LifecycleRevoked: r.lifecycleRevoked != 0}, nil
 }
+
+// Pure native key matching also supports deterministic regression without a window.
+func matchesNativeDetachKey(shortcut string, code uint16, modifiers uint64) bool {
+	value := C.CString(shortcut)
+	defer C.free(unsafe.Pointer(value))
+	return C.sinanUIDetachKeyMatches(value, C.ushort(code), C.ulong(modifiers)) != 0
+}

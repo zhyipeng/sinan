@@ -40,6 +40,10 @@ export function CloseTrustedView(): $CancellablePromise<void> {
     return $Call.ByID(456120721);
 }
 
+export function DetachShortcutSettings(): $CancellablePromise<$models.ShortcutState> {
+    return $Call.ByID(4262640395);
+}
+
 /**
  * DetachTrustedView rotates the Shell role, preserving the original trusted WebView.
  * Identity is resolved against installed commands and the bundled component allowlist.
@@ -114,6 +118,10 @@ export function Reload(pluginID: string): $CancellablePromise<kernel$0.PluginInf
 
 export function ResizeLauncher(height: number): $CancellablePromise<void> {
     return $Call.ByID(2198789619, height);
+}
+
+export function SaveDetachShortcut(value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
+    return $Call.ByID(1332948311, value, revision);
 }
 
 export function SavePluginSettings(pluginID: string, revision: number, values: { [_ in string]?: string[] | null } | null): $CancellablePromise<storage$0.SettingsSnapshot> {

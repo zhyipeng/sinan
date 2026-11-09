@@ -15,8 +15,9 @@ import (
 )
 
 type Options struct {
-	Panel        bool
-	WindowAction func(string) bool // signal state only; never block on UI
+	DetachShortcut string
+	Panel          bool
+	WindowAction   func(string) bool // signal state only; never block on UI
 
 	Executable     string
 	Args           []string
@@ -32,24 +33,25 @@ type Result struct {
 	Err    error
 }
 type Process struct {
-	focusSequence uint64
-	focusPending  map[uint64]chan bool
-	cmd           *exec.Cmd
-	input         *os.File
-	output        *os.File
-	session       *uiview.Session
-	options       Options
-	exchange      sync.Mutex
-	mu            sync.Mutex
-	result        Result
-	finished      bool
-	ready         chan struct{}
-	readyOnce     sync.Once
-	stop          chan struct{}
-	stopOnce      sync.Once
-	done          chan struct{}
-	readDone      chan struct{}
-	unsubscribe   func()
+	preferenceRevision uint64
+	focusSequence      uint64
+	focusPending       map[uint64]chan bool
+	cmd                *exec.Cmd
+	input              *os.File
+	output             *os.File
+	session            *uiview.Session
+	options            Options
+	exchange           sync.Mutex
+	mu                 sync.Mutex
+	result             Result
+	finished           bool
+	ready              chan struct{}
+	readyOnce          sync.Once
+	stop               chan struct{}
+	stopOnce           sync.Once
+	done               chan struct{}
+	readDone           chan struct{}
+	unsubscribe        func()
 }
 
 func Start(ctx context.Context, session *uiview.Session, options Options) (*Process, error) {
@@ -109,7 +111,7 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	go p.wait()
 	go func() {
 		p.exchange.Lock()
-		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), Panel: options.Panel, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
+		err := writeFrame(p.input, Init{Kind: "init", Version: 1, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
 		p.exchange.Unlock()
 		if err != nil {
 			p.fail("UI 初始化写入失败")
@@ -341,4 +343,22 @@ func (p *Process) serve() {
 	if !finished {
 		p.fail("UI 管道提前关闭或格式无效")
 	}
+}
+
+// SetDetachShortcut updates trusted renderer preferences without page messages,
+// focus controls, a new session, or a document reload.
+func (p *Process) SetDetachShortcut(value string, revision uint64) error {
+	if len(value) == 0 || len(value) > 128 {
+		return errors.New("快捷键格式无效")
+	}
+	p.exchange.Lock()
+	defer p.exchange.Unlock()
+	if revision < p.preferenceRevision {
+		return nil
+	}
+	if !p.session.Active() {
+		return errors.New("视图已关闭")
+	}
+	p.preferenceRevision = revision
+	return writeFrame(p.input, response{Kind: "detach-shortcut", DetachShortcut: value})
 }

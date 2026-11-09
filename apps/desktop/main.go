@@ -177,7 +177,7 @@ func run() error {
 	if !*uiProbe {
 		tray := configureTray(app, host.showMain)
 		host.shortcuts = newShortcutController(manager, app.GlobalShortcut, host.toggleMain, func(value string) {
-			host.launcher.dispatch(&application.CustomEvent{Name: "shortcut:recorded", Data: value, Sender: "kernel.shortcuts"})
+			host.captureShortcut(value)
 		}, func(state ShortcutState) {
 			host.launcher.setShortcutError(state.Error)
 			if *acceptance {
@@ -187,8 +187,17 @@ func run() error {
 			}
 			host.launcher.dispatch(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
 		})
+		host.detachShortcuts = newShortcutControllerWithDefault(windowPreferences{manager}, localShortcutRegistry{}, nil, nil, func(state ShortcutState) {
+			if host.ui != nil {
+				host.ui.SetDetachShortcut(state.Active)
+			}
+			host.launcher.dispatch(&application.CustomEvent{Name: "detach-shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
+		}, defaultDetachShortcut())
+		if host.ui != nil {
+			host.ui.SetDetachShortcut(host.detachShortcuts.State().Shortcut)
+		}
 		// Register after startup so native conflicts are returned synchronously.
-		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) { host.shortcuts.Start() })
+		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) { host.shortcuts.Start(); host.startDetachShortcuts() })
 		app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
 			go host.showMain()
 		})
