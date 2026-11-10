@@ -47,25 +47,3 @@ export interface Snapshot {
     "plugins": PluginInfo[] | null;
     "diagnostics": string[] | null;
 }
-
-export interface UIPermission {
-    "id": string;
-    "title": string;
-    "allowed": boolean;
-}
-
-export interface UIPermissionInfo {
-    "id": string;
-    "name": string;
-    "fingerprint": string;
-    "reviewed": boolean;
-    "stale": boolean;
-    "changed": boolean;
-    "permissions": UIPermission[] | null;
-}
-
-export interface UIPermissionState {
-    "revision": number;
-    "plugins": UIPermissionInfo[] | null;
-    "error": string;
-}

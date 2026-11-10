@@ -394,14 +394,3 @@ func (h *HostService) ClearPluginData(pluginID, token string) error {
 	}
 	return nil
 }
-
-func (h *HostService) UIPermissions() (kernel.UIPermissionState, error) {
-	return h.manager.UIPermissions()
-}
-func (h *HostService) SaveUIPermissions(id, fingerprint string, revision uint64, capabilities []string) (kernel.UIPermissionState, error) {
-	result, err := h.manager.SaveUIPermissions(id, fingerprint, revision, capabilities)
-	if err == nil && h.launcher != nil {
-		h.launcher.closePlugin(id)
-	}
-	return result, err
-}

@@ -43,20 +43,16 @@ let done = false;
 function publish() {
   window._wails.dispatchWailsEvent({name:'search:update',data:{queryId:sequence,items:[...items],pending:done?0:1,failures:[],done}});
 }
-let permissionSaves=0;
-let permissionState={revision:0,error:'',plugins:[{id:plugin.id,name:plugin.name,fingerprint:'1'.repeat(64),reviewed:false,stale:false,changed:false,permissions:[{id:'main/command/alpha',title:'运行命令：Alpha',allowed:false},{id:'main/storage',title:'读写私有数据',allowed:false}]}]};
 let dataClears=0;
 let dataRows=[{id:plugin.id,name:'Fixture',installed:true,bytes:128,corrupt:false,token:'f'.repeat(64)},{id:'example.orphan',name:'example.orphan',installed:false,bytes:17,corrupt:true,token:'e'.repeat(64)}];
 const fixture = {
-  stalePermissionRevision(){permissionState.revision++;},
-  mutatePermissionPackage(){permissionState.plugins[0]={...permissionState.plugins[0],fingerprint:"2".repeat(64),reviewed:false,stale:true,permissions:permissionState.plugins[0].permissions.map(cap=>({...cap,allowed:false}))};},
   mutateData(){dataRows[0].token='a'.repeat(64);},
   addUnclearableData(){dataRows.push({id:'example.link',name:'example.link',installed:false,bytes:0,corrupt:true,token:''});},
   advance() { items = [item('Late'),...items.filter(item=>item.title!=='Late')]; publish(); },
   complete() { done=true; publish(); },
   refresh() { publish(); },
   mutatePackage() { sourceFingerprint="c".repeat(64); },
-  counts() { return {permissionSaves,dataClears,detachShortcut,detaches,pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
+  counts() { return {dataClears,detachShortcut,detaches,pendingWindow:!!completeWindow,commandWindows,commandOpenArgs,openedViews,executions,dismissals,saves,clears,config,reloads,upgrades,shortcut,recording,managerPresent,managerRestores,stops,uninstalls,fixtureDisabled:plugin.disabled,managerDisabled:managerPlugin.disabled}; },
   enableUI(){uiEnabled=true;},
   nameView(){plugin.uiViews[0].title='输入视图';},
   readyWindows(){uiEnabled=true;plugin.changed=false;},
@@ -77,15 +73,6 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
-    case 1580998567:return structuredClone(permissionState);
-    case 2058116116:{
-      const target=permissionState.plugins[0];
-      if(args.args[0]!==target.id||args.args[1]!==target.fingerprint)throw new Error('插件包已变化，请刷新权限后重新确认');
-      if(args.args[2]!==permissionState.revision)throw new Error('权限设置已变化，请刷新后重试');
-      if(args.args[3].some((id:string)=>!target.permissions.some(cap=>cap.id===id)))throw new Error('权限未声明');
-      permissionState={...permissionState,revision:permissionState.revision+1,plugins:[{...target,reviewed:true,stale:false,permissions:target.permissions.map(cap=>({...cap,allowed:args.args[3].includes(cap.id)}))}]};
-      permissionSaves++;return structuredClone(permissionState);
-    }
     case 3637179584:return dataRows.map(row=>({...row,installed:row.id===plugin.id?fixturePresent:row.installed}));
     case 1111664535:{
       const row=dataRows.find(row=>row.id===args.args[0]);

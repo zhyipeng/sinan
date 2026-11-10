@@ -58,8 +58,6 @@ type plugin struct {
 }
 
 type Manager struct {
-	uiGrants           map[string]uiGrant
-	uiPermissionErr    error
 	documents          *storage.Documents
 	views              map[*uiview.Session]struct{} // Accessed under mutationMu.
 	disabled           map[string]bool              // Accessed under mutationMu.
@@ -98,7 +96,6 @@ func New(root string) (*Manager, error) {
 	m := &Manager{blockedUpgrades: map[string]bool{}, lease: lease, root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
 	m.documents = storage.OpenDocuments(filepath.Join(abs, ".sinan-state", "data"))
 	m.loadEnablement()
-	m.loadUIPermissions()
 	m.startupDiagnostics = m.recoverUpgrades()
 	m.Refresh()
 	return m, nil

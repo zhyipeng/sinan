@@ -5,8 +5,5 @@ export type {
     PackagePreview,
     PluginDataInfo,
     PluginInfo,
-    Snapshot,
-    UIPermission,
-    UIPermissionInfo,
-    UIPermissionState
+    Snapshot
 } from "./models.js";

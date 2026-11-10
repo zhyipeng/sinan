@@ -608,27 +608,6 @@ func TestSuccessfulPanelReplacementRetiresOnlyPreviousAttachedPage(t *testing.T)
 	}
 }
 
-func grantNativeUI(t *testing.T, m *kernel.Manager, id string) {
-	t.Helper()
-	state, err := m.UIPermissions()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, plugin := range state.Plugins {
-		if plugin.ID == id {
-			caps := []string{}
-			for _, cap := range plugin.Permissions {
-				caps = append(caps, cap.ID)
-			}
-			if _, err = m.SaveUIPermissions(id, plugin.Fingerprint, state.Revision, caps); err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-	}
-	t.Fatal("missing UI permissions")
-}
-
 func TestNativeHostJSONPluginCallsAndDraftRestart(t *testing.T) {
 	if nativeGuest == "" {
 		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
@@ -711,7 +690,6 @@ window.webkit.messageHandlers.sinan.postMessage({kind:'close'});
 				m.Close()
 				t.Fatal(err)
 			}
-			grantNativeUI(t, m, "tools.json")
 		}
 		session, err := m.OpenUICommand(context.Background(), "tools.json", "open")
 		if err != nil {
@@ -789,7 +767,6 @@ void save();`
 	if _, err = m.Install(source, false); err != nil {
 		t.Fatal(err)
 	}
-	grantNativeUI(t, m, "example.writer")
 	session, err := m.OpenUIView(context.Background(), "example.writer", "main")
 	if err != nil {
 		t.Fatal(err)

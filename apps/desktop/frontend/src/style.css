@@ -111,12 +111,3 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .data-confirm { padding: 12px; background: #fff6f2; border: 1px solid #f1d3c8; border-radius: 7px; margin-top: 12px; }
 .data-confirm p { margin: 0 0 5px; font-size: 13px; overflow-wrap: anywhere; }
 .data-confirm > div { display: flex; justify-content: flex-end; margin-top: 10px; }
-
-.plugin-permissions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
-.permission-plugin { padding: 14px 0; border-bottom: 1px solid var(--line); }
-.permission-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.permission-title strong { font-size: 13px; }
-.permission-title small { font-size: 11px; color: var(--muted); }
-.permission-option { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 8px 0; overflow-wrap: anywhere; }
-.permission-option input { flex-shrink: 0; accent-color: var(--accent); }
-.permission-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; font-size: 12px; }
