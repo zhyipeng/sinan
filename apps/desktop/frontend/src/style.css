@@ -117,3 +117,10 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .theme-options { display: flex; gap: 8px; }
 .theme-options button { flex: 1; border: 1px solid var(--line); background: var(--sinan-surface); font-size: 13px; }
 .theme-options button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--sinan-selected); }
+
+/* Keep the dropdown inside the dynamically sized native window. */
+.launcher { position: relative; }
+.launcher.menu-open { min-height: 144px; }
+.launcher-menu-items { position: absolute; z-index: 2; top: 50px; right: 18px; width: 156px; padding: 5px; border: 1px solid var(--line); border-radius: 9px; background: var(--sinan-surface); box-shadow: 0 6px 18px #00000018; }
+.launcher-menu-items button { display: block; width: 100%; text-align: left; padding: 10px 12px; font-size: 13px; }
+.launcher-menu-items button:focus-visible { background: var(--sinan-selected); }

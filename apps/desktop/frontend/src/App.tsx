@@ -3,6 +3,7 @@ import { Events } from '@wailsio/runtime';
 import { pluginViews } from './pluginViews';
 import { keyCombination, formatShortcut } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Recovery from './Recovery';
+import LauncherMenu from './LauncherMenu';
 import PluginViewBoundary from './PluginViewBoundary';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
 import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenSettings, OpenPluginCommand, DetachShortcutSettings, DetachTrustedView, CloseTrustedView } from '../bindings/sinan/apps/desktop/hostservice';
@@ -19,6 +20,7 @@ function normalize(snapshot: { plugins: (Omit<Plugin, 'commands'> & { commands: 
 export default function App() {
   const [data, setData] = useState<Data>({ plugins: [], diagnostics: [] });
   const [query, setQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [commands, setCommands] = useState<SearchItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchFailures, setSearchFailures] = useState(0);
@@ -61,6 +63,7 @@ export default function App() {
       // A stale/broadcast launcher event must never reset a detached tool.
       if (detachedRef.current) return;
       generation.current++;
+      setMenuOpen(false);
       setRecovery(false); setActive(undefined); setQuery(''); setSelection({ key: '', manual: false });
       setInput(''); setOutput(''); setError(''); setBusy(false);
       void LauncherStatus().then(setShortcutError).catch(() => {});
@@ -276,7 +279,7 @@ export default function App() {
         </form>
         {output && <output aria-live="polite">{output}</output>}
       </div>}</>
-    </section> : <section className="launcher">
+    </section> : <section className={`launcher${menuOpen ? " menu-open" : ""}`}>
       <div className="search">
         <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>
         <input ref={searchRef} autoFocus spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelection({ key: '', manual: false }); setOutput(''); setError(''); }} onKeyDown={event => {
@@ -285,7 +288,8 @@ export default function App() {
           if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1); }
           if (event.key === 'Enter' && hasQuery) { event.preventDefault(); choose(selected); }
         }} />
-        <button className="manage-button" aria-label="管理插件" title="管理插件" onClick={openManager}>···{shortcutError && <span className="warning-dot" />}</button>
+        <LauncherMenu open={menuOpen} onOpenChange={setMenuOpen} warning={!!shortcutError}
+          onSettings={() => { void OpenSettings().catch(() => setError('无法打开设置。')); }} onPlugins={openManager} />
       </div>
       {hasQuery && <>
         <div id="search-results" className="command-list" role="listbox" aria-label="搜索结果">
