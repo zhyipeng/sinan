@@ -7,6 +7,7 @@ import App from '../src/App';
 import settingsManifest from '../../../../plugins/system-settings/manifest.json';
 import managerManifest from '../../../../plugins/system-plugin-manager/manifest.json';
 import '../src/style.css';
+import themes from '../../../../internal/theme/builtin.json';
 
 declare global {
   interface Window {
@@ -23,6 +24,7 @@ let installedFingerprint="b".repeat(64), sourceFingerprint="a".repeat(64);
 let config={revision:0,values:{directories:[] as string[]}};
 let shortcut={shortcut:'Cmd+Space',active:'Cmd+Space',default:'Cmd+Space',revision:0,error:'',ready:true};
 let detachShortcut={shortcut:'Shift+Cmd+D',active:'Shift+Cmd+D',default:'Shift+Cmd+D',revision:0,error:'',ready:true};
+let theme={mode:'system',revision:0,light:themes[0],dark:themes[1]};
 let recording=false;
 let managerPresent=true, fixturePresent=true, managerRestores=0, stops=0, uninstalls=0;
 let uiEnabled=false, openedViews=0, commandWindows=0, failWindowOpen=false, deferWindow=false;
@@ -73,6 +75,14 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 4090646417:return theme;
+    case 3412871400:return;
+    case 1993998295:
+      if(args.args[1]!==theme.revision)throw new Error('主题设置已变化');
+      if(!['system','light','dark'].includes(args.args[0]))throw new Error('主题模式无效');
+      theme={...theme,mode:args.args[0],revision:theme.revision+1};
+      queueMicrotask(()=>window._wails.dispatchWailsEvent({name:'theme:changed',data:theme}));
+      return theme;
     case 3637179584:return dataRows.map(row=>({...row,installed:row.id===plugin.id?fixturePresent:row.installed}));
     case 1111664535:{
       const row=dataRows.find(row=>row.id===args.args[0]);

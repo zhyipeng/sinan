@@ -14,7 +14,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"sinan/internal/development/uiacceptance"
 	"sinan/internal/kernel"
+	"sinan/internal/platform"
 	"sinan/internal/plugin/uiwindows"
+	"sinan/internal/theme"
 )
 
 //go:embed all:frontend/dist
@@ -105,6 +107,26 @@ func run() error {
 	var shellSequence uint
 	newShell := func(url string, hidden bool) *application.WebviewWindow {
 		shellSequence++
+		themeState, themeError := manager.ThemeSettings()
+		if themeError != nil {
+			themeState = theme.Builtins("system", 0)
+		}
+		appearance := themeState.Mode
+		if appearance == "system" {
+			appearance = "light"
+			// App.Run has not initialized Wails' dispatcher on first creation.
+			// The system preference read is thread-safe and requires no window.
+			if platform.SystemDark() {
+				appearance = "dark"
+			}
+		}
+		macAppearance := application.DefaultAppearance
+		if themeState.Mode == "light" {
+			macAppearance = application.NSAppearanceNameAqua
+		}
+		if themeState.Mode == "dark" {
+			macAppearance = application.NSAppearanceNameDarkAqua
+		}
 		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name: fmt.Sprintf("shell-%d", shellSequence), Title: "司南", Width: launcherWidth, Height: launcherMinHeight,
 			MinWidth: launcherWidth, MinHeight: launcherMinHeight,
@@ -115,6 +137,7 @@ func run() error {
 				// A non-activating panel can take keyboard focus over another app's
 				// fullscreen Space without activating Sinan and switching desktops.
 				WindowClass: application.MacWindowClassPanel,
+				Appearance:  macAppearance,
 				PanelPreferences: application.MacPanelPreferences{
 					NonActivating: true,
 				},
@@ -123,7 +146,7 @@ func run() error {
 					application.MacWindowCollectionBehaviorFullScreenAuxiliary,
 				TitleBar: application.MacTitleBar{Hide: true},
 			},
-			BackgroundColour: application.NewRGB(246, 247, 251), URL: url,
+			BackgroundColour: themeColour(themeState, appearance), URL: url,
 		})
 		window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 			if host.launcher.isMain(window) {
@@ -170,6 +193,9 @@ func run() error {
 				host.uiError = err.Error()
 			} else {
 				host.ui = controller
+				if state, err := manager.ThemeSettings(); err == nil {
+					controller.SetTheme(state)
+				}
 				defer controller.Close()
 			}
 		}

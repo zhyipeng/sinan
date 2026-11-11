@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"sinan/internal/plugin/uiview"
+	"sinan/internal/theme"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -19,6 +20,7 @@ type Control struct {
 }
 
 type Client struct {
+	theme            *protocol.ThemeState
 	detachShortcut   string
 	focusRequests    chan Control
 	init             Init
@@ -43,10 +45,10 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 		return nil, errors.New("UI 初始化管道已关闭")
 	}
 	var init Init
-	if decode(scanner.Bytes(), &init) != nil || (init.BridgeVersion != "" && !protocol.SupportedUIBridge(init.BridgeVersion)) || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP || len(init.DetachShortcut) > 128 {
+	if decode(scanner.Bytes(), &init) != nil || (init.BridgeVersion != "" && !protocol.SupportedUIBridge(init.BridgeVersion)) || (init.Theme != nil && theme.ValidateState(*init.Theme) != nil) || init.Kind != "init" || init.Version != 1 || init.Entry == "" || init.CSP != uiview.CSP || len(init.DetachShortcut) > 128 {
 		return nil, errors.New("UI 初始化消息无效")
 	}
-	c := &Client{focusRequests: make(chan Control, 1), init: init, detachShortcut: init.DetachShortcut, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
+	c := &Client{theme: init.Theme, focusRequests: make(chan Control, 1), init: init, detachShortcut: init.DetachShortcut, reader: reader, writer: writer, closed: make(chan struct{}), gate: make(chan struct{}), listeners: map[uint64]func(){}}
 	go func() {
 		var focusSequence uint64
 		defer c.Close()
@@ -56,6 +58,20 @@ func Connect(reader io.ReadCloser, writer io.WriteCloser) (*Client, error) {
 				return
 			}
 			if (len(frame.Result) > 0 || frame.Error != "") && frame.Kind != "reply" {
+				return
+			}
+			if frame.Kind == "theme" {
+				if frame.Theme == nil || theme.ValidateState(*frame.Theme) != nil || frame.ID != 0 || frame.OK || frame.Action != 0 || frame.Resource != nil || frame.DetachShortcut != "" || frame.Error != "" || len(frame.Result) > 0 {
+					return
+				}
+				c.mu.Lock()
+				if c.theme == nil || frame.Theme.Revision >= c.theme.Revision {
+					c.theme = frame.Theme
+				}
+				c.mu.Unlock()
+				continue
+			}
+			if frame.Theme != nil {
 				return
 			}
 			if frame.Kind == "detach-shortcut" {
@@ -287,4 +303,23 @@ func (c *Client) Call(data []byte) (json.RawMessage, error) {
 		return nil, errors.New("UI 响应无效")
 	}
 	return frame.Result, nil
+}
+
+func (c *Client) ThemeState() *protocol.ThemeState {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.theme == nil {
+		return nil
+	}
+	copy := theme.CloneState(*c.theme)
+	return &copy
+}
+
+func (c *Client) ThemeRevision() uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.theme == nil {
+		return 0
+	}
+	return c.theme.Revision
 }

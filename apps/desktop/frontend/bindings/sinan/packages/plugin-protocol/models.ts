@@ -6,6 +6,22 @@ export interface CommandResult {
     "dismiss"?: boolean;
 }
 
+export interface ThemeDefinition {
+    "version": string;
+    "id": string;
+    "name": string;
+    "appearance": string;
+    "tokens": { [_ in string]?: string } | null;
+}
+
+export interface ThemeState {
+    "mode": string;
+    "revision": number;
+    "light": ThemeDefinition;
+    "dark": ThemeDefinition;
+    "error"?: string;
+}
+
 /**
  * UIView declares a fixed resource entry. Bridge 1 accepts no capabilities;
  * bridge 2 explicitly allows same-plugin backend commands and private storage.

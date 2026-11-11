@@ -5,7 +5,7 @@ import { createElement, type ComponentType } from 'react';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData } from '../bindings/sinan/apps/desktop/hostservice';
+import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -30,6 +30,7 @@ function normalize(value: {revision: number; values: Record<string, string[] | n
 }
 let recordingQueue: Promise<void> = Promise.resolve();
 export const settingsBridge: SettingsBridge = {
+  theme:{load:ThemeSettings,save:SaveTheme,subscribe(changed){return Events.On("theme:changed",event=>changed(event.data as import("../../../../plugins/system-settings/frontend/Theme").ThemeState));}},
   detachShortcut: {
     async load() { return await DetachShortcutSettings(); },
     async save(value, revision) { return await SaveDetachShortcut(value, revision); },

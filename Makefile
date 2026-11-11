@@ -49,6 +49,7 @@ dev-ui: build
 demo: dev
 
 test: frontend
+	node --test packages/plugin-sdk/theme/runtime.test.mjs
 	SINAN_NATIVE_UI_TEST=0 go test -race -p 1 ./...
 
 ui-probe:

@@ -28,6 +28,13 @@ export function ApplyPackage(directory: string, trustNative: boolean, fingerprin
     return $Call.ByID(1907720315, directory, trustNative, fingerprint, installedFingerprint);
 }
 
+/**
+ * Appearance is window-local; system media changes never rewrite saved preferences.
+ */
+export function ApplyThemeAppearance(revision: number, appearance: string): $CancellablePromise<void> {
+    return $Call.ByID(3412871400, revision, appearance);
+}
+
 export function CancelSearch(sequence: number): $CancellablePromise<void> {
     return $Call.ByID(640499065, sequence);
 }
@@ -151,6 +158,10 @@ export function SaveShortcut(value: string, revision: number): $CancellablePromi
     return $Call.ByID(2913582280, value, revision);
 }
 
+export function SaveTheme(mode: string, revision: number): $CancellablePromise<protocol$0.ThemeState> {
+    return $Call.ByID(1993998295, mode, revision);
+}
+
 export function SetPluginEnabled(pluginID: string, enabled: boolean): $CancellablePromise<kernel$0.PluginInfo> {
     return $Call.ByID(448181795, pluginID, enabled);
 }
@@ -173,6 +184,10 @@ export function StartSearch(sequence: number, query: string): $CancellablePromis
 
 export function Stop(pluginID: string): $CancellablePromise<void> {
     return $Call.ByID(110346107, pluginID);
+}
+
+export function ThemeSettings(): $CancellablePromise<protocol$0.ThemeState> {
+    return $Call.ByID(4090646417);
 }
 
 export function Uninstall(pluginID: string): $CancellablePromise<void> {

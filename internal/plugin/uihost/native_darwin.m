@@ -92,6 +92,7 @@ static void positionPanel(NSWindow *window) {
 @property NSUInteger navigationDenials;
 @property NSUInteger rejected;
 @property NSUInteger messages;
+@property NSDictionary *theme;
 @property NSUInteger pendingCalls;
 @property NSInteger bridgeVersion;
 @property NSDictionary *guestReport;
@@ -102,10 +103,20 @@ static void positionPanel(NSWindow *window) {
 @property NSTimeInterval lastHeartbeat;
 - (void)fail:(SinanUIFailure)reason;
 - (void)checkResponsiveness;
+- (void)applyTheme:(NSDictionary *)theme toWindow:(NSWindow *)window;
 
 @end
 
 @implementation SinanUIProbe
+- (void)applyTheme:(NSDictionary *)theme toWindow:(NSWindow *)window {
+    if (![theme isKindOfClass:NSDictionary.class] || [theme isEqual:self.theme]) return;
+    self.theme = theme;
+    NSString *mode = theme[@"mode"];
+    window.appearance = [mode isEqual:@"dark"] ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : [mode isEqual:@"light"] ? [NSAppearance appearanceNamed:NSAppearanceNameAqua] : nil;
+    NSData *data = [NSJSONSerialization dataWithJSONObject:theme options:0 error:nil];
+    NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    if (json) [self.view evaluateJavaScript:[NSString stringWithFormat:@"window.__sinanApplyTheme && window.__sinanApplyTheme(%@);",json] completionHandler:nil];
+}
 - (void)detachPanel:(id)sender { self.detachRequested = YES; }
 - (void)backPanel:(id)sender { self.backRequested = YES; }
 - (void)windowDidResignKey:(NSNotification *)notification {
@@ -287,6 +298,10 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         delegate.target = [NSString stringWithUTF8String:targetURL];
         WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistentDataStore;
+        NSData *themeData = [NSJSONSerialization dataWithJSONObject:bundle[@"theme"] options:0 error:nil];
+        NSString *themeJSON = [[NSString alloc] initWithData:themeData encoding:NSUTF8StringEncoding];
+        NSString *script = [NSString stringWithFormat:@"%@;window.__sinanApplyTheme(%@);", bundle[@"themeRuntime"],themeJSON];
+        [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:script injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
         [configuration setURLSchemeHandler:delegate forURLScheme:@"sinan-plugin"];
         [configuration.userContentController addScriptMessageHandler:delegate name:@"sinan"];
         if (delegate.bridgeVersion == 2) [configuration.userContentController addScriptMessageHandlerWithReply:delegate contentWorld:WKContentWorld.pageWorld name:@"sinanCall"];
@@ -305,6 +320,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         }
         window.title = bundle[@"title"];
         window.delegate = delegate;
+        [delegate applyTheme:bundle[@"theme"] toWindow:window];
         window.releasedWhenClosed = NO;
         if (delegate.attached) {
             NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0,0,680,530)];
@@ -410,6 +426,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                         window.title = bundle[@"title"];
                         window.delegate = delegate;
                         window.contentView = view;
+                        window.appearance = previous.appearance;
                         NSRect previousFrame = previous.frame;
                         NSRect work = previous.screen.visibleFrame;
                         previous.delegate = nil;
@@ -431,6 +448,12 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                     if (kind == 1) focusHandled++;
                     if (kind == 2) togglesHandled++;
                 }
+            }
+            char *encodedTheme = sinanUITheme(handle,[delegate.theme[@"revision"] unsignedLongLongValue]);
+            if (encodedTheme) {
+                NSData *data = [NSData dataWithBytes:encodedTheme length:strlen(encodedTheme)]; free(encodedTheme);
+                NSDictionary *theme = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                [delegate applyTheme:theme toWindow:window];
             }
             [delegate checkResponsiveness];
             if (delegate.revoked && !delegate.done) {

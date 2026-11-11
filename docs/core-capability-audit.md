@@ -113,3 +113,7 @@
 
 
 回滚验证：`make test`（全包 Go -race、TypeScript/Vite）、`make build json-plugin`、`go vet ./...` 均通过。未启动真实桌面、原生 WebView 或浏览器交互；未修改日常插件配置与数据。
+
+## 2026-11-11 外观能力补充
+
+已实现浅/深色、跟随系统、配置持久化、可信窗口与隔离 HTML 的动态同步；语义调色板协议、命名空间注册器和 SDK 通知已预留。插件主题声明/加载、自定义主题选择和其他平台原生呈现尚未交付。无界面回归不能替代视觉验收，见 [ADR 0032](adr/0032-theme-contract-and-appearance.md)。

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"sinan/internal/plugin/uiview"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 const maxFrameBytes = 1 << 20
@@ -19,15 +20,16 @@ const maxRequests = 256
 const maxResourceBytes = 8 << 20
 
 type Init struct {
-	BridgeVersion  string `json:"bridgeVersion,omitempty"`
-	DetachShortcut string `json:"detachShortcut,omitempty"`
-	Panel          bool   `json:"panel,omitempty"`
-	Title          string `json:"title,omitempty"`
-	Kind           string `json:"kind"`
-	Version        int    `json:"version"`
-	Entry          string `json:"entry"`
-	CSP            string `json:"csp"`
-	ProbeTarget    string `json:"probeTarget,omitempty"`
+	Theme          *protocol.ThemeState `json:"theme,omitempty"`
+	BridgeVersion  string               `json:"bridgeVersion,omitempty"`
+	DetachShortcut string               `json:"detachShortcut,omitempty"`
+	Panel          bool                 `json:"panel,omitempty"`
+	Title          string               `json:"title,omitempty"`
+	Kind           string               `json:"kind"`
+	Version        int                  `json:"version"`
+	Entry          string               `json:"entry"`
+	CSP            string               `json:"csp"`
+	ProbeTarget    string               `json:"probeTarget,omitempty"`
 }
 type request struct {
 	WindowAction string          `json:"windowAction,omitempty"`
@@ -40,14 +42,15 @@ type request struct {
 	Report       json.RawMessage `json:"report,omitempty"`
 }
 type response struct {
-	Result         json.RawMessage  `json:"result,omitempty"`
-	Error          string           `json:"error,omitempty"`
-	DetachShortcut string           `json:"detachShortcut,omitempty"`
-	Kind           string           `json:"kind"`
-	ID             uint64           `json:"id,omitempty"`
-	OK             bool             `json:"ok,omitempty"`
-	Action         uiview.Action    `json:"action,omitempty"`
-	Resource       *uiview.Resource `json:"resource,omitempty"`
+	Theme          *protocol.ThemeState `json:"theme,omitempty"`
+	Result         json.RawMessage      `json:"result,omitempty"`
+	Error          string               `json:"error,omitempty"`
+	DetachShortcut string               `json:"detachShortcut,omitempty"`
+	Kind           string               `json:"kind"`
+	ID             uint64               `json:"id,omitempty"`
+	OK             bool                 `json:"ok,omitempty"`
+	Action         uiview.Action        `json:"action,omitempty"`
+	Resource       *uiview.Resource     `json:"resource,omitempty"`
 }
 
 func newScanner(reader io.Reader) *bufio.Scanner {

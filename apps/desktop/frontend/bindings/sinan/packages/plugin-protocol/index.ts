@@ -3,5 +3,7 @@
 
 export type {
     CommandResult,
+    ThemeDefinition,
+    ThemeState,
     UIView
 } from "./models.js";

@@ -13,6 +13,8 @@ import (
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/uiprocess"
 	"sinan/internal/plugin/uiview"
+	"sinan/internal/theme"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 type Event struct {
@@ -191,7 +193,11 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 	owned.process = process
 	// Never write a pipe under c.mu: window-action callbacks take this mutex.
 	shortcut, revision := c.options.DetachShortcut, c.preferenceRevision
+	currentTheme := c.options.Theme
 	c.mu.Unlock()
+	if currentTheme != nil {
+		_ = process.SetTheme(*currentTheme)
+	}
 	if shortcut != "" {
 		_ = process.SetDetachShortcut(shortcut, revision)
 	}
@@ -282,5 +288,28 @@ func (c *Controller) SetDetachShortcut(value string) {
 	c.mu.Unlock()
 	for _, process := range processes {
 		_ = process.SetDetachShortcut(value, revision)
+	}
+}
+
+func (c *Controller) SetTheme(state protocol.ThemeState) {
+	if theme.ValidateState(state) != nil {
+		return
+	}
+	copy := theme.CloneState(state)
+	c.mu.Lock()
+	if c.options.Theme != nil && state.Revision < c.options.Theme.Revision {
+		c.mu.Unlock()
+		return
+	}
+	c.options.Theme = &copy
+	var processes []*uiprocess.Process
+	for _, entry := range c.opening {
+		if entry.process != nil {
+			processes = append(processes, entry.process)
+		}
+	}
+	c.mu.Unlock()
+	for _, process := range processes {
+		_ = process.SetTheme(copy)
 	}
 }

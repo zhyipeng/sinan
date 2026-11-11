@@ -11,8 +11,11 @@ package uihost
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"runtime/cgo"
+	"sinan/internal/theme"
+	themesdk "sinan/packages/plugin-sdk/theme"
 	"sync"
 	"unsafe"
 )
@@ -45,6 +48,13 @@ func runNative(data []byte, target string, session Session, disable func() error
 		gateMu.Unlock()
 		handle.Delete()
 	}()
+	var config map[string]any
+	_ = json.Unmarshal(data, &config)
+	if config["theme"] == nil {
+		config["theme"] = theme.Builtins("system", 0)
+	}
+	config["themeRuntime"] = themesdk.Runtime
+	data, _ = json.Marshal(config)
 	bundle := C.CString(string(data))
 	defer C.free(unsafe.Pointer(bundle))
 	url := C.CString(target)

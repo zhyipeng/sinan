@@ -11,9 +11,12 @@ import (
 	"time"
 
 	"sinan/internal/plugin/uiview"
+	"sinan/internal/theme"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 type Options struct {
+	Theme          *protocol.ThemeState
 	DetachShortcut string
 	Panel          bool
 	WindowAction   func(string) bool // signal state only; never block on UI
@@ -32,6 +35,7 @@ type Result struct {
 	Err    error
 }
 type Process struct {
+	themeRevision      uint64
 	preferenceRevision uint64
 	focusSequence      uint64
 	focusPending       map[uint64]chan bool
@@ -63,6 +67,9 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 			session.Revoke()
 		}
 	}()
+	if options.Theme != nil && theme.ValidateState(*options.Theme) != nil {
+		return nil, errors.New("主题状态无效")
+	}
 	if !session.Active() || ctx.Err() != nil {
 		return nil, errors.New("UI 会话不可用")
 	}
@@ -108,12 +115,15 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	outWrite.Close()
 	p := &Process{cmd: cmd, input: inWrite, output: outRead, session: session, options: options, ready: make(chan struct{}), stop: make(chan struct{}), done: make(chan struct{}), readDone: make(chan struct{})}
 	p.unsubscribe = session.OnRevoke(p.signalStop)
+	if options.Theme != nil {
+		p.themeRevision = options.Theme.Revision
+	}
 	go p.serve()
 	go p.watch(ctx)
 	go p.wait()
 	go func() {
 		p.exchange.Lock()
-		err := writeFrame(p.input, Init{Kind: "init", Version: 1, BridgeVersion: session.Binding().BridgeVersion, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
+		err := writeFrame(p.input, Init{Theme: options.Theme, Kind: "init", Version: 1, BridgeVersion: session.Binding().BridgeVersion, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
 		p.exchange.Unlock()
 		if err != nil {
 			p.fail("UI 初始化写入失败")
@@ -376,4 +386,20 @@ func (p *Process) SetDetachShortcut(value string, revision uint64) error {
 	}
 	p.preferenceRevision = revision
 	return writeFrame(p.input, response{Kind: "detach-shortcut", DetachShortcut: value})
+}
+
+func (p *Process) SetTheme(state protocol.ThemeState) error {
+	if theme.ValidateState(state) != nil {
+		return errors.New("主题状态无效")
+	}
+	p.exchange.Lock()
+	defer p.exchange.Unlock()
+	if state.Revision < p.themeRevision {
+		return nil
+	}
+	if !p.session.Active() {
+		return errors.New("视图已关闭")
+	}
+	p.themeRevision = state.Revision
+	return writeFrame(p.input, response{Kind: "theme", Theme: &state})
 }

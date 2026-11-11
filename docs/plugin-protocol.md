@@ -233,3 +233,13 @@ storage.get / put 返回 `{revision, value}`；未保存时为 `{revision:0,valu
 PluginData() 返回私有文档元数据，不含正文；ClearPluginData(id, token) 仅清理该 ID 的固定文档，需要列表返回的最新文件状态指纹。数据有变化则要求重新检查并确认；成功后撤销该插件旧 HTML 会话，新页面看到空文档，避免旧自动保存重建数据。此接口不开放给 UI 桥 2。
 
 CLI：先退出持有相同根目录的宿主，运行 `sinanctl -plugins 路径 data` 查看，再显式运行 `sinanctl -plugins 路径 clear-data 插件ID 检查指纹`。UI 的清理入口位于插件管理底部，支持已卸载残留和损坏文档；符号链接及目录不会递归清理。设置、使用历史、插件包及缓存不受影响。详情见 [ADR 0030](adr/0030-plugin-data-management.md)。
+
+## 主题数据协议 v1
+
+`packages/plugin-protocol/theme.go` 与 TypeScript 同步定义 `ThemeDefinition` / `ThemeState`。定义字段为 `version: "1"`、命名空间 `id`、`name`、`appearance: "light" | "dark"` 和 `tokens`；状态包含 `mode: "system" | "light" | "dark"`、`revision`、`light` / `dark` 两套定义及可选错误。注册器要求 ID 属于提供者命名空间，每批 1–16 套，整批校验后发布并复制数据。
+
+颜色角色固定为 background、surface、text、muted、placeholder、line、accent、accentHover、onAccent、hover、selected、error、errorBackground、danger、warning、warningBackground、warningLine、outputLine，值均为 `#RRGGBB`。映射为 `--sinan-<kebab-case>`，例如 `--sinan-text`、`--sinan-error-background`；页面可用 `color: var(--sinan-text)` 主动适配。
+
+`packages/plugin-sdk/theme/index.js` 导出 `currentTheme()`（未就绪时 undefined）和 `onThemeChanged(listener)`（返回取消订阅函数）。快照包含 mode、revision、id、appearance 和 tokens，读取时复制；系统模式按当前系统明暗产生快照。宿主在 HTML 文档开始时注入固定呈现运行时，经私有父子通道同步主题，不依赖页面桥 1 / 2 权限，不提供完整 Wails Bridge。
+
+当前仅内置浅/深色可选，未支持 manifest 声明主题或安装主题包。主题契约不允许任意 CSS、网络资源或可执行主题脚本。主程序与客体须同步重建。见 [ADR 0032](adr/0032-theme-contract-and-appearance.md)。

@@ -18,3 +18,7 @@ export interface SearchResult { items: SearchItem[] }
 export interface UIView { id:string; entry:string; title?:string; bridgeVersion:'1'|'2'; commands?:string[]; permissions?:'storage'[] }
 export type UIRequest = {method:'command.execute';commandId:string;input:string} | {method:'storage.get'} | {method:'storage.put';revision:number;value:unknown};
 export interface PluginDocument<T=unknown> {revision:number;value:T|null}
+
+/** Data-only contract reserved for future theme providers; no CSS or scripts. */
+export interface ThemeDefinition {version:'1';id:string;name:string;appearance:'light'|'dark';tokens:Record<string,string>}
+export interface ThemeState {mode:'system'|'light'|'dark';revision:number;light:ThemeDefinition;dark:ThemeDefinition;error?:string}

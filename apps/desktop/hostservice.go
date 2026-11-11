@@ -17,6 +17,7 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	themeMu          sync.Mutex
 	ui               *uiwindows.Controller
 	uiError          string
 	shortcuts        *shortcutController

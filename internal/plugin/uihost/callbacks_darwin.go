@@ -13,6 +13,7 @@ import (
 	"runtime/cgo"
 	"sinan/internal/plugin/uiprocess"
 	"sinan/internal/plugin/uiview"
+	protocol "sinan/packages/plugin-protocol"
 	"unsafe"
 )
 
@@ -197,4 +198,32 @@ func sinanUISessionCall(handle C.ulonglong, data *C.char, length C.int) (result 
 		value, _ = json.Marshal(map[string]json.RawMessage{"result": value})
 	}
 	return C.CString(string(value))
+}
+
+//export sinanUITheme
+func sinanUITheme(handle C.ulonglong, revision C.ulonglong) (result *C.char) {
+	defer func() {
+		if recover() != nil {
+			result = nil
+		}
+	}()
+	binding := bindingFor(handle)
+	if !binding.session.Active() {
+		return nil
+	}
+	if source, ok := binding.session.(interface {
+		ThemeState() *protocol.ThemeState
+		ThemeRevision() uint64
+	}); ok {
+		if source.ThemeRevision() <= uint64(revision) {
+			return nil
+		}
+		if state := source.ThemeState(); state != nil {
+			data, err := json.Marshal(state)
+			if err == nil {
+				return C.CString(string(data))
+			}
+		}
+	}
+	return nil
 }

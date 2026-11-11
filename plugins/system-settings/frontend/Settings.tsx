@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import Shortcut, {type ShortcutBridge} from './Shortcut';
+import Theme,{type ThemeBridge} from './Theme';
 
 export type SettingsSchema = { id: string; title: string; type: string };
 export type ConfigurablePlugin = { id: string; name: string; settings?: SettingsSchema[] | null };
 export type SettingsSnapshot = { revision: number; values: Record<string, string[]> };
 export type SettingsBridge = {
+  theme:ThemeBridge;
   shortcut: ShortcutBridge;
   detachShortcut: ShortcutBridge;
   load(pluginID: string): Promise<SettingsSnapshot>;
@@ -73,6 +75,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
     <section className="settings-history"><div><h2>使用历史</h2><p className="settings-note">用于调整搜索结果顺序</p></div><button disabled={!!pending} onClick={() => void clear()}>{pending === 'history' ? '清除中…' : '清除使用历史'}</button></section>
     <Shortcut bridge={bridge.shortcut} />
     <Shortcut bridge={bridge.detachShortcut} title="窗口独立快捷键" />
+    <Theme bridge={bridge.theme} />
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {error && <p className="error" role="alert">{error}</p>}
   </div>;
