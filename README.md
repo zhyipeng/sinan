@@ -175,9 +175,25 @@ make dev-ui
 
 ### JSON 格式化插件
 
-使用 `make dev-ui` 在开发实例中安装并打开 `tools.json`，搜索 JSON 即可进入。支持格式化、压缩、错误行列、保留大整数和草稿保存；Command/Ctrl + Enter 格式化，加 Shift 压缩。拆出窗口使用设置中的窗口独立快捷键。
+JSON 工具（`tools.json`）是可独立分发的官方插件，源码已迁至同级独立仓库 `../sinan-official-plugins/plugins/json-tool`；本体只保留应用检索、设置和插件管理三个内置插件。`make dev` / `make dev-ui` 不再自动构建或安装 JSON 工具，也不会卸载现有开发实例中已安装的 JSON 工具或清理其草稿。
 
-也可先 `make build json-plugin`，退出使用目标目录的宿主后，用 `bin/sinanctl -plugins 插件目录 -trust-native install bin/plugins/json-tool` 安装，再以 `-plugin-ui` 启动桌面宿主。原生后端需显式信任，独立进程不是安全沙箱。草稿显示“已保存”后才确认落盘，单插件文档最大 32 KiB。完整边界见 [ADR 0029](docs/adr/0029-ui-calls-private-data-json-tool.md)。
+```sh
+make -C ../sinan-official-plugins test build
+# 先退出使用 .sinan-dev/plugins 的宿主，再显式安装；已有版本使用 upgrade。
+./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install ../sinan-official-plugins/bin/plugins/json-tool
+make dev-ui
+```
+
+可选兼容命令 `make json-plugin` 仅委托外部仓库构建，不再生成本体的 `bin/plugins/json-tool`；仓库位于其他位置时设置 `OFFICIAL_PLUGINS_DIR`。支持格式化、压缩、错误行列、保留大整数和草稿保存；Command/Ctrl + Enter 格式化，加 Shift 压缩。原生后端需显式信任，独立进程不是安全沙箱。草稿最大 32 KiB，插件 ID 保持不变。
+
+只有用户明确要求真实 UI 验证时，才执行跨仓原生集成测试：先构建官方插件，再在本体根目录运行下列命令（会启动原生窗口，不属于日常回归）：
+
+```sh
+SINAN_JSON_PLUGIN_PACKAGE="$(cd ../sinan-official-plugins/bin/plugins/json-tool && pwd)" \
+SINAN_NATIVE_UI_TEST=1 go test ./internal/plugin/uiwindows -run '^TestNativeHostJSONPluginCallsAndDraftRestart$' -count=1
+```
+
+同级 `../sinan-plugin-registry` 只登记 JSON 工具资料，目前没有可安装版本；GitHub 仓库、目录发布及商店接入尚未建立。仓库边界与迁移决策见 [ADR 0034](docs/adr/0034-official-plugin-repositories.md)。
 
 ### 插件私有数据管理
 

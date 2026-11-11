@@ -612,22 +612,18 @@ func TestNativeHostJSONPluginCallsAndDraftRestart(t *testing.T) {
 	if nativeGuest == "" {
 		t.Skip("set SINAN_NATIVE_UI_TEST=1 on macOS")
 	}
+	// This optional integration test consumes a built external package, never
+	// requires the official plugin source for ordinary host tests.
+	packageDir := os.Getenv("SINAN_JSON_PLUGIN_PACKAGE")
+	if packageDir == "" {
+		t.Skip("set SINAN_JSON_PLUGIN_PACKAGE to the built official JSON plugin directory")
+	}
+	if !filepath.IsAbs(packageDir) {
+		t.Fatal("SINAN_JSON_PLUGIN_PACKAGE must be absolute")
+	}
 	source := t.TempDir()
-	if err := os.CopyFS(source, os.DirFS("../../../plugins/json-tool")); err != nil {
+	if err := os.CopyFS(source, os.DirFS(packageDir)); err != nil {
 		t.Fatal(err)
-	}
-	bridge, err := os.ReadFile("../../../packages/plugin-sdk/ui/index.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = os.WriteFile(filepath.Join(source, "ui", "bridge.js"), bridge, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err = os.Mkdir(filepath.Join(source, "backend"), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err = exec.Command("go", "build", "-o", filepath.Join(source, "backend", "plugin"), "../../../plugins/json-tool/cmd").Run(); err != nil {
-		t.Fatal("build JSON backend", err)
 	}
 	entry, err := os.ReadFile(filepath.Join(source, "ui", "index.html"))
 	if err != nil {

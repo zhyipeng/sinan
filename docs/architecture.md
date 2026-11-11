@@ -274,3 +274,8 @@ UI 桥 2 增加按会话、实例和清单白名单约束的本插件后端命�
 ## 窗口内设置快捷入口
 
 2026-11-11：Command + ,（macOS）或 Ctrl + ,（其他平台）在可信窗口内进入设置；macOS HTML 客体通过原生私有动作转交宿主。复用已拆出的设置窗口，保持其他独立窗口，释放被替换的附着 HTML 面板。无新增全局热键或页面桥权限，见 [ADR 0033](adr/0033-settings-navigation-shortcut.md)。
+
+
+## 内置插件与官方插件仓库边界
+
+2026-11-11：按用户指令，本体仓库只保留应用检索、设置、插件管理三个内置插件；JSON 工具 `tools.json` 迁入同级独立 Git 仓库 `sinan-official-plugins`，通过普通插件安装机制使用，不再由本体开发脚本自动安装。独立 `sinan-plugin-registry` 当前仅登记官方 JSON 工具资料，无可安装版本。SDK 尚未正式发布，官方插件暂使用带来源提交和文件摘要的最小 SDK 快照，不依赖宿主 internal 包或本体源码目录。插件 ID、后端 API 1、UI 桥 2、原生信任和隔离边界保持不变；未创建 GitHub 远端，未实现商店、远程更新或目录签名。见 [ADR 0034](adr/0034-official-plugin-repositories.md)。

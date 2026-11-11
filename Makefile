@@ -67,10 +67,8 @@ ui-probe:
 ui-acceptance: build
 	./bin/sinan -ui-acceptance -acceptance-packages "$(CURDIR)/plugins"
 
-# A real process plugin with an isolated UI; never imports HTML into the Shell.
+# Optional compatibility entry; official plugins have an independent repository.
+OFFICIAL_PLUGINS_DIR ?= ../sinan-official-plugins
 json-plugin:
-	mkdir -p bin/plugins/json-tool/backend bin/plugins/json-tool/ui
-	cp plugins/json-tool/manifest.json bin/plugins/json-tool/manifest.json
-	cp plugins/json-tool/ui/* bin/plugins/json-tool/ui/
-	cp packages/plugin-sdk/ui/index.js bin/plugins/json-tool/ui/bridge.js
-	go build -o bin/plugins/json-tool/backend/plugin ./plugins/json-tool/cmd
+	@test -f "$(OFFICIAL_PLUGINS_DIR)/Makefile" || { echo "请先检出官方插件仓库，或设置 OFFICIAL_PLUGINS_DIR"; exit 1; }
+	$(MAKE) -C "$(OFFICIAL_PLUGINS_DIR)" build

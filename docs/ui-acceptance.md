@@ -102,7 +102,7 @@ npm --prefix apps/desktop/frontend run test:windows
 
 ## JSON 格式化工具
 
-`make dev-ui` 会构建并准备 tools.json，再以显式开关启用 HTML 窗口。日常实例仍默认关闭 `-plugin-ui`，验收请使用开发实例；准备脚本需要先退出使用同一开发目录的旧实例。
+JSON 工具已迁至独立的官方插件仓库。先按 [README 的 JSON 安装步骤](../README.md#json-格式化插件) 构建并显式安装，再用 `make dev-ui` 开启 HTML 窗口；该命令只准备三个内置插件，不自动安装 JSON。日常实例仍默认关闭 `-plugin-ui`，验收请使用开发实例；安装前须退出使用同一开发目录的旧实例。
 
 1. 搜索 JSON，回车打开编辑器；输入包含 `900719925474099312345` 的合法 JSON，点击格式化 / 压缩，数字和键顺序应保持。Command/Ctrl + Enter 格式化，加 Shift 压缩。
 2. 输入错误 JSON，保留原输入并提示行列；编辑界面没有英文自动纠正。嵌套、输入和输出超限应返回错误。
@@ -110,7 +110,7 @@ npm --prefix apps/desktop/frontend run test:windows
 4. 输入后拆出窗口，继续格式化；再次呼出主搜索框，独立窗口内容不变。确认拆出前后均能保存草稿。
 5. 仅在临时目录构造 revision 冲突或损坏数据文件：保存失败保留输入并提示，不能静默覆盖文件；显式“载入已存草稿”恢复已保存版本。读取失败仍可格式化，暂停自动写入。
 
-可重复原生自动化：`SINAN_NATIVE_UI_TEST=1 go test -race ./internal/plugin/uiwindows -run TestNativeHostJSONPlugin`（使用本机 Go 1.26 工具链及项目 macOS 编译标志）。浏览器 UI 夹具：运行 `node plugins/json-tool/tests/serve.mjs`，再执行 `ego-browser nodejs < plugins/json-tool/tests/ui-regression.js`；该夹具不验证真实桥安全边界。
+可重复原生自动化：按 [README](../README.md#json-格式化插件) 设置 `SINAN_JSON_PLUGIN_PACKAGE` 和 `SINAN_NATIVE_UI_TEST=1` 后运行对应测试（使用本机 Go 1.26 工具链及项目 macOS 编译标志）。浏览器 UI 夹具已迁至官方插件仓库，在该仓库运行 `node plugins/json-tool/tests/serve.mjs`，再执行 `ego-browser nodejs < plugins/json-tool/tests/ui-regression.js`；该夹具不验证真实桥安全边界。以上均仅在用户明确要求 UI 验证时运行。
 
 ## 插件私有数据管理
 
