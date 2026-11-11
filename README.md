@@ -23,9 +23,9 @@ Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
 - 宿主 CLI、协议类型、Go 插件 SDK，以及应用检索与设置系统插件。
 - 宿主搜索协调、静态命令索引、动态来源并行合并、请求取消及来源失败隔离。
 - 配置服务、可信设置组件插件、额外应用目录及桌面历史清除入口。
-- 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；尚未开放默认启用的第三方 UI 加载。
+- 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；macOS 插件 UI 已默认启用，跨平台承载仍待实现。
 
-首版 macOS 应用检索插件已实现名称匹配、应用图标与直接启动。设置插件支持目录、历史清除和快捷键；本地插件管理界面由 `system.plugin-manager` 提供。独立插件 UI 已有 macOS 开发入口，默认关闭；SQLite、插件市场和远程更新尚未实现。
+首版 macOS 应用检索插件已实现名称匹配、应用图标与直接启动。设置插件支持目录、历史清除和快捷键；本地插件管理界面由 `system.plugin-manager` 提供。插件 UI 在 macOS 默认启用，可用 `-plugin-ui=false` 显式关闭；SQLite、插件市场和远程更新尚未实现。
 
 ## 搜索交互
 
@@ -95,7 +95,7 @@ make ui-probe
 
 该命令依次检查正常关闭、消息洪泛、禁用插件，以及脚本调用错误、JavaScript 卡死、可响应慢页面六种模式。它把编译进程序的固定测试夹具安装到独立临时根目录，使用非持久 WKWebView、自定义资源 Scheme 和导航决策代理，不读取日常插件目录。父进程持有内核会话，独立客体进程通过会话专属 stdio 管道逐次读取资源，不复制整包资源。启动须完成管道与页面握手，撤销后通知退出，超时强制终止并回收。每次自动关闭验证窗口，只输出固定诊断字段；正常模式接受 close，洪泛模式 `budgetRevoked=true`，禁用模式 `lifecycleRevoked=true`；各模式均应退出 0，且旧资源和消息都被拒绝，`separateProcess`、`childReaped`、`startupHandshake` 和 `eventLoopResponsive` 均为 true。正对照 HTTP 服务可访问，客体的网络和导航尝试不得到达该服务。故障模式额外输出 `failure=script-error` 或 `failure=unresponsive`，检查会话失效后在同一内核打开正常客体；慢页面须完成原生响应探测后正常关闭。故障与响应预算见 [ADR 0016](docs/adr/0016-ui-renderer-failure-probes.md)。命令目前要求 macOS+cgo，基础验证见 [ADR 0012](docs/adr/0012-native-ui-boundary-probe.md)，会话接入见 [ADR 0013](docs/adr/0013-ui-session-revocation.md)，进程监督见 [ADR 0014](docs/adr/0014-ui-guest-supervision.md)。
 
-可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和受限能力（桥 1 无权限，桥 2 可显式声明本插件命令与私有文档）；内核准备接口只接受已声明视图 ID。Shell 不加载第三方 HTML；开发期可通过插件管理打开独立窗口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
+可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和受限能力（桥 1 无权限，桥 2 可显式声明本插件命令与私有文档）；内核准备接口只接受已声明视图 ID。Shell 不加载第三方 HTML；可通过插件管理在主面板打开视图，按需拆出独立窗口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
 
 内核会话准备接口固定读取已安装包的 `ui/` 子目录，绑定插件实例、包指纹、声明视图 ID 和桥版本，资源加载前后检查包内容。停止、禁用、重载、升级、卸载、配置保存及检测到包文件变化时撤销会话；回退相同包也不会让旧句柄复活。外部文件变化在刷新或打开会话等校验点发现，尚无文件监听。每插件最多 4 个、每宿主最多 16 个活动会话，此接口不暴露给 Wails 或插件进程。
 
@@ -111,7 +111,7 @@ make ui-acceptance
 
 ```sh
 make dev-ui
-# 已构建时：./bin/sinan -plugins .sinan-dev/plugins -plugin-ui
+# 已构建时：./bin/sinan -plugins .sinan-dev/plugins
 ```
 
 默认启动不启用。开启后，在插件管理中可打开包内 `contributes.uiViews` 声明的视图，也可搜索通过 `uiView` 关联的命令并回车打开；不会自动安装测试插件。若日常实例正在运行，先通过托盘退出，再启动开发实例。`make build` 构建固定的 `sinan-ui-host`，`make package` 将它一并放入应用包；缺少它时保留 Shell 并显示诊断。
@@ -202,3 +202,20 @@ SINAN_NATIVE_UI_TEST=1 go test ./internal/plugin/uiwindows -run '^TestNativeHost
 设置 → 外观支持浅色、深色和跟随系统（默认），选择自动保存并同步已打开的窗口。JSON 工具已适配；第三方 HTML 可使用主题 CSS 变量和只读 SDK 通知，见[主题协议](docs/plugin-protocol.md#主题数据协议-v1)。当前预留主题扩展接口，尚未支持安装主题插件。
 
 窗口内按 `Command + ,`（macOS）或 `Ctrl + ,`（其他平台）进入设置；设置已拆出时直接聚焦该窗口。macOS 隔离插件窗口也支持此入口。
+
+
+### 创建插件项目
+
+插件管理右上角“创建插件”支持 **Go 后端 + React 界面**、**React 界面（无后端）**两种模板。填写名称、确认插件 ID、选择父目录后，在该目录下新建独立项目；已有同名目录不会被覆盖。生成后先运行 `npm ci`，再运行 `npm run build`，再安装构建出的 `dist/plugin`。创建过程不会执行代码或自动安装插件。详见[插件开发模板](docs/plugin-development.md)。
+
+安装 / 升级插件时，可点击输入框旁的“选择目录”选择已构建的插件包目录，也可手动填写绝对路径。选择后仍需检查包并确认安装；取消选择保留原输入及检查结果。
+
+插件界面现在默认启用，`make run`、`make dev` 均可直接打开已安装的 HTML 插件；`make dev-ui` 保留为 `make dev` 的兼容别名。临时排障可用 `./bin/sinan -plugin-ui=false` 关闭。当前仅 macOS 支持该承载；普通页面打开直接由宿主承载，独立 helper 保留给探测。
+
+
+模板 v3 支持 `node scripts/build.mjs --dev [--plugins-dir 目录]`，将产物链接到默认或指定插件目录；原生开发插件首次在插件管理界面确认信任。模板同时生成 GitHub Release 工作流、可选目录审核 PR 脚本和 `AGENTS.md`，配置方法见[插件开发模板](docs/plugin-development.md)。
+
+新建模板已升级到 v3：React 业务页面默认在主面板使用，返回和拆出由宿主管理；仍保持动态加载与页面隔离。已有项目不会自动转换。
+
+
+动态插件现在在 macOS 的同一个主窗口内容区打开，与插件管理复用同一 React 页头和返回/拆出流程；采用独立 WKWebView 配置保持页面与 Wails Bridge 分离。普通打开不再依赖独立 UI helper，原生 UI 控制器进入宿主进程，边界见 [ADR 0040](docs/adr/0040-same-window-plugin-content.md)。

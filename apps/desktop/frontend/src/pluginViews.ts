@@ -5,7 +5,7 @@ import { createElement, type ComponentType } from 'react';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme } from '../bindings/sinan/apps/desktop/hostservice';
+import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, TrustDevelopmentPlugin } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -13,6 +13,10 @@ export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> =
 };
 // These adapters are private to bundled trusted views, never passed to installed JS.
 const managementBridge: ManagementBridge = {
+  async trustDevelopment(id,fingerprint){return await TrustDevelopmentPlugin(id,fingerprint);},
+  async chooseInstallDirectory(){return await ChooseInstallDirectory();},
+  async chooseDirectory(){return await ChoosePluginDirectory();},
+  async createProject(options){return await CreatePluginProject(options);},
   async listData(){return await PluginData()??[];},
   async clearData(id,token){await ClearPluginData(id,token);},
   async refresh(){const [data,uiEnabled]=await Promise.all([Refresh(),PluginUIEnabled()]);return {plugins:data.plugins??[],diagnostics:data.diagnostics??[],uiEnabled};},

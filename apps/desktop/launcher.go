@@ -29,6 +29,7 @@ type launcher struct {
 	screenID      string
 	detached      map[uint]trustedWindow
 	newWindow     func() *application.WebviewWindow
+	dialogs       map[*application.WebviewWindow]int
 }
 
 func (l *launcher) show() {
@@ -40,6 +41,9 @@ func (l *launcher) show() {
 func (l *launcher) toggle() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.dialogs[l.window] > 0 {
+		return
+	}
 	if l.window.IsVisible() {
 		l.window.Hide()
 		return
@@ -48,6 +52,9 @@ func (l *launcher) toggle() {
 }
 
 func (l *launcher) showLocked() {
+	if l.dialogs[l.window] > 0 {
+		return
+	}
 	l.window.SetSize(launcherWidth, launcherMinHeight)
 	id, ok := platform.CursorScreenID()
 	if !ok {
@@ -66,6 +73,30 @@ func (l *launcher) showLocked() {
 	l.window.Focus()
 	// EmitEvent broadcasts through the application bus; Sender is not a target.
 	l.window.DispatchWailsEvent(&application.CustomEvent{Name: "launcher:show", Sender: "kernel.launcher"})
+}
+
+// Native directory dialogs temporarily own focus without dismissing the panel.
+func (l *launcher) beginDialog(window *application.WebviewWindow) func() {
+	l.mu.Lock()
+	if l.dialogs == nil {
+		l.dialogs = make(map[*application.WebviewWindow]int)
+	}
+	l.dialogs[window]++
+	l.mu.Unlock()
+	return func() {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		l.dialogs[window]--
+		if l.dialogs[window] == 0 {
+			delete(l.dialogs, window)
+		}
+	}
+}
+
+func (l *launcher) shouldHideOnBlur(window *application.WebviewWindow) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return window != nil && l.window == window && l.dialogs[window] == 0
 }
 
 func (l *launcher) resize(window *application.WebviewWindow, height int) {

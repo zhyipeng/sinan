@@ -29,6 +29,9 @@ export interface PluginDataInfo {
 }
 
 export interface PluginInfo {
+    "development"?: boolean;
+    "developmentFingerprint"?: string;
+    "needsTrust"?: boolean;
     "protected": boolean;
     "uiViews"?: protocol$0.UIView[] | null;
     "disabled": boolean;

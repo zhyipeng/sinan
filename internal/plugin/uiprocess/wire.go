@@ -20,6 +20,8 @@ const maxRequests = 256
 const maxResourceBytes = 8 << 20
 
 type Init struct {
+	HeaderTitle    string               `json:"headerTitle,omitempty"`
+	HeaderSource   string               `json:"headerSource,omitempty"`
 	Theme          *protocol.ThemeState `json:"theme,omitempty"`
 	BridgeVersion  string               `json:"bridgeVersion,omitempty"`
 	DetachShortcut string               `json:"detachShortcut,omitempty"`

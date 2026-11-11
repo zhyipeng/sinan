@@ -22,18 +22,21 @@ import (
 )
 
 type PluginInfo struct {
-	Protected       bool                      `json:"protected"`
-	UIViews         []protocol.UIView         `json:"uiViews,omitempty"`
-	Disabled        bool                      `json:"disabled"`
-	Changed         bool                      `json:"changed"`
-	Settings        []manifest.Setting        `json:"settings,omitempty"`
-	ID              string                    `json:"id"`
-	Name            string                    `json:"name"`
-	Version         string                    `json:"version"`
-	Kind            string                    `json:"kind"`
-	State           string                    `json:"state"`
-	Commands        []manifest.Command        `json:"commands"`
-	SearchProviders []manifest.SearchProvider `json:"searchProviders"`
+	Development            bool                      `json:"development,omitempty"`
+	DevelopmentFingerprint string                    `json:"developmentFingerprint,omitempty"`
+	NeedsTrust             bool                      `json:"needsTrust,omitempty"`
+	Protected              bool                      `json:"protected"`
+	UIViews                []protocol.UIView         `json:"uiViews,omitempty"`
+	Disabled               bool                      `json:"disabled"`
+	Changed                bool                      `json:"changed"`
+	Settings               []manifest.Setting        `json:"settings,omitempty"`
+	ID                     string                    `json:"id"`
+	Name                   string                    `json:"name"`
+	Version                string                    `json:"version"`
+	Kind                   string                    `json:"kind"`
+	State                  string                    `json:"state"`
+	Commands               []manifest.Command        `json:"commands"`
+	SearchProviders        []manifest.SearchProvider `json:"searchProviders"`
 }
 
 type Snapshot struct {
@@ -42,19 +45,21 @@ type Snapshot struct {
 }
 
 type plugin struct {
-	views        map[*uiview.Session]struct{}
-	viewEpoch    uint64
-	disabled     bool
-	fingerprint  string
-	changed      bool
-	settings     map[string][]string
-	mu           sync.Mutex
-	removed      bool
-	capabilities []string
-	manifest     manifest.Manifest
-	dir          string
-	state        string
-	process      *transport.Process
+	development   bool
+	nativeTrusted bool
+	views         map[*uiview.Session]struct{}
+	viewEpoch     uint64
+	disabled      bool
+	fingerprint   string
+	changed       bool
+	settings      map[string][]string
+	mu            sync.Mutex
+	removed       bool
+	capabilities  []string
+	manifest      manifest.Manifest
+	dir           string
+	state         string
+	process       *transport.Process
 }
 
 type Manager struct {
@@ -138,9 +143,12 @@ func (m *Manager) Refresh() Snapshot {
 		var mf manifest.Manifest
 		var digest string
 		var loadErr error
-		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		if entry.Type()&os.ModeSymlink != 0 {
+			dir, loadErr = m.developmentTarget(id)
+		} else if !entry.IsDir() {
 			loadErr = errors.New("插件目录无效")
-		} else {
+		}
+		if loadErr == nil {
 			mf, digest, loadErr = loadPackage(dir)
 			if loadErr == nil && mf.ID != id {
 				loadErr = errors.New("插件 ID 不匹配")
@@ -148,7 +156,7 @@ func (m *Manager) Refresh() Snapshot {
 		}
 		if old := oldPlugins[id]; old != nil {
 			old.mu.Lock()
-			old.changed = loadErr != nil || digest != old.fingerprint
+			old.changed = loadErr != nil || digest != old.fingerprint || dir != old.dir
 			if old.changed {
 				old.revokeViewsLocked()
 			}
@@ -207,7 +215,11 @@ func (p *plugin) info() PluginInfo {
 	if p.disabled {
 		state = "disabled"
 	}
-	return PluginInfo{Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	developmentFingerprint := ""
+	if p.development {
+		developmentFingerprint = p.fingerprint
+	}
+	return PluginInfo{Development: p.development, DevelopmentFingerprint: developmentFingerprint, NeedsTrust: p.development && p.manifest.Runtime.Kind == "process" && !p.nativeTrusted, Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.
@@ -388,7 +400,14 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 		return nil, errors.New("插件文件已变化，请先重载")
 	}
 	approval, err := os.ReadFile(filepath.Join(root, ".trusted", p.manifest.ID))
-	if err != nil || string(approval) != "trusted-native-v1\n" {
+	approved := err == nil && string(approval) == "trusted-native-v1\n"
+	if p.development {
+		approved = developmentApproved(root, p.manifest.ID, p.dir)
+	}
+	if !approved {
+		if p.development {
+			return nil, errors.New("此开发插件未经信任确认，请在插件管理中确认")
+		}
 		return nil, errors.New("此原生插件未经信任确认，请重新安装")
 	}
 	path, err := manifest.Executable(p.dir, p.manifest)
@@ -404,7 +423,7 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 	}
 	var init protocol.InitializeResult
 	// Disposable cache stays outside plugin packages so upgrades do not remove it.
-	cacheDir := filepath.Join(filepath.Dir(p.dir), ".sinan-state", "cache", p.manifest.ID)
+	cacheDir := filepath.Join(root, ".sinan-state", "cache", p.manifest.ID)
 	if os.MkdirAll(cacheDir, 0700) != nil {
 		cacheDir = "" // Cache failure must not prevent plugin activation.
 	}
@@ -596,10 +615,23 @@ func (m *Manager) Uninstall(id string) error {
 	delete(m.plugins, id)
 	m.mu.Unlock()
 	p.stop(true)
-	if err := os.RemoveAll(p.dir); err != nil {
+	var removeErr error
+	if p.development {
+		link := filepath.Join(m.root, id)
+		// Remove a link only: never recurse into the external build directory.
+		if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink != 0 {
+			removeErr = os.Remove(link)
+		} else if !os.IsNotExist(err) {
+			removeErr = errors.New("开发链接已被替换，未删除任何目录")
+		}
+	} else {
+		removeErr = os.RemoveAll(p.dir)
+	}
+	if removeErr != nil {
 		return errors.New("无法移除插件文件")
 	}
 	_ = os.Remove(filepath.Join(m.root, ".trusted", id))
+	_ = os.Remove(developmentApprovalPath(m.root, id))
 	return nil
 }
 

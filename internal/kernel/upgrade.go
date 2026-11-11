@@ -70,6 +70,12 @@ func (m *Manager) applyPackage(source string, trustNative bool, expected string,
 		}
 		return m.installLocked(abs, trustNative, expected)
 	}
+	if old.development {
+		return PluginInfo{}, errors.New("开发链接请重新构建并重载；需普通安装时先卸载链接")
+	}
+	if info, err := os.Lstat(old.dir); err != nil || info.Mode()&os.ModeSymlink != 0 {
+		return PluginInfo{}, errors.New("安装目录已被替换，请还原后重试")
+	}
 	installedHash, hashErr := packageFingerprint(old.dir)
 	if hashErr != nil || installedHash != old.fingerprint {
 		old.markUIChanged()
@@ -178,7 +184,8 @@ func (m *Manager) applyPackage(source string, trustNative bool, expected string,
 	return info, nil
 }
 func (m *Manager) packageInstance(mf manifest.Manifest, digest, dir string) *plugin {
-	return &plugin{disabled: m.enablementErr != nil || m.disabled[mf.ID], manifest: mf, fingerprint: digest, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
+	development := dir != filepath.Join(m.root, mf.ID)
+	return &plugin{development: development, nativeTrusted: developmentApproved(m.root, mf.ID, dir), disabled: m.enablementErr != nil || m.disabled[mf.ID], manifest: mf, fingerprint: digest, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
 }
 func (m *Manager) publishReplacement(p *plugin) {
 	m.mu.Lock()
@@ -186,7 +193,7 @@ func (m *Manager) publishReplacement(p *plugin) {
 	m.mu.Unlock()
 }
 func (m *Manager) activateCandidate(p *plugin) error {
-	if p.disabled || p.manifest.Runtime.Kind != "process" {
+	if p.disabled || p.manifest.Runtime.Kind != "process" || p.development && !p.nativeTrusted {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -215,6 +222,12 @@ func (m *Manager) reloadLocked(id string) (PluginInfo, error) {
 	old, err := m.lookup(id)
 	if err != nil {
 		return PluginInfo{}, err
+	}
+	if old.development {
+		target, err := m.developmentTarget(id)
+		if err != nil || target != old.dir {
+			return PluginInfo{}, errors.New("开发链接目标已变化，请卸载链接后重新登记")
+		}
 	}
 	mf, digest, err := loadPackage(old.dir)
 	if err != nil || mf.ID != id {

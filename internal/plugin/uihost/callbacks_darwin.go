@@ -18,8 +18,9 @@ import (
 )
 
 type nativeBinding struct {
-	session Session
-	disable func() error
+	embeddedAction func(int)
+	session        Session
+	disable        func() error
 }
 
 func bindingFor(handle C.ulonglong) *nativeBinding {
@@ -229,4 +230,13 @@ func sinanUITheme(handle C.ulonglong, revision C.ulonglong) (result *C.char) {
 		}
 	}
 	return nil
+}
+
+//export sinanUIEmbeddedAction
+func sinanUIEmbeddedAction(handle C.ulonglong, kind C.int) {
+	defer func() { _ = recover() }()
+	binding := bindingFor(handle)
+	if binding.session.Active() && binding.embeddedAction != nil {
+		go binding.embeddedAction(int(kind))
+	}
 }

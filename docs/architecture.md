@@ -28,7 +28,7 @@ macOS Shell 采用非激活 NSPanel，并配置 floating 层级及跨 Space / �
 
 插件启用策略由内核持久管理，界面仍在管理插件中。禁用后停止进程、拒绝激活与执行、排除所有搜索贡献，升级和重载保留状态；历史版本允许管理插件禁用自身，再通过宿主恢复入口重新启用；按用户后续指令，设置和插件管理现禁止禁用及卸载。策略保存失败保留原状态，策略损坏时阻止激活而不覆盖原文件。见 [ADR 0011](adr/0011-plugin-enablement.md)。
 
-第三方 UI 边界验证新增只读资源快照构建器与独立的 macOS 原生开发宿主：使用无 Wails Bridge 的 WKWebView、非持久存储、自定义资源 Scheme、导航前拒绝和有预算的窄消息处理。实测和限制见 [ADR 0012](adr/0012-native-ui-boundary-probe.md)。内核现已补齐实例/包指纹绑定的会话和生命周期撤销，原生资源逐次经过会话检查，见 [ADR 0013](adr/0013-ui-session-revocation.md)。开发验证现已接入独立客体进程和私有管道，具备握手、运行超时、撤销通知和强制回收，见 [ADR 0014](adr/0014-ui-guest-supervision.md)。受限 `contributes.uiViews` 声明现已接入内核准备接口，按声明 ID 创建会话，桥版本不兼容和所有非空 UI 权限请求默认拒绝，见 [ADR 0015](adr/0015-declared-ui-views.md)。原生开发客体已补齐调用脚本异常、渲染退出和导航失败的终止处理，以及页面响应超时检测；脚本抛错、死循环和可响应慢页面已有实测，见 [ADR 0016](adr/0016-ui-renderer-failure-probes.md)。另提供 `make ui-acceptance`，在临时根目录准备手动验收页面并在正常关闭回调中清理，见[手动验收](ui-acceptance.md)和 [ADR 0018](adr/0018-disposable-ui-acceptance.md)。桌面现通过默认关闭的 `-plugin-ui` 开关，在可信管理插件中按声明 ID 打开独立客体窗口；普通客体不执行探测代码，也不接收探测专用动作，见 [ADR 0017](adr/0017-desktop-plugin-windows.md)。独立客体须通过 AppKit 事件取出、派发与窗口更新维持交互，不能只运行 NSRunLoop；修复和回归见 [ADR 0019](adr/0019-native-ui-event-dispatch.md)。独立视图命令可通过 `uiView` 关联声明，搜索回车由内核解析并打开；原有可信组件 `view` 语义不变，见 [ADR 0020](adr/0020-search-opens-independent-views.md)。复用窗口现通过会话绑定的私有聚焦控制保持输入，并支持可读标题和鼠标屏幕初始居中，见 [ADR 0021](adr/0021-window-focus-title-and-placement.md)。第三方 HTML 不进入 Shell；面向公共分发的稳定入口、通用权限授权服务、CPU/内存硬配额及跨平台承载仍待实现。
+第三方 UI 边界验证新增只读资源快照构建器与独立的 macOS 原生开发宿主：使用无 Wails Bridge 的 WKWebView、非持久存储、自定义资源 Scheme、导航前拒绝和有预算的窄消息处理。实测和限制见 [ADR 0012](adr/0012-native-ui-boundary-probe.md)。内核现已补齐实例/包指纹绑定的会话和生命周期撤销，原生资源逐次经过会话检查，见 [ADR 0013](adr/0013-ui-session-revocation.md)。开发验证现已接入独立客体进程和私有管道，具备握手、运行超时、撤销通知和强制回收，见 [ADR 0014](adr/0014-ui-guest-supervision.md)。受限 `contributes.uiViews` 声明现已接入内核准备接口，按声明 ID 创建会话，桥版本不兼容和所有非空 UI 权限请求默认拒绝，见 [ADR 0015](adr/0015-declared-ui-views.md)。原生开发客体已补齐调用脚本异常、渲染退出和导航失败的终止处理，以及页面响应超时检测；脚本抛错、死循环和可响应慢页面已有实测，见 [ADR 0016](adr/0016-ui-renderer-failure-probes.md)。另提供 `make ui-acceptance`，在临时根目录准备手动验收页面并在正常关闭回调中清理，见[手动验收](ui-acceptance.md)和 [ADR 0018](adr/0018-disposable-ui-acceptance.md)。桌面现默认启用插件 UI（可用 `-plugin-ui=false` 关闭），在可信管理插件中按声明 ID 打开独立客体窗口；普通客体不执行探测代码，也不接收探测专用动作，见 [ADR 0017](adr/0017-desktop-plugin-windows.md)。独立客体须通过 AppKit 事件取出、派发与窗口更新维持交互，不能只运行 NSRunLoop；修复和回归见 [ADR 0019](adr/0019-native-ui-event-dispatch.md)。独立视图命令可通过 `uiView` 关联声明，搜索回车由内核解析并打开；原有可信组件 `view` 语义不变，见 [ADR 0020](adr/0020-search-opens-independent-views.md)。复用窗口现通过会话绑定的私有聚焦控制保持输入，并支持可读标题和鼠标屏幕初始居中，见 [ADR 0021](adr/0021-window-focus-title-and-placement.md)。第三方 HTML 不进入 Shell；面向公共分发的稳定入口、通用权限授权服务、CPU/内存硬配额及跨平台承载仍待实现。
 
 ## 1. 定位与原则
 
@@ -279,3 +279,38 @@ UI 桥 2 增加按会话、实例和清单白名单约束的本插件后端命�
 ## 内置插件与官方插件仓库边界
 
 2026-11-11：按用户指令，本体仓库只保留应用检索、设置、插件管理三个内置插件；JSON 工具 `tools.json` 迁入同级独立 Git 仓库 `sinan-official-plugins`，通过普通插件安装机制使用，不再由本体开发脚本自动安装。独立 `sinan-plugin-registry` 当前仅登记官方 JSON 工具资料，无可安装版本。SDK 尚未正式发布，官方插件暂使用带来源提交和文件摘要的最小 SDK 快照，不依赖宿主 internal 包或本体源码目录。插件 ID、后端 API 1、UI 桥 2、原生信任和隔离边界保持不变；未创建 GitHub 远端，未实现商店、远程更新或目录签名。见 [ADR 0034](adr/0034-official-plugin-repositories.md)。
+
+
+## 插件项目创建入口
+
+2026-11-11：`system.plugin-manager` 在已有管理能力后增加两种独立开发模板：Go 后端 + HTML、纯 HTML。模板资源和生成逻辑属于管理插件，宿主提供仅供可信组件使用的类型化目录选择/创建适配器；公开协议与 SDK 提供最小源码快照，生成项目不依赖宿主 internal 或源码目录。创建不构建、不安装、不初始化 Git，也不自动注册商店身份。沿用后端 API 1、UI 桥 2 和现有信任策略。原生目录对话框期间暂停其主面板的失焦隐藏和呼出重置，关闭后恢复。实现及限制见 [ADR 0035](adr/0035-plugin-project-templates.md) 和[开发模板](plugin-development.md)。
+
+
+## 默认启用插件界面
+
+2026-11-11：按用户指令移除普通使用流程中的 UI 启动门槛，`-plugin-ui` 默认 true，`make run` / `make dev` 可直接打开已安装 HTML 插件，`make dev-ui` 保留为兼容别名。`-plugin-ui=false` 显式关闭，隔离探测模式仍不初始化普通插件 UI。仅 macOS 已实现承载；平台不支持或 helper 初始化失败时报告具体原因。默认启用不自动打开插件、不改变按需激活，也不扩大页面桥、资源、原生信任或权限边界。见 [ADR 0036](adr/0036-plugin-ui-default-enabled.md)。
+
+
+## 开发链接与模板发布工具
+
+2026-11-11：模板 v2 增加单次开发构建与默认/自定义插件目录软链接、标签驱动的 Release 工作流、可选目录审核 PR 和项目级 agent skill。宿主仅在插件根目录允许外部开发链接，仍拒绝包内链接及 system.* 开发链接；原生开发信任由用户在可信插件管理界面确认，绑定规范化目标路径，普通安装信任不能替代该确认。开发插件按指纹显式重载，不使用普通升级事务；卸载只移除链接。目录发布 PR 只进入 submissions 审核记录，不构成已上架、签名或宿主远程分发能力。见 [ADR 0037](adr/0037-plugin-template-dev-release-skill.md)。
+
+
+## React 主面板模板
+
+2026-11-11：用户确认模板应与插件管理一样默认在主面板使用，保留返回与拆出，同时继续动态加载和隔离。模板 v3 将两种业务页面改为 React（Go + React、无后端 React），使用锁定依赖与本地 esbuild 打包；界面只渲染业务内容，复用宿主头部及主题样式。现有 Panel 默认路由不变，不把第三方 React 注入可信 Shell，不扩大 Wails Bridge。当前仍是 macOS 隔离客体提供逻辑主面板，不宣称同 WebView 内嵌。详见 [ADR 0038](adr/0038-react-main-panel-template.md)。
+
+
+模板项目的 agent 开发指引按用户后续要求直接生成至根目录 `AGENTS.md`，不再单独生成项目 skill。主面板/React、协议和发布约束保持，已生成项目不自动迁移。沿用 ADR 0037 的后续调整记录。
+
+
+## 插件页头风格统一
+
+2026-11-11：按用户要求，隔离客体的宿主原生页头对齐可信插件管理的 58 DIP 高度、16 DIP 水平留白、15pt 标题、箭头返回/拆出和主题色。视图标题与插件来源拆分显示，窗口标题保持原语义；拆出时迁移同一内容树并保留页头，将返回切换为关闭、隐藏拆出按钮。第三方页面不绘制宿主导航，也不获得新桥接权限。宿主与 UI helper 需同步构建。见 [ADR 0039](adr/0039-unified-plugin-header.md)。
+
+
+## 真正的主窗口内插件承载
+
+2026-11-11：用户明确要求与插件管理在同一个主窗口内切换页面，统一焦点、尺寸和返回体验。本轮普通 macOS 路径改为在现有 NSWindow 中添加独立配置、非持久存储的 WKWebView 内容子视图；标题栏直接复用可信 Shell 的 React 页头，返回/拆出/设置和尺寸均走原窗口路径。拆出保留整个 Wails 窗口及原生子视图树，创建新搜索窗口接替主角色。第三方 DOM 与 Wails WebView 分离，不复用其配置、脚本或完整 Bridge。
+
+这明确替代 ADR 0022 的另一个 NSPanel 模拟主面板方案，以及 ADR 0039 普通路径的原生仿制页头。UI 原生控制器现在进入宿主进程，不能继续声称独立 UI 客体进程故障隔离或独占 WebContent 进程；插件后端进程不变。WebKit 导航/CSP/受限桥接、会话撤销、预算和响应检测继续；普通模式不要求 helper。见 [ADR 0040](adr/0040-same-window-plugin-content.md)。

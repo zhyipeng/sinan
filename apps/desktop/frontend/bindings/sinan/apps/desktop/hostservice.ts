@@ -19,6 +19,9 @@ import * as storage$0 from "../../internal/storage/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as protocol$0 from "../../packages/plugin-protocol/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as scaffold$0 from "../../plugins/system-plugin-manager/scaffold/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -39,6 +42,17 @@ export function CancelSearch(sequence: number): $CancellablePromise<void> {
     return $Call.ByID(640499065, sequence);
 }
 
+export function ChooseInstallDirectory(): $CancellablePromise<string> {
+    return $Call.ByID(599771664);
+}
+
+/**
+ * These methods are available only to bundled trusted views, never guest pages.
+ */
+export function ChoosePluginDirectory(): $CancellablePromise<string> {
+    return $Call.ByID(4184167660);
+}
+
 export function ClearHistory(): $CancellablePromise<void> {
     return $Call.ByID(2575679692);
 }
@@ -47,8 +61,16 @@ export function ClearPluginData(pluginID: string, token: string): $CancellablePr
     return $Call.ByID(1111664535, pluginID, token);
 }
 
+export function ClosePluginView(): $CancellablePromise<void> {
+    return $Call.ByID(3318767903);
+}
+
 export function CloseTrustedView(): $CancellablePromise<void> {
     return $Call.ByID(456120721);
+}
+
+export function CreatePluginProject(options: scaffold$0.Options): $CancellablePromise<scaffold$0.Result> {
+    return $Call.ByID(2099979901, options);
 }
 
 export function DetachShortcutSettings(): $CancellablePromise<$models.ShortcutState> {
@@ -82,7 +104,7 @@ export function LauncherStatus(): $CancellablePromise<string> {
 /**
  * OpenPluginCommand accepts command identity only; the kernel resolves its view.
  */
-export function OpenPluginCommand(pluginID: string, commandID: string): $CancellablePromise<void> {
+export function OpenPluginCommand(pluginID: string, commandID: string): $CancellablePromise<boolean> {
     return $Call.ByID(2354522669, pluginID, commandID);
 }
 
@@ -195,6 +217,13 @@ export function Stop(pluginID: string): $CancellablePromise<void> {
 
 export function ThemeSettings(): $CancellablePromise<protocol$0.ThemeState> {
     return $Call.ByID(4090646417);
+}
+
+/**
+ * TrustDevelopmentPlugin belongs only to the bundled management view.
+ */
+export function TrustDevelopmentPlugin(id: string, fingerprint: string): $CancellablePromise<kernel$0.PluginInfo> {
+    return $Call.ByID(1768059911, id, fingerprint);
 }
 
 export function Uninstall(pluginID: string): $CancellablePromise<void> {

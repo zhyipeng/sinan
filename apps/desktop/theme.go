@@ -17,6 +17,7 @@ func (h *HostService) SaveTheme(mode string, revision uint64) (protocol.ThemeSta
 	if err != nil {
 		return state, err
 	}
+	h.setEmbeddedTheme(state)
 	if h.ui != nil {
 		h.ui.SetTheme(state)
 	}

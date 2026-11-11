@@ -26,3 +26,30 @@ func TestLauncherPositionOnReportedDisplays(t *testing.T) {
 		})
 	}
 }
+
+func TestDirectoryDialogDefersMainPanelBlurOnly(t *testing.T) {
+	main := &application.WebviewWindow{}
+	other := &application.WebviewWindow{}
+	l := &launcher{window: main}
+	if !l.shouldHideOnBlur(main) || l.shouldHideOnBlur(other) {
+		t.Fatal("unexpected ordinary blur policy")
+	}
+	finish := l.beginDialog(main)
+	nested := l.beginDialog(main)
+	if l.shouldHideOnBlur(main) {
+		t.Fatal("dialog dismissed its owner")
+	}
+	finish()
+	if l.shouldHideOnBlur(main) {
+		t.Fatal("nested dialog lost focus protection")
+	}
+	nested()
+	if !l.shouldHideOnBlur(main) {
+		t.Fatal("blur policy was not restored")
+	}
+	finishOther := l.beginDialog(other)
+	if !l.shouldHideOnBlur(main) {
+		t.Fatal("detached dialog changed main panel policy")
+	}
+	finishOther()
+}

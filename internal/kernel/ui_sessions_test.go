@@ -406,7 +406,7 @@ func TestUIViewMetadataDoesNotConsumeSlots(t *testing.T) {
 	}
 	for range 8 {
 		binding, err := m.ResolveUICommand(context.Background(), mf.ID, "window")
-		if err != nil || binding.Title != mf.Name+" · 输入" || binding.ViewID != "main" {
+		if err != nil || binding.Title != mf.Name+" · 输入" || binding.HeaderTitle != "输入" || binding.HeaderSource != mf.Name || binding.ViewID != "main" {
 			t.Fatal("metadata resolution failed at the session limit")
 		}
 	}

@@ -36,7 +36,7 @@ func main() {
 
 func run() error {
 	uiProbe := flag.Bool("ui-probe", false, "运行开发用 UI 隔离验证")
-	pluginUI := flag.Bool("plugin-ui", false, "启用开发期独立插件窗口")
+	pluginUI := flag.Bool("plugin-ui", true, "启用插件界面（使用 -plugin-ui=false 关闭）")
 	acceptance := flag.Bool("ui-acceptance", false, "运行独立临时窗口验收环境")
 	acceptancePackages := flag.String("acceptance-packages", "plugins", "验收所需系统插件源码目录")
 	root := flag.String("plugins", "", "插件安装目录")
@@ -96,6 +96,7 @@ func run() error {
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
 		OnShutdown: func() {
 			host.cancelSearch()
+			go host.closeEmbeddedAll()
 			if host.ui != nil {
 				host.ui.Close()
 			}
@@ -153,12 +154,13 @@ func run() error {
 				event.Cancel()
 				window.Hide()
 			} else {
+				go host.releaseEmbedded(window)
 				host.launcher.forget(window)
 			}
 			host.stopRecording(window)
 		})
 		window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) {
-			if host.launcher.isMain(window) {
+			if host.launcher.shouldHideOnBlur(window) {
 				host.cancelSearch()
 				window.Hide()
 			}
@@ -174,10 +176,13 @@ func run() error {
 	window := newShell(appURL, false)
 	host.launcher.window = window
 	host.launcher.newWindow = func() *application.WebviewWindow { return newShell("/", true) }
-	if *pluginUI && !*uiProbe {
+	if *pluginUI && !*uiProbe && runtime.GOOS == "darwin" {
+		host.embedded = &embeddedViews{entries: map[*application.WebviewWindow]*embeddedEntry{}, sequence: map[*application.WebviewWindow]uint64{}}
+	}
+	if *pluginUI && !*uiProbe && host.embedded == nil {
 		executable, err := os.Executable()
 		if runtime.GOOS != "darwin" {
-			host.uiError = "独立插件窗口目前仅支持 macOS"
+			host.uiError = "插件界面目前仅支持 macOS"
 		} else if err != nil {
 			host.uiError = "无法确定 UI 客体程序位置"
 		} else {
@@ -218,6 +223,7 @@ func run() error {
 			host.launcher.dispatch(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
 		})
 		host.detachShortcuts = newShortcutControllerWithDefault(windowPreferences{manager}, localShortcutRegistry{}, nil, nil, func(state ShortcutState) {
+			host.setEmbeddedShortcut(state.Active, state.Revision)
 			if host.ui != nil {
 				host.ui.SetDetachShortcut(state.Active)
 			}

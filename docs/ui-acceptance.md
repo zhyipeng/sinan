@@ -102,7 +102,7 @@ npm --prefix apps/desktop/frontend run test:windows
 
 ## JSON 格式化工具
 
-JSON 工具已迁至独立的官方插件仓库。先按 [README 的 JSON 安装步骤](../README.md#json-格式化插件) 构建并显式安装，再用 `make dev-ui` 开启 HTML 窗口；该命令只准备三个内置插件，不自动安装 JSON。日常实例仍默认关闭 `-plugin-ui`，验收请使用开发实例；安装前须退出使用同一开发目录的旧实例。
+JSON 工具已迁至独立的官方插件仓库。先按 [README 的 JSON 安装步骤](../README.md#json-格式化插件) 构建并显式安装，再用 `make dev` 使用默认启用的 HTML 窗口；该命令只准备三个内置插件，不自动安装 JSON。日常实例默认启用插件 UI，可用 `-plugin-ui=false` 关闭，验收请使用开发实例；安装前须退出使用同一开发目录的旧实例。
 
 1. 搜索 JSON，回车打开编辑器；输入包含 `900719925474099312345` 的合法 JSON，点击格式化 / 压缩，数字和键顺序应保持。Command/Ctrl + Enter 格式化，加 Shift 压缩。
 2. 输入错误 JSON，保留原输入并提示行列；编辑界面没有英文自动纠正。嵌套、输入和输出超限应返回错误。

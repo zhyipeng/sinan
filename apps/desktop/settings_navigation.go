@@ -32,6 +32,10 @@ func (h *HostService) openSettings() error {
 		}
 	}
 	h.launcher.mu.Unlock()
+	h.launcher.mu.Lock()
+	main := h.launcher.window
+	h.launcher.mu.Unlock()
+	h.releaseEmbedded(main)
 	if h.ui != nil {
 		h.ui.ReleaseMain()
 	}

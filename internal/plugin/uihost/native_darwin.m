@@ -40,13 +40,143 @@ static BOOL matchesDetachShortcut(NSEvent *event, NSString *shortcut, NSWindow *
     if ([responder respondsToSelector:@selector(hasMarkedText)] && [(id<NSTextInputClient>)responder hasMarkedText]) return NO;
     return matchesDetachKey(event.keyCode, event.modifierFlags, shortcut);
 }
-static NSString *detachLabel(NSString *shortcut) {
+static NSString *detachTooltip(NSString *shortcut) {
     NSDictionary *symbols = @{@"Cmd":@"⌘", @"Ctrl":@"⌃", @"Alt":@"⌥", @"Shift":@"⇧"};
-    NSMutableString *label = [NSMutableString stringWithString:@"独立 "];
+    NSMutableString *label = [NSMutableString stringWithString:@"独立窗口（"];
     for (NSString *part in [shortcut componentsSeparatedByString:@"+"])
         [label appendString:symbols[part] ?: part];
+    [label appendString:@"）"];
     return label;
 }
+
+// Match the trusted Shell's .view-header without loading plugin HTML into it.
+static const CGFloat SinanHeaderHeight = 58;
+
+static NSColor *headerToken(NSDictionary *theme, NSString *token, NSAppearance *appearance) {
+    BOOL dark = [[appearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]] isEqual:NSAppearanceNameDarkAqua];
+    NSString *mode = theme[@"mode"];
+    if ([mode isEqual:@"dark"]) dark = YES;
+    else if ([mode isEqual:@"light"]) dark = NO;
+    NSString *hex = theme[dark ? @"dark" : @"light"][@"tokens"][token];
+    unsigned int rgb = 0;
+    if ([hex isKindOfClass:NSString.class] && hex.length == 7 && [hex hasPrefix:@"#"] &&
+        [[NSScanner scannerWithString:[hex substringFromIndex:1]] scanHexInt:&rgb])
+        return [NSColor colorWithSRGBRed:((rgb >> 16) & 255)/255.0 green:((rgb >> 8) & 255)/255.0 blue:(rgb & 255)/255.0 alpha:1];
+    return NSColor.labelColor;
+}
+
+@interface SinanHeaderButton : NSButton
+@property BOOL hovered;
+@property NSTrackingArea *hoverTracking;
+@property NSColor *hoverColor;
+@property NSColor *focusColor;
+@end
+@implementation SinanHeaderButton
+- (BOOL)acceptsFirstResponder { return YES; }
+- (void)updateTrackingAreas {
+    [super updateTrackingAreas];
+    if (self.hoverTracking) [self removeTrackingArea:self.hoverTracking];
+    self.hoverTracking = [[NSTrackingArea alloc] initWithRect:NSZeroRect options:NSTrackingMouseEnteredAndExited | NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect owner:self userInfo:nil];
+    [self addTrackingArea:self.hoverTracking];
+}
+- (void)mouseEntered:(NSEvent *)event { self.hovered = YES; self.needsDisplay = YES; }
+- (void)mouseExited:(NSEvent *)event { self.hovered = NO; self.needsDisplay = YES; }
+- (void)drawRect:(NSRect)dirtyRect {
+    if (self.hovered || [self.cell isHighlighted]) {
+        [self.hoverColor setFill];
+        [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:7 yRadius:7] fill];
+    }
+    [super drawRect:dirtyRect];
+    if (self.window.isKeyWindow && self.window.firstResponder == self) {
+        [self.focusColor setStroke];
+        NSBezierPath *ring = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,1,1) xRadius:6 yRadius:6];
+        ring.lineWidth = 2;
+        [ring stroke];
+    }
+}
+@end
+
+@interface SinanPanelHeader : NSView
+@property NSDictionary *theme;
+@property SinanHeaderButton *backButton;
+@property SinanHeaderButton *detachButton;
+@property NSTextField *titleLabel;
+@property NSTextField *sourceLabel;
+@property BOOL detached;
+- (instancetype)initWithTitle:(NSString *)title source:(NSString *)source target:(id)target;
+- (void)refreshTheme;
+@end
+@implementation SinanPanelHeader
+- (instancetype)initWithTitle:(NSString *)title source:(NSString *)source target:(id)target {
+    if (!(self = [super initWithFrame:NSZeroRect])) return nil;
+    self.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+    self.backButton = [self button:@"←" label:@"返回搜索" target:target action:@selector(backPanel:)];
+    self.detachButton = [self button:@"↗" label:@"独立窗口" target:target action:@selector(detachPanel:)];
+    self.titleLabel = [NSTextField labelWithString:title ?: @"司南插件"];
+    self.titleLabel.font = [NSFont systemFontOfSize:15 weight:NSFontWeightMedium];
+    self.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    self.titleLabel.cell.wraps = NO;
+    self.sourceLabel = [NSTextField labelWithString:source ?: @""];
+    self.sourceLabel.font = [NSFont systemFontOfSize:11];
+    self.sourceLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    self.sourceLabel.cell.wraps = NO;
+    [self addSubview:self.titleLabel];
+    [self addSubview:self.sourceLabel];
+    [self refreshTheme];
+    return self;
+}
+- (SinanHeaderButton *)button:(NSString *)symbol label:(NSString *)label target:(id)target action:(SEL)action {
+    SinanHeaderButton *button = [[SinanHeaderButton alloc] initWithFrame:NSZeroRect];
+    button.title = symbol;
+    button.target = target;
+    button.action = action;
+    [button setButtonType:NSButtonTypeMomentaryPushIn];
+    button.bordered = NO;
+    button.font = [NSFont systemFontOfSize:18];
+    button.focusRingType = NSFocusRingTypeNone;
+    [(NSButtonCell *)button.cell setHighlightsBy:NSNoCellMask];
+    [button setAccessibilityLabel:label];
+    [self addSubview:button];
+    return button;
+}
+- (NSColor *)color:(NSString *)token {
+    __weak SinanPanelHeader *weakSelf = self;
+    return [NSColor colorWithName:nil dynamicProvider:^NSColor *(NSAppearance *appearance) {
+        return headerToken(weakSelf.theme,token,appearance);
+    }];
+}
+- (void)refreshTheme {
+    if (!self.backButton || !self.detachButton) return;
+    self.titleLabel.textColor = [self color:@"text"];
+    self.sourceLabel.textColor = [self color:@"muted"];
+    for (SinanHeaderButton *button in @[self.backButton,self.detachButton]) {
+        button.attributedTitle = [[NSAttributedString alloc] initWithString:button.title attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:18],NSForegroundColorAttributeName:[self color:@"muted"]}];
+        button.hoverColor = [self color:@"hover"];
+        button.focusColor = [self color:@"accent"];
+        button.needsDisplay = YES;
+    }
+    self.needsDisplay = YES;
+}
+- (void)viewDidChangeEffectiveAppearance {
+    [super viewDidChangeEffectiveAppearance];
+    [self refreshTheme];
+}
+- (void)layout {
+    [super layout];
+    CGFloat width = self.bounds.size.width;
+    self.backButton.frame = NSMakeRect(16,11,42,36);
+    self.detachButton.frame = NSMakeRect(MAX(70,width-58),11,42,36);
+    CGFloat sourceWidth = self.sourceLabel.stringValue.length ? MIN(180,[self.sourceLabel.stringValue sizeWithAttributes:@{NSFontAttributeName:self.sourceLabel.font}].width+2) : 0;
+    CGFloat trailing = self.detached ? 16 : 70;
+    CGFloat titleWidth = MAX(0,width-70-trailing-(sourceWidth ? sourceWidth+12 : 0));
+    self.titleLabel.frame = NSMakeRect(70,19,titleWidth,20);
+    self.sourceLabel.frame = NSMakeRect(70+titleWidth+12,21,sourceWidth,16);
+}
+- (void)drawRect:(NSRect)dirtyRect {
+    [[self color:@"background"] setFill]; NSRectFill(self.bounds);
+    [[self color:@"line"] setFill]; NSRectFill(NSMakeRect(0,0,self.bounds.size.width,1));
+}
+@end
 
 @interface SinanMainPanel : NSPanel
 @end
@@ -71,6 +201,10 @@ static void positionPanel(NSWindow *window) {
 @interface SinanUIProbe : NSObject <WKNavigationDelegate, WKUIDelegate, WKURLSchemeHandler, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, NSWindowDelegate>
 @property unsigned long long handle;
 @property SinanUIControl *control;
+@property BOOL ownsControl;
+@property NSTimer *embeddedTimer;
+@property id embeddedKeyMonitor;
+@property id embeddedResizeObserver;
 @property NSString *entry;
 @property NSString *csp;
 @property NSString *target;
@@ -79,6 +213,7 @@ static void positionPanel(NSWindow *window) {
 @property BOOL attached;
 @property NSString *detachShortcut;
 @property NSButton *detachButton;
+@property SinanPanelHeader *header;
 @property BOOL detachRequested;
 @property BOOL backRequested;
 @property BOOL initialNavigation;
@@ -108,9 +243,12 @@ static void positionPanel(NSWindow *window) {
 @end
 
 @implementation SinanUIProbe
+- (void)dealloc { if (_ownsControl && _control) sinanUIControlFree(_control); }
 - (void)applyTheme:(NSDictionary *)theme toWindow:(NSWindow *)window {
     if (![theme isKindOfClass:NSDictionary.class] || [theme isEqual:self.theme]) return;
     self.theme = theme;
+    self.header.theme = theme;
+    [self.header refreshTheme];
     NSString *mode = theme[@"mode"];
     window.appearance = [mode isEqual:@"dark"] ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua] : [mode isEqual:@"light"] ? [NSAppearance appearanceNamed:NSAppearanceNameAqua] : nil;
     NSData *data = [NSJSONSerialization dataWithJSONObject:theme options:0 error:nil];
@@ -118,7 +256,10 @@ static void positionPanel(NSWindow *window) {
     if (json) [self.view evaluateJavaScript:[NSString stringWithFormat:@"window.__sinanApplyTheme && window.__sinanApplyTheme(%@);",json] completionHandler:nil];
 }
 - (void)detachPanel:(id)sender { self.detachRequested = YES; }
-- (void)backPanel:(id)sender { self.backRequested = YES; }
+- (void)backPanel:(id)sender {
+    if (self.attached) self.backRequested = YES;
+    else [self.view.window performClose:nil];
+}
 - (void)windowDidResignKey:(NSNotification *)notification {
     if (self.attached) [(NSWindow *)notification.object orderOut:nil];
 }
@@ -325,22 +466,20 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         if (delegate.attached) {
             NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0,0,680,530)];
             window.contentView = container;
-            view.frame = NSMakeRect(0,0,680,480);
+            view.frame = NSMakeRect(0,0,680,530-SinanHeaderHeight);
             view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
             [container addSubview:view];
-            NSButton *back = [NSButton buttonWithTitle:@"返回" target:delegate action:@selector(backPanel:)];
-            back.frame = NSMakeRect(12,490,54,28);
-            back.autoresizingMask = NSViewMinYMargin;
-            [container addSubview:back];
-            NSTextField *title = [NSTextField labelWithString:bundle[@"title"] ?: @"司南插件"];
-            title.frame = NSMakeRect(80,493,350,22);
-            title.autoresizingMask = NSViewMinYMargin;
-            [container addSubview:title];
-            NSButton *detach = [NSButton buttonWithTitle:detachLabel(delegate.detachShortcut) target:delegate action:@selector(detachPanel:)];
-            delegate.detachButton = detach;
-            detach.frame = NSMakeRect(548,490,120,28);
-            detach.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
-            [container addSubview:detach];
+            NSString *headerTitle = bundle[@"headerTitle"];
+            if (!headerTitle.length) headerTitle = bundle[@"title"] ?: @"司南插件";
+            SinanPanelHeader *header = [[SinanPanelHeader alloc] initWithTitle:headerTitle source:bundle[@"headerSource"] target:delegate];
+            header.frame = NSMakeRect(0,530-SinanHeaderHeight,680,SinanHeaderHeight);
+            header.theme = delegate.theme;
+            [header refreshTheme];
+            header.needsLayout = YES;
+            header.detachButton.toolTip = detachTooltip(delegate.detachShortcut);
+            delegate.header = header;
+            delegate.detachButton = header.detachButton;
+            [container addSubview:header];
         } else window.contentView = view;
         // Cocoa screen frames and mouseLocation share logical global coordinates,
         // including negative origins on monitors to the left/below the main one.
@@ -385,7 +524,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                         free(value);
                         if (shortcut && ![shortcut isEqual:delegate.detachShortcut]) {
                             delegate.detachShortcut = shortcut;
-                            delegate.detachButton.title = detachLabel(shortcut);
+                            delegate.detachButton.toolTip = detachTooltip(shortcut);
                         }
                     }
                 }
@@ -422,12 +561,22 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                     if (sinanUIWindowAction(handle, 1)) {
                         NSWindow *previous = window;
                         delegate.attached = NO;
-                        [view removeFromSuperview];
-                        window = [[NSWindow alloc] initWithContentRect:view.frame styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+                        // Move the same content tree, keeping both React state and
+                        // host-owned chrome just like the trusted management view.
+                        NSView *content = previous.contentView;
+                        NSRect contentFrame = content.bounds;
+                        previous.contentView = [[NSView alloc] initWithFrame:contentFrame];
+                        delegate.header.detached = YES;
+                        delegate.header.backButton.title = @"×";
+                        [delegate.header.backButton setAccessibilityLabel:@"关闭窗口"];
+                        delegate.header.detachButton.hidden = YES;
+                        [delegate.header refreshTheme];
+                        delegate.header.needsLayout = YES;
+                        window = [[NSWindow alloc] initWithContentRect:contentFrame styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
                         window.releasedWhenClosed = NO;
                         window.title = bundle[@"title"];
                         window.delegate = delegate;
-                        window.contentView = view;
+                        window.contentView = content;
                         window.appearance = previous.appearance;
                         NSRect previousFrame = previous.frame;
                         NSRect work = previous.screen.visibleFrame;
@@ -502,4 +651,131 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         [window close];
         return result;
     }
+}
+
+
+SinanEmbeddedRect sinanUIEmbeddedRect(double width, double height, int detached, int flipped) {
+    double available = MAX(0,height-58);
+    double body = detached ? available : MIN(430,available);
+    return (SinanEmbeddedRect){0,flipped ? MIN(58,MAX(0,height)) : MAX(0,height-58-body),MAX(0,width),body};
+}
+
+@interface SinanEmbeddedWebView : WKWebView
+@property BOOL growWithWindow;
+@end
+@implementation SinanEmbeddedWebView
+- (void)resizeWithOldSuperviewSize:(NSSize)oldSize {
+    NSView *parent = self.superview;
+    if (!parent) return;
+    SinanEmbeddedRect rect = sinanUIEmbeddedRect(parent.bounds.size.width,parent.bounds.size.height,self.growWithWindow,parent.isFlipped);
+    self.frame = NSMakeRect(rect.x,rect.y,rect.width,rect.height);
+}
+@end
+
+// An isolated WebView in the existing host window. Wails' configuration and
+// scripts are deliberately not reused: this page receives only the narrow bridge.
+void *sinanUIEmbeddedCreate(const char *json, unsigned long long handle, void *nativeWindow) {
+    @autoreleasepool {
+        NSDictionary *bundle = [NSJSONSerialization JSONObjectWithData:[[NSString stringWithUTF8String:json] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+        NSWindow *window = (__bridge NSWindow *)nativeWindow;
+        if (!window || ![bundle isKindOfClass:NSDictionary.class]) return NULL;
+        SinanUIProbe *delegate = [SinanUIProbe new];
+        delegate.handle = handle;
+        delegate.control = sinanUIControlNew();
+        if (!delegate.control) return NULL;
+        delegate.ownsControl = YES;
+        delegate.entry = bundle[@"entry"];
+        delegate.csp = bundle[@"csp"];
+        delegate.bridgeVersion = [bundle[@"bridgeVersion"] isEqual:@"2"] ? 2 : 1;
+        WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
+        configuration.websiteDataStore = WKWebsiteDataStore.nonPersistentDataStore;
+        NSData *themeData = [NSJSONSerialization dataWithJSONObject:bundle[@"theme"] options:0 error:nil];
+        NSString *themeJSON = [[NSString alloc] initWithData:themeData encoding:NSUTF8StringEncoding];
+        NSString *script = [NSString stringWithFormat:@"%@;window.__sinanApplyTheme(%@);",bundle[@"themeRuntime"],themeJSON];
+        [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:script injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
+        [configuration setURLSchemeHandler:delegate forURLScheme:@"sinan-plugin"];
+        [configuration.userContentController addScriptMessageHandler:delegate name:@"sinan"];
+        if (delegate.bridgeVersion == 2) [configuration.userContentController addScriptMessageHandlerWithReply:delegate contentWorld:WKContentWorld.pageWorld name:@"sinanCall"];
+        NSView *parent = window.contentView;
+        NSRect frame = parent.bounds;
+        frame.size.height = MAX(0,frame.size.height - 58);
+        if (parent.isFlipped) frame.origin.y += 58;
+        WKWebView *view = [[SinanEmbeddedWebView alloc] initWithFrame:frame configuration:configuration];
+        view.hidden = YES;
+        view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        view.navigationDelegate = delegate;
+        view.UIDelegate = delegate;
+        delegate.view = view;
+        [parent addSubview:view positioned:NSWindowAbove relativeTo:nil];
+        [delegate applyTheme:bundle[@"theme"] toWindow:window];
+        delegate.detachShortcut = bundle[@"detachShortcut"] ?: @"Shift+Cmd+D";
+        __weak SinanUIProbe *weak = delegate;
+        delegate.embeddedKeyMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
+            SinanUIProbe *current = weak;
+            if (!current || current.revoked || current.view.hidden || current.view.window != event.window) return event;
+            if (matchesDetachShortcut(event,@"Cmd+Comma",event.window)) { sinanUIEmbeddedAction(current.handle,2); return nil; }
+            if (matchesDetachShortcut(event,current.detachShortcut,event.window)) { sinanUIEmbeddedAction(current.handle,1); return nil; }
+            return event;
+        }];
+        parent.postsFrameChangedNotifications = YES;
+        delegate.embeddedResizeObserver = [NSNotificationCenter.defaultCenter addObserverForName:NSViewFrameDidChangeNotification object:parent queue:nil usingBlock:^(NSNotification *note) {
+            SinanUIProbe *current = weak;
+            if (current && !current.revoked) [current.view resizeWithOldSuperviewSize:NSZeroSize];
+        }];
+        delegate.embeddedTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer *timer) {
+            SinanUIProbe *current = weak;
+            if (!current) { [timer invalidate]; return; }
+            if (current.done && current.handle) sinanUISessionRevoke(current.handle);
+            else if (!current.revoked) [current checkResponsiveness];
+        }];
+        [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:delegate.entry]]];
+        return (void *)CFBridgingRetain(delegate);
+    }
+}
+int sinanUIEmbeddedStatus(void *value) {
+    SinanUIProbe *delegate = (__bridge SinanUIProbe *)value;
+    return delegate.done || delegate.revoked ? -1 : delegate.ready ? 1 : 0;
+}
+void sinanUIEmbeddedShow(void *value) {
+    SinanUIProbe *delegate = (__bridge SinanUIProbe *)value;
+    delegate.view.hidden = NO;
+    [delegate.view.window makeFirstResponder:delegate.view];
+}
+void sinanUIEmbeddedTheme(void *value, const char *json) {
+    SinanUIProbe *delegate = (__bridge SinanUIProbe *)value;
+    NSDictionary *theme = [NSJSONSerialization JSONObjectWithData:[[NSString stringWithUTF8String:json] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+    [delegate applyTheme:theme toWindow:delegate.view.window];
+}
+void sinanUIEmbeddedClose(void *value) {
+    SinanUIProbe *delegate = CFBridgingRelease(value);
+    sinanUIControlRevoke(delegate.control);
+    delegate.handle = 0;
+    if (delegate.embeddedKeyMonitor) [NSEvent removeMonitor:delegate.embeddedKeyMonitor];
+    delegate.embeddedKeyMonitor = nil;
+    if (delegate.embeddedResizeObserver) [NSNotificationCenter.defaultCenter removeObserver:delegate.embeddedResizeObserver];
+    delegate.embeddedResizeObserver = nil;
+    [delegate.embeddedTimer invalidate];
+    delegate.embeddedTimer = nil;
+    WKWebView *view = delegate.view;
+    [view.configuration.userContentController removeScriptMessageHandlerForName:@"sinan"];
+    [view.configuration.userContentController removeScriptMessageHandlerForName:@"sinanCall" contentWorld:WKContentWorld.pageWorld];
+    view.navigationDelegate = nil;
+    view.UIDelegate = nil;
+    [view stopLoading];
+    NSWindow *window = view.window;
+    id responder = window.firstResponder;
+    if ([responder isKindOfClass:NSView.class] && (responder == view || [(NSView *)responder isDescendantOf:view])) [window makeFirstResponder:nil];
+    [view removeFromSuperview];
+    delegate.view = nil;
+}
+
+void sinanUIEmbeddedShortcut(void *value, const char *shortcut) {
+    SinanUIProbe *delegate = (__bridge SinanUIProbe *)value;
+    delegate.detachShortcut = [NSString stringWithUTF8String:shortcut];
+}
+
+void sinanUIEmbeddedDetached(void *value) {
+    SinanUIProbe *delegate = (__bridge SinanUIProbe *)value;
+    ((SinanEmbeddedWebView *)delegate.view).growWithWindow = YES;
+    [delegate.view resizeWithOldSuperviewSize:NSZeroSize];
 }

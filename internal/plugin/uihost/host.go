@@ -18,6 +18,8 @@ type Session interface {
 }
 
 type Config struct {
+	HeaderTitle     string               `json:"headerTitle,omitempty"`
+	HeaderSource    string               `json:"headerSource,omitempty"`
 	Theme           *protocol.ThemeState `json:"theme,omitempty"`
 	BridgeVersion   string               `json:"bridgeVersion,omitempty"`
 	Panel           bool                 `json:"panel"`

@@ -17,6 +17,7 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	embedded         *embeddedViews
 	themeMu          sync.Mutex
 	ui               *uiwindows.Controller
 	uiError          string
@@ -250,23 +251,44 @@ func (h *HostService) SetPluginEnabled(pluginID string, enabled bool) (kernel.Pl
 }
 
 // OpenPluginView is only bound to the trusted Shell; the child gets no Wails bridge.
-func (h *HostService) OpenPluginView(pluginID, viewID string) error {
+func (h *HostService) OpenPluginView(ctx context.Context, pluginID, viewID string) error {
+	if h.embedded != nil {
+		return h.openEmbedded(ctx, pluginID, viewID, "")
+	}
 	if h.ui == nil {
-		return errors.New("独立插件窗口尚未启用")
+		return h.pluginUIUnavailable()
 	}
 	return h.ui.Open(pluginID, viewID)
 }
-func (h *HostService) PluginUIEnabled() bool { return h.ui != nil }
+func (h *HostService) pluginUIUnavailable() error {
+	if h.uiError != "" {
+		return errors.New(h.uiError)
+	}
+	return errors.New("插件界面已关闭，请移除 -plugin-ui=false 后重启")
+}
+
+func (h *HostService) PluginUIEnabled() bool { return h.ui != nil || h.embedded != nil }
 
 // OpenPluginCommand accepts command identity only; the kernel resolves its view.
-func (h *HostService) OpenPluginCommand(pluginID, commandID string) error {
-	if h.ui == nil {
-		return errors.New("独立插件窗口尚未启用")
+func (h *HostService) OpenPluginCommand(ctx context.Context, pluginID, commandID string) (bool, error) {
+	if h.embedded != nil {
+		return true, h.openEmbedded(ctx, pluginID, "", commandID)
 	}
-	return h.ui.OpenCommand(pluginID, commandID)
+	if h.ui == nil {
+		return false, h.pluginUIUnavailable()
+	}
+	return false, h.ui.OpenCommand(pluginID, commandID)
 }
 
 func (h *HostService) toggleMain() {
+	if h.embedded != nil {
+		h.launcher.mu.Lock()
+		window := h.launcher.window
+		h.launcher.mu.Unlock()
+		if !window.IsVisible() {
+			h.releaseEmbedded(window)
+		}
+	}
 	if h.ui != nil {
 		if handled, _ := h.ui.Main(true); handled {
 			return
@@ -275,6 +297,12 @@ func (h *HostService) toggleMain() {
 	h.launcher.toggle()
 }
 func (h *HostService) showMain() {
+	if h.embedded != nil {
+		h.launcher.mu.Lock()
+		window := h.launcher.window
+		h.launcher.mu.Unlock()
+		h.releaseEmbedded(window)
+	}
 	if h.ui != nil {
 		if handled, _ := h.ui.Main(false); handled {
 			return
@@ -288,6 +316,24 @@ func (h *HostService) showMain() {
 func (h *HostService) DetachTrustedView(ctx context.Context, pluginID, commandID string) error {
 	if h.launcher == nil {
 		return errors.New("窗口不可用")
+	}
+	window := h.launcher.caller(ctx)
+	if h.embedded != nil && window != nil {
+		h.embedded.mu.Lock()
+		entry := h.embedded.entries[window]
+		h.embedded.mu.Unlock()
+		if entry != nil && entry.session.Binding().PluginID == pluginID {
+			binding, err := h.manager.ResolveUIView(ctx, pluginID, entry.session.Binding().ViewID)
+			if err != nil || binding != entry.session.Binding() {
+				return errors.New("插件页面已变化")
+			}
+			err = h.launcher.detach(window, binding.Title, pluginID+"/ui/"+binding.ViewID)
+			if err == nil {
+				entry.view.SetDetached()
+				entry.view.Show()
+			}
+			return err
+		}
 	}
 	title, key, err := trustedView(h.manager.Snapshot(), pluginID, commandID)
 	if err != nil {
@@ -394,4 +440,9 @@ func (h *HostService) ClearPluginData(pluginID, token string) error {
 		h.launcher.closePlugin(pluginID)
 	}
 	return nil
+}
+
+// TrustDevelopmentPlugin belongs only to the bundled management view.
+func (h *HostService) TrustDevelopmentPlugin(id, fingerprint string) (kernel.PluginInfo, error) {
+	return h.manager.TrustDevelopmentPlugin(id, fingerprint)
 }

@@ -1,0 +1,15 @@
+package main
+
+import (
+    "errors"
+    "os"
+    protocol "sinan/packages/plugin-protocol"
+    sdk "sinan/packages/plugin-sdk"
+)
+
+func main() {
+    if sdk.Serve(os.Stdin, os.Stdout, "__PLUGIN_ID__", func(p protocol.CommandParams) (protocol.CommandResult, error) {
+        if p.CommandID != "echo" { return protocol.CommandResult{}, errors.New("unknown command") }
+        return protocol.CommandResult{Text: p.Input}, nil
+    }) != nil { os.Exit(1) }
+}

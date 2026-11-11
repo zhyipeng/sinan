@@ -117,3 +117,19 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .theme-options { display: flex; gap: 8px; }
 .theme-options button { flex: 1; border: 1px solid var(--line); background: var(--sinan-surface); font-size: 13px; }
 .theme-options button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--sinan-selected); }
+
+/* Plugin creation follows the existing management sections. */
+.management-toolbar > span { margin-right: auto; }
+.create-plugin { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.create-plugin h2 { margin: 0; font-size: 14px; font-weight: 550; }
+.create-plugin form > label { display: block; margin: 14px 0 7px; font-size: 12px; }
+.create-plugin form > input, .create-plugin select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; color: inherit; background: var(--sinan-surface); font: inherit; }
+.create-plugin .install-row { margin-top: 0; }
+.create-plugin .install-row button { flex-shrink: 0; border: 1px solid var(--line); }
+.create-plugin .primary { margin-top: 8px; }
+.project-path { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.project-result { margin-top: 14px; }
+.project-result p { font-size: 12px; overflow-wrap: anywhere; }
+
+.embedded-plugin-slot { height: 430px; flex: 1; min-height: 0; }
+.detached .embedded-plugin-slot { height: auto; }

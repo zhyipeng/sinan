@@ -1,0 +1,13 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; font-size: 14px; font-synthesis: none; color: var(--sinan-text, #26334d); background: var(--sinan-background, #f5f7fb); }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.plugin-body { padding: 20px; }
+label { display: block; margin-bottom: 8px; font-size: 12px; }
+textarea { display: block; width: 100%; min-height: 140px; resize: vertical; padding: 12px; border: 1px solid var(--sinan-line, #dce2ed); border-radius: 8px; font: inherit; line-height: 1.6; color: inherit; background: var(--sinan-surface, #fff); }
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
+.form-actions p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--sinan-muted, #64718a); }
+button { flex-shrink: 0; padding: 9px 20px; border: 0; border-radius: 7px; font: inherit; color: var(--sinan-on-accent, #fff); background: var(--sinan-accent, #3761de); cursor: pointer; }
+button:hover { background: var(--sinan-accent-hover, #2e54c0); }
+button:disabled { opacity: .45; cursor: default; }
+textarea:focus-visible, button:focus-visible { outline: 2px solid var(--sinan-accent, #3761de); outline-offset: 2px; }
+output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 20px; padding: 14px; border: 1px solid var(--sinan-line, #dce2ed); border-radius: 8px; background: var(--sinan-surface, #fff); }

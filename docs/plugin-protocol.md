@@ -131,7 +131,7 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 
 ## 受限 UI 资源声明
 
-Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供资源元数据；Shell 不加载 HTML；开发开关启用时，可信管理组件可按声明 ID 请求独立窗口，搜索命令可通过 `uiView` 关联该声明。`commands[].view` 仍只选择宿主构建时注册的可信组件，与声明的 UI ID 同名时拒绝，避免隐式切换承载方式。
+Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供资源元数据；Shell 不加载 HTML；插件 UI 可用时，可信管理组件可按声明 ID 请求独立窗口，搜索命令可通过 `uiView` 关联该声明。`commands[].view` 仍只选择宿主构建时注册的可信组件，与声明的 UI ID 同名时拒绝，避免隐式切换承载方式。
 
 ```json
 {
@@ -147,12 +147,12 @@ Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供
 
 只有宿主能按声明 ID 创建会话，不能通过入口路径或页面自报身份创建。声明缺失、版本不支持、资源不可用、插件禁用或包改变均拒绝；升级移除视图后旧句柄失效。`packages/plugin-protocol/ui.go` 定义声明类型，`schemas/manifest.schema.json` 提供静态结构约束，Go 校验额外检查 ID 唯一和可信组件冲突。
 
-后端 stdio API 1 保持不变。旧宿主通过未知字段拒绝新声明，不会降级为可信组件；旧插件无需添加该字段。后续桌面开发入口增加仅供可信 Shell 的 `PluginUIEnabled` / `OpenPluginView(pluginId, viewId)`，默认关闭，不暴露给客体或后端 RPC；它不允许选择入口、可执行文件、脚本或权限。没有通用 UI 权限授权服务。见 [ADR 0015](adr/0015-declared-ui-views.md)。
+后端 stdio API 1 保持不变。旧宿主通过未知字段拒绝新声明，不会降级为可信组件；旧插件无需添加该字段。后续桌面开发入口增加仅供可信 Shell 的 `PluginUIEnabled` / `OpenPluginView(pluginId, viewId)`，现默认启用（可显式关闭），不暴露给客体或后端 RPC；它不允许选择入口、可执行文件、脚本或权限。没有通用 UI 权限授权服务。见 [ADR 0015](adr/0015-declared-ui-views.md)。
 
 
 ## 桌面开发窗口入口
 
-`make dev-ui` 或宿主 `-plugin-ui` 开启独立窗口；默认启动关闭。可信管理组件获取 `PluginUIEnabled()` 后显示包声明视图的打开按钮，调用 `OpenPluginView(pluginId, viewId)`。普通命令执行和可信组件注册不因此改变；页面不会获得这两个 Wails 方法。
+插件界面默认启用，无需额外启动参数；`-plugin-ui=false` 可显式关闭，`make dev-ui` 是 `make dev` 的兼容别名。当前仅 macOS 支持承载，其他平台或 helper 不可用时返回具体诊断。可信管理组件获取 `PluginUIEnabled()` 后显示包声明视图的打开按钮，调用 `OpenPluginView(pluginId, viewId)`。普通命令执行和可信组件注册不因此改变；页面不会获得这两个 Wails 方法。
 
 宿主只运行自身目录的固定 `sinan-ui-host`，不会运行包内指定的 UI 程序。窗口控制器复用同一插件/视图，首次等待 ready 后返回；关闭后可重新打开，包变更和启用状态仍由内核会话控制。退出宿主时取消启动并等待所有客体回收，再释放内核。helper 缺失或平台不支持时返回诊断并保留 Shell。客体异步退出事件 `ui:closed` 只发送给可信 Shell，字段为 pluginId / viewId / failed，不传播页面错误原文。
 
@@ -185,7 +185,7 @@ document.querySelector('#close').addEventListener('click', () => send({ kind: 'c
 
 用户选择结果后，可信 Shell 调用 `OpenPluginCommand(pluginId, commandId)`。内核在同一变更锁中解析已安装包的当前绑定，并沿用启用状态、包指纹、资源和会话检查；前端不能为命令覆盖视图。普通 Execute（包括 CLI run）拒绝此类命令；打开视图不调用后端 execute。搜索 Provider 的激活规则保持不变。
 
-成功启动才隐藏面板，失败保留搜索；启动期间重新呼出面板后，迟到结果不能隐藏新面板。开发开关仍默认关闭，未启用时拒绝打开。同一视图的命令别名和管理入口共同去重，重复打开复用并聚焦同一窗口，保留输入和位置。搜索输入参数暂不传给页面；桥 1 只能 ready / close，桥 2 的显式调用见文末。
+成功启动才隐藏面板，失败保留搜索；启动期间重新呼出面板后，迟到结果不能隐藏新面板。插件界面默认启用；显式关闭或承载不可用时拒绝打开并说明原因。同一视图的命令别名和管理入口共同去重，重复打开复用并聚焦同一窗口，保留输入和位置。搜索输入参数暂不传给页面；桥 1 只能 ready / close，桥 2 的显式调用见文末。
 
 旧宿主拒绝未知 uiView 字段，后端 API 1 和 UI 桥版本不变。详见 [ADR 0020](adr/0020-search-opens-independent-views.md)。
 
@@ -245,3 +245,17 @@ CLI：先退出持有相同根目录的宿主，运行 `sinanctl -plugins 路径
 当前仅内置浅/深色可选，未支持 manifest 声明主题或安装主题包。主题契约不允许任意 CSS、网络资源或可执行主题脚本。主程序与客体须同步重建。见 [ADR 0032](adr/0032-theme-contract-and-appearance.md)。
 
 宿主私有窗口控制增加 `window-action/settings`，仅供原生客体把窗口内 Command + , 转交父进程；与 detach/back 不同，它也允许来自独立客体。此动作没有暴露给页面消息桥，页面不能据此获得设置服务访问能力。主程序和 sinan-ui-host 需同步构建，见 [ADR 0033](adr/0033-settings-navigation-shortcut.md)。
+
+
+## 开发软链接插件
+
+模板 v2 的 `build.mjs --dev` 在选定插件根目录创建 `<id> → <项目>/dist/plugin` 链接，宿主按开发模式注册规范化目标；只允许根目录外的目标且拒绝 system.*。包内链接、特殊文件和大小/数量限制保持。`PluginInfo` 增加 development、developmentFingerprint、needsTrust 管理元数据；`TrustDevelopmentPlugin(id,fingerprint)` 仅供可信管理组件使用，按当前内容核验后将原生开发信任保存在宿主 `.sinan-state/development-trust/` 并绑定目标路径，不执行候选程序。重载前原生首次调用仍拒绝未经信任代码。
+
+同目标重建后按现有指纹标记变化并显式重载；未确认信任时重载只做静态校验，便于刷新信任预览。目标改指其他目录后拒绝沿用旧注册和信任，重启发现新目标也需重新确认。开发链接拒绝普通升级，卸载只 unlink，不删除外部产物。开发缓存仍位于宿主状态目录，不写入外部项目。后端 API 1 和第三方 UI 桥不新增调用能力。详见 [ADR 0037](adr/0037-plugin-template-dev-release-skill.md)。
+
+
+## 同窗口动态页面承载
+
+普通 macOS 打开路径现将独立配置的 WKWebView 作为主 NSWindow 的原生内容子视图，复用可信 React 页头。`OpenPluginCommand` 在可信窗口上下文中返回是否已在同窗呈现；成功后定向发送 plugin-view:open，页面就绪再提交替换。`ClosePluginView` 仅移除调用窗口的动态内容；返回、设置导航和窗口角色切换均撤销相应旧会话，迟到打开通过窗口序号拒绝。拆出复用同一窗口/内容树并更新窗口归属。
+
+受限页面资源和命令调用直接适配内核会话，保留总计 256 次请求、8 MiB 资源交付预算、1 小时既有寿命上限，以及会话自己的消息/调用预算。没有新增第三方 Wails 方法或 UI 桥动作。UI 原生控制器与宿主同进程，WebKit 页面上下文独立，但不承诺独占渲染进程或 native 故障隔离；后端 stdio API 1、UI 桥 2 不变。

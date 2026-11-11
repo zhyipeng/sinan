@@ -41,9 +41,8 @@ dev: build
 	sh scripts/prepare-dev.sh
 	./bin/sinan -plugins .sinan-dev/plugins
 
-dev-ui: build
-	sh scripts/prepare-dev.sh
-	./bin/sinan -plugins .sinan-dev/plugins -plugin-ui
+# Compatibility alias: plugin UI is now enabled by default.
+dev-ui: dev
 
 # Compatibility alias; the development instance contains only system plugins.
 demo: dev

@@ -123,7 +123,7 @@ func Start(ctx context.Context, session *uiview.Session, options Options) (*Proc
 	go p.wait()
 	go func() {
 		p.exchange.Lock()
-		err := writeFrame(p.input, Init{Theme: options.Theme, Kind: "init", Version: 1, BridgeVersion: session.Binding().BridgeVersion, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
+		err := writeFrame(p.input, Init{HeaderTitle: session.Binding().HeaderTitle, HeaderSource: session.Binding().HeaderSource, Theme: options.Theme, Kind: "init", Version: 1, BridgeVersion: session.Binding().BridgeVersion, Entry: session.EntryURL(), Panel: options.Panel, DetachShortcut: options.DetachShortcut, Title: session.Binding().Title, CSP: uiview.CSP, ProbeTarget: options.ProbeTarget})
 		p.exchange.Unlock()
 		if err != nil {
 			p.fail("UI 初始化写入失败")

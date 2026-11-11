@@ -105,7 +105,8 @@ func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string) (*uiv
 	if err = ctx.Err(); err != nil {
 		return nil, err
 	}
-	session, err := uiview.NewSession(uiview.Binding{PluginID: id, Title: uiWindowTitle(p.manifest.Name, declaration.Title), Fingerprint: p.fingerprint, ViewID: viewID, BridgeVersion: declaration.BridgeVersion}, bundle)
+	headerTitle, headerSource := uiHeaderTitle(p.manifest.Name, declaration.Title)
+	session, err := uiview.NewSession(uiview.Binding{HeaderTitle: headerTitle, HeaderSource: headerSource, PluginID: id, Title: uiWindowTitle(p.manifest.Name, declaration.Title), Fingerprint: p.fingerprint, ViewID: viewID, BridgeVersion: declaration.BridgeVersion}, bundle)
 	if err != nil {
 		return nil, err
 	}
@@ -158,4 +159,14 @@ func uiWindowTitle(name, title string) string {
 		return name + " · " + title
 	}
 	return name
+}
+
+// The host owns header text; third-party HTML cannot replace navigation chrome.
+func uiHeaderTitle(name, title string) (string, string) {
+	name = uiWindowTitle(name, "")
+	title = strings.TrimSpace(title)
+	if title != "" && title != name {
+		return title, name
+	}
+	return name, ""
 }

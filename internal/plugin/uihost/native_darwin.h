@@ -25,4 +25,14 @@ extern char *sinanUIDetachShortcut(unsigned long long handle);
 extern int sinanUIPollControl(unsigned long long handle, unsigned long long *id);
 extern int sinanUIWindowAction(unsigned long long handle, int kind);
 extern int sinanUIFocused(unsigned long long handle, unsigned long long id);
+void *sinanUIEmbeddedCreate(const char *json, unsigned long long handle, void *window);
+int sinanUIEmbeddedStatus(void *value);
+void sinanUIEmbeddedShow(void *value);
+void sinanUIEmbeddedTheme(void *value, const char *json);
+void sinanUIEmbeddedClose(void *value);
+void sinanUIEmbeddedShortcut(void *value, const char *shortcut);
+extern void sinanUIEmbeddedAction(unsigned long long handle, int action);
+void sinanUIEmbeddedDetached(void *value);
+typedef struct { double x,y,width,height; } SinanEmbeddedRect;
+SinanEmbeddedRect sinanUIEmbeddedRect(double width, double height, int detached, int flipped);
 #endif
