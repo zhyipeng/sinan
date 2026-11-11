@@ -5,7 +5,7 @@ import { keyCombination, formatShortcut } from '../../../../plugins/system-setti
 import Recovery from './Recovery';
 import PluginViewBoundary from './PluginViewBoundary';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
-import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenPluginCommand, DetachShortcutSettings, DetachTrustedView, CloseTrustedView } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenSettings, OpenPluginCommand, DetachShortcutSettings, DetachTrustedView, CloseTrustedView } from '../bindings/sinan/apps/desktop/hostservice';
 
 type Command = { uiView?: string; view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
 type Plugin = { disabled?: boolean; changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
@@ -68,6 +68,19 @@ export default function App() {
       requestAnimationFrame(() => searchRef.current?.focus());
     };
     const offShow = Events.On('launcher:show', reset);
+    const offSettings = Events.On('settings:open', () => {
+      if (detachedRef.current) return;
+      const current = ++generation.current;
+      void Snapshot().then(snapshot => {
+        if (current !== generation.current || detachedRef.current) return;
+        const next = normalize(snapshot);
+        setData(next); setConnected(true);
+        const plugin = next.plugins.find(plugin => plugin.id === 'system.settings' && !plugin.disabled);
+        const command = plugin?.commands.find(command => command.id === 'open' && command.view === 'settings');
+        if (!plugin || !command) { setError('设置插件不可用。'); return; }
+        setRecovery(false); setActive({plugin, command}); setBusy(false); setOutput(''); setError('');
+      }).catch(() => { if (current === generation.current) setError('无法读取设置插件。'); });
+    });
     const applyDetachShortcut = (state: {active:string; shortcut:string; revision:number}) => {
       if (state.revision < detachRevision.current) return;
       detachRevision.current = state.revision;
@@ -77,7 +90,7 @@ export default function App() {
     const offDetachShortcut = Events.On('detach-shortcut:changed', event => applyDetachShortcut(event.data as {active:string;shortcut:string;revision:number}));
     const offDetached = Events.On('view:detached', () => { detachedRef.current = true; setDetached(true); });
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
-    return () => { offShow(); offShortcut(); offDetached(); offDetachShortcut(); };
+    return () => { offShow(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); };
   }, []);
 
   useEffect(() => {
@@ -134,6 +147,12 @@ export default function App() {
   }
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      const primary = /mac/i.test(navigator.platform) ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+      if (!event.defaultPrevented && !event.isComposing && !event.repeat && primary && !event.altKey && !event.shiftKey && event.code === 'Comma') {
+        event.preventDefault();
+        if (active?.plugin.id !== 'system.settings') void OpenSettings().catch(() => setError('无法打开设置。'));
+        return;
+      }
       if (event.defaultPrevented || event.isComposing || event.repeat || keyCombination(event) !== detachShortcut || !ActiveView || detached) return;
       event.preventDefault();
       void detachView();

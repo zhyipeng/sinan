@@ -93,6 +93,13 @@ export function OpenPluginView(pluginID: string, viewID: string): $CancellablePr
     return $Call.ByID(188677181, pluginID, viewID);
 }
 
+/**
+ * OpenSettings is available only to a registered trusted Shell window.
+ */
+export function OpenSettings(): $CancellablePromise<void> {
+    return $Call.ByID(3516089106);
+}
+
 export function PluginData(): $CancellablePromise<kernel$0.PluginDataInfo[] | null> {
     return $Call.ByID(3637179584);
 }

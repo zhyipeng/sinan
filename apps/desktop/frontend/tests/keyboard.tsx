@@ -75,6 +75,10 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 3516089106:
+      window._wails.dispatchWailsEvent({name:'launcher:show',data:null});
+      window._wails.dispatchWailsEvent({name:'settings:open',data:null});
+      return;
     case 4090646417:return theme;
     case 3412871400:return;
     case 1993998295:

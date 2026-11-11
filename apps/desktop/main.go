@@ -182,6 +182,10 @@ func run() error {
 			host.uiError = "无法确定 UI 客体程序位置"
 		} else {
 			controller, err := uiwindows.New(manager, filepath.Join(filepath.Dir(executable), "sinan-ui-host"), func(event uiwindows.Event) {
+				if event.OpenSettings {
+					_ = host.openSettings()
+					return
+				}
 				if event.ReturnToSearch {
 					go host.showMain()
 				}

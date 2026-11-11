@@ -16,7 +16,7 @@ void sinanUIControlFree(SinanUIControl *control) { free(control); }
 
 static BOOL matchesDetachKey(unsigned short keyCode, NSEventModifierFlags modifiers, NSString *shortcut) {
     NSArray<NSString *> *parts = [shortcut componentsSeparatedByString:@"+"];
-    NSDictionary *codes = @{@"A":@0, @"S":@1, @"D":@2, @"F":@3, @"H":@4, @"G":@5, @"Z":@6, @"X":@7, @"C":@8, @"V":@9, @"B":@11, @"Q":@12, @"W":@13, @"E":@14, @"R":@15, @"Y":@16, @"T":@17, @"1":@18, @"2":@19, @"3":@20, @"4":@21, @"6":@22, @"5":@23, @"9":@25, @"7":@26, @"8":@28, @"0":@29, @"O":@31, @"U":@32, @"I":@34, @"P":@35, @"Enter":@36, @"L":@37, @"J":@38, @"K":@40, @"N":@45, @"M":@46, @"Tab":@48, @"Space":@49, @"Backspace":@51, @"Delete":@117, @"Home":@115, @"End":@119, @"Page Up":@116, @"Page Down":@121, @"Left":@123, @"Right":@124, @"Down":@125, @"Up":@126, @"F1":@122, @"F2":@120, @"F3":@99, @"F4":@118, @"F5":@96, @"F6":@97, @"F7":@98, @"F8":@100, @"F9":@101, @"F10":@109, @"F11":@103, @"F12":@111, @"F13":@105, @"F14":@107, @"F15":@113, @"F16":@106, @"F17":@64, @"F18":@79, @"F19":@80, @"F20":@90};
+    NSDictionary *codes = @{@"A":@0, @"S":@1, @"D":@2, @"F":@3, @"H":@4, @"G":@5, @"Z":@6, @"X":@7, @"C":@8, @"V":@9, @"B":@11, @"Q":@12, @"W":@13, @"E":@14, @"R":@15, @"Y":@16, @"T":@17, @"1":@18, @"2":@19, @"3":@20, @"4":@21, @"6":@22, @"5":@23, @"9":@25, @"7":@26, @"8":@28, @"0":@29, @"O":@31, @"U":@32, @"I":@34, @"P":@35, @"Enter":@36, @"L":@37, @"J":@38, @"K":@40, @"N":@45, @"M":@46, @"Comma":@43, @"Tab":@48, @"Space":@49, @"Backspace":@51, @"Delete":@117, @"Home":@115, @"End":@119, @"Page Up":@116, @"Page Down":@121, @"Left":@123, @"Right":@124, @"Down":@125, @"Up":@126, @"F1":@122, @"F2":@120, @"F3":@99, @"F4":@118, @"F5":@96, @"F6":@97, @"F7":@98, @"F8":@100, @"F9":@101, @"F10":@109, @"F11":@103, @"F12":@111, @"F13":@105, @"F14":@107, @"F15":@113, @"F16":@106, @"F17":@64, @"F18":@79, @"F19":@80, @"F20":@90};
     NSNumber *code = codes[parts.lastObject];
     if (!code || keyCode != code.unsignedShortValue) return NO;
     NSEventModifierFlags expected = 0;
@@ -390,7 +390,9 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                     }
                 }
                 if (event) {
-                    if (delegate.attached && matchesDetachShortcut(event, delegate.detachShortcut, window))
+                    if (matchesDetachShortcut(event, @"Cmd+Comma", window)) {
+                        sinanUIWindowAction(handle, 3);
+                    } else if (delegate.attached && matchesDetachShortcut(event, delegate.detachShortcut, window))
                         delegate.detachRequested = YES;
                     else [NSApp sendEvent:event];
                     if (event.type == NSEventTypeApplicationDefined && event.subtype == marker) eventLoopResponsive = YES;

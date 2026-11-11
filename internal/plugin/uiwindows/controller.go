@@ -18,6 +18,7 @@ import (
 )
 
 type Event struct {
+	OpenSettings   bool   `json:"openSettings"`
 	PluginID       string `json:"pluginId"`
 	ViewID         string `json:"viewId"`
 	ReturnToSearch bool   `json:"returnToSearch"`
@@ -165,6 +166,16 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 	options := c.options
 	c.mu.Unlock()
 	options.WindowAction = func(action string) bool {
+		if action == "settings" {
+			c.mu.Lock()
+			available := !c.closed && c.opening[key] == owned && owned.process != nil
+			c.mu.Unlock()
+			if available && c.onExit != nil {
+				go c.onExit(Event{PluginID: pluginID, ViewID: viewID, OpenSettings: true})
+				return true
+			}
+			return false
+		}
 		c.mu.Lock()
 		if c.closed || !owned.attached || c.panel != owned {
 			c.mu.Unlock()
@@ -311,5 +322,20 @@ func (c *Controller) SetTheme(state protocol.ThemeState) {
 	c.mu.Unlock()
 	for _, process := range processes {
 		_ = process.SetTheme(copy)
+	}
+}
+
+// ReleaseMain returns the logical main slot to the trusted Shell. Detached
+// windows and their documents remain independent; no return-to-search event is sent.
+func (c *Controller) ReleaseMain() {
+	c.mu.Lock()
+	entry := c.panel
+	c.panel = nil
+	if entry != nil {
+		entry.attached = false
+	}
+	c.mu.Unlock()
+	if entry != nil && entry.session != nil {
+		entry.session.Revoke()
 	}
 }

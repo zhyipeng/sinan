@@ -69,6 +69,12 @@ func main() {
 	if _, err = c.Message([]byte(`{"kind":"ready","version":1}`)); err != nil {
 		os.Exit(9)
 	}
+	if mode == "settings" {
+		time.Sleep(100 * time.Millisecond)
+		if c.WindowAction("settings") != nil {
+			os.Exit(18)
+		}
+	}
 	if mode == "back" {
 		time.Sleep(100 * time.Millisecond)
 		_ = c.WindowAction("back")
@@ -96,7 +102,7 @@ func main() {
 		time.Sleep(time.Minute)
 		return
 	}
-	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" || mode == "wait-shortcut" || mode == "stderr-child" || mode == "wait-theme" {
+	if mode == "wait-revoke" || mode == "delay-focus" || mode == "panel" || mode == "wait-shortcut" || mode == "stderr-child" || mode == "wait-theme" || mode == "settings" {
 		done := make(chan struct{})
 		c.OnRevoke(func() { close(done) })
 		delayed := false

@@ -243,3 +243,5 @@ CLI：先退出持有相同根目录的宿主，运行 `sinanctl -plugins 路径
 `packages/plugin-sdk/theme/index.js` 导出 `currentTheme()`（未就绪时 undefined）和 `onThemeChanged(listener)`（返回取消订阅函数）。快照包含 mode、revision、id、appearance 和 tokens，读取时复制；系统模式按当前系统明暗产生快照。宿主在 HTML 文档开始时注入固定呈现运行时，经私有父子通道同步主题，不依赖页面桥 1 / 2 权限，不提供完整 Wails Bridge。
 
 当前仅内置浅/深色可选，未支持 manifest 声明主题或安装主题包。主题契约不允许任意 CSS、网络资源或可执行主题脚本。主程序与客体须同步重建。见 [ADR 0032](adr/0032-theme-contract-and-appearance.md)。
+
+宿主私有窗口控制增加 `window-action/settings`，仅供原生客体把窗口内 Command + , 转交父进程；与 detach/back 不同，它也允许来自独立客体。此动作没有暴露给页面消息桥，页面不能据此获得设置服务访问能力。主程序和 sinan-ui-host 需同步构建，见 [ADR 0033](adr/0033-settings-navigation-shortcut.md)。
