@@ -3,6 +3,7 @@
   "name":"插件商店",
   "version":"0.1.0",
   "apiVersion":"1",
+ "icon":"icon.svg",
   "runtime":{"kind":"declarative"},
   "contributes":{"commands":[{"id":"open","title":"插件商店","keywords":["store","marketplace","商店","下载插件"],"view":"store"}]},
   "permissions":[],

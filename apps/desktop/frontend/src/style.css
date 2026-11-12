@@ -32,7 +32,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round
 .command { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 10px 12px; border-radius: 7px; }
 .command:hover { background: transparent; }
 .command.selected { background: var(--sinan-selected); }
-.command-icon { background: var(--sinan-surface); width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; font-size: 22px; color: var(--accent); flex-shrink: 0; }
 strong { font-weight: 550; font-size: 14px; }
 small { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
 .command strong, .command small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -62,7 +61,6 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .trust { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .trust input { accent-color: var(--accent); }
 
-.command-icon img { width: 32px; height: 32px; object-fit: contain; }
 
 .settings-body { padding: 20px; max-height: 470px; overflow-y: auto; }
 .settings-section { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
@@ -159,3 +157,15 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .paste-preview span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .paste-preview.image { flex: 0 0 64px; justify-content: center; padding: 2px; }
 .paste-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+/* Shared plugin artwork follows the existing compact host rhythm. */
+.plugin-icon { width: 34px; height: 34px; flex: 0 0 auto; display: inline-grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--sinan-surface); color: var(--accent); font-size: 16px; font-weight: 550; line-height: 1; }
+.plugin-icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.plugin-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.plugin-identity > div { min-width: 0; overflow-wrap: anywhere; }
+.header-plugin-icon { width: 26px; height: 26px; border-radius: 6px; font-size: 13px; }
+.store-item { display: flex; align-items: center; gap: 10px; }
+.store-item-label { min-width: 0; }
+.store-detail-title { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.store-detail-title .plugin-icon { width: 42px; height: 42px; border-radius: 10px; font-size: 20px; }
+.store-detail-title h2 { margin: 0; }

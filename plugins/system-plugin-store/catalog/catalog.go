@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sinan/internal/plugin/icon"
 	"sinan/internal/plugin/manifest"
 	"sort"
 	"strconv"
@@ -62,6 +63,7 @@ type Release struct {
 	Assets         []Asset       `json:"assets"`
 }
 type Entry struct {
+	Icon          string    `json:"icon,omitempty"`
 	SchemaVersion int       `json:"schemaVersion"`
 	ID            string    `json:"id"`
 	Name          string    `json:"name"`
@@ -124,6 +126,9 @@ func (r Release) Asset(osName, arch string) (Asset, bool) {
 	return Asset{}, false
 }
 func Validate(e Entry) error {
+	if e.Icon != "" && icon.Normalize(e.Icon) == "" {
+		return errors.New("目录图标无效")
+	}
 	if e.SchemaVersion != 1 || !manifest.ValidID(e.ID) || strings.HasPrefix(e.ID, "system.") || strings.TrimSpace(e.Name) == "" || len([]rune(e.Name)) > 64 || len(e.Summary) > 2048 {
 		return errors.New("插件资料无效")
 	}

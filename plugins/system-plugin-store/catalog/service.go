@@ -82,6 +82,9 @@ func (s *Service) Load(ctx context.Context, force bool) (View, error) {
 	result := View{Entries: []Item{}, Revision: snapshot.Revision, UpdatedAt: snapshot.UpdatedAt, Stale: snapshot.Stale, Notice: snapshot.Notice, OS: runtime.GOOS, Arch: runtime.GOARCH, HostVersion: HostVersion}
 	for _, entry := range snapshot.Entries {
 		p := installed[entry.ID]
+		if entry.Icon == "" {
+			entry.Icon = p.Icon
+		}
 		result.Entries = append(result.Entries, Item{Entry: entry, InstalledVersion: p.Version, Development: p.Development, Changed: p.Changed, Protected: p.Protected})
 	}
 	return result, nil

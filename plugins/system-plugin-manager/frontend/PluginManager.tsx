@@ -1,8 +1,9 @@
+import PluginIcon from '../../../packages/ui-components/PluginIcon';
 import { useEffect, useRef, useState } from 'react';
 import CreatePlugin, {type ProjectBridge} from './CreatePlugin';
 import PluginData,{type DataBridge} from './PluginData';
 
-export type ManagedPlugin = {development?: boolean; developmentFingerprint?: string; needsTrust?: boolean; protected?: boolean; id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string;title?:string}[] | null};
+export type ManagedPlugin = {icon?: string;development?: boolean; developmentFingerprint?: string; needsTrust?: boolean; protected?: boolean; id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string;title?:string}[] | null};
 export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]; uiEnabled?: boolean};
 export type PackagePreview = {id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean};
 export type ManagementBridge = DataBridge & ProjectBridge & {
@@ -79,7 +80,7 @@ export default function PluginManager({bridge, onChanged, onRecover,onOpenStore}
     <div className="management-toolbar"><span>{data.plugins.length} 个插件</span><button disabled={busy||projectBusy} onClick={()=>void perform(async()=>{})}>刷新</button><button disabled={busy||projectBusy} onClick={()=>setShowCreate(value=>!value)} aria-expanded={showCreate}>创建插件</button>{onOpenStore&&<button disabled={busy||projectBusy} onClick={onOpenStore}>插件商店</button>}</div>
     <div className="plugins">
       {data.plugins.map(plugin=><div className="plugin" key={plugin.id}>
-        <div><strong>{plugin.name}</strong><small>{plugin.version}{plugin.development?' · 开发链接':''} · {states[plugin.state]??plugin.state}{plugin.changed?' · 文件有变更':''}</small></div>
+        <div className="plugin-identity"><PluginIcon name={plugin.name} icon={plugin.icon}/><div><strong>{plugin.name}</strong><small>{plugin.version}{plugin.development?' · 开发链接':''} · {states[plugin.state]??plugin.state}{plugin.changed?' · 文件有变更':''}</small></div></div>
         <div className="plugin-actions">
           {plugin.needsTrust&&<><label className="trust"><input type="checkbox" disabled={busy||projectBusy} checked={!!developmentTrust[plugin.id]} onChange={event=>setDevelopmentTrust(previous=>({...previous,[plugin.id]:event.target.checked}))}/>允许以当前用户权限运行</label><button disabled={busy||projectBusy||!developmentTrust[plugin.id]||plugin.changed} onClick={()=>void perform(async()=>{await bridge.trustDevelopment(plugin.id,plugin.developmentFingerprint!);setDevelopmentTrust(previous=>({...previous,[plugin.id]:false}));})}>信任开发插件</button></>}
 

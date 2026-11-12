@@ -29,6 +29,7 @@ export interface PluginDataInfo {
 }
 
 export interface PluginInfo {
+    "icon"?: string;
     "development"?: boolean;
     "developmentFingerprint"?: string;
     "needsTrust"?: boolean;

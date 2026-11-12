@@ -17,6 +17,7 @@ export interface Compatibility {
 }
 
 export interface Item {
+    "icon"?: string;
     "schemaVersion": number;
     "id": string;
     "name": string;

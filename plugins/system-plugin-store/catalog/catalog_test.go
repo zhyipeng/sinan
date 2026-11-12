@@ -99,3 +99,21 @@ func TestCatalogRejectsInvalidReleaseRecords(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionalCatalogArtwork(t *testing.T) {
+	_, loader, _, _ := serviceFixture(t)
+	entry := loader.snapshot.Entries[0]
+	if err := Validate(entry); err != nil {
+		t.Fatal("old catalog entry no longer compatible", err)
+	}
+	entry.Icon = "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#e9efff"/></svg>`))
+	if err := Validate(entry); err != nil {
+		t.Fatal("embedded catalog artwork rejected", err)
+	}
+	for _, bad := range []string{"https://example.com/icon.svg", "file:///tmp/icon.png", "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(`<svg><script/></svg>`))} {
+		entry.Icon = bad
+		if Validate(entry) == nil {
+			t.Fatal("unsafe catalog artwork accepted")
+		}
+	}
+}

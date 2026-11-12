@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"sinan/internal/plugin/icon"
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/transport"
 	"sinan/internal/plugin/uiview"
@@ -22,6 +23,7 @@ import (
 )
 
 type PluginInfo struct {
+	Icon                   string                    `json:"icon,omitempty"`
 	Development            bool                      `json:"development,omitempty"`
 	DevelopmentFingerprint string                    `json:"developmentFingerprint,omitempty"`
 	NeedsTrust             bool                      `json:"needsTrust,omitempty"`
@@ -219,7 +221,7 @@ func (p *plugin) info() PluginInfo {
 	if p.development {
 		developmentFingerprint = p.fingerprint
 	}
-	return PluginInfo{Development: p.development, DevelopmentFingerprint: developmentFingerprint, NeedsTrust: p.development && p.manifest.Runtime.Kind == "process" && !p.nativeTrusted, Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	return PluginInfo{Icon: icon.Load(p.dir, p.manifest.Icon), Development: p.development, DevelopmentFingerprint: developmentFingerprint, NeedsTrust: p.development && p.manifest.Runtime.Kind == "process" && !p.nativeTrusted, Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.

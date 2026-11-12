@@ -1,8 +1,9 @@
+import PluginIcon from '../../../packages/ui-components/PluginIcon';
 import { useEffect, useRef, useState } from 'react';
 
 type Asset = {os:string;arch:string;file:string;sha256:string;size:number;assetId:number;downloadUrl:string};
 type Release = {version:string;repository:string;minHostVersion:string;compatibility:{apiVersion:string;uiBridgeVersion:string};assets:Asset[]};
-type Entry = {id:string;name:string;summary:string;publisher:{kind:string};source:{repository:string|null;path:string};status:string;releases:Release[];installedVersion:string;development:boolean;changed:boolean;protected:boolean};
+type Entry = {icon?:string;id:string;name:string;summary:string;publisher:{kind:string};source:{repository:string|null;path:string};status:string;releases:Release[];installedVersion:string;development:boolean;changed:boolean;protected:boolean};
 export type StoreSnapshot = {entries:Entry[];revision:string;updatedAt:number;stale:boolean;notice:string;os:string;arch:string;hostVersion:string};
 export type StorePreview = {ticket:string;id:string;name:string;version:string;kind:string;installedVersion:string;changed:boolean;repository:string;archiveSha256:string;expiresAt:number};
 export type StoreBridge = {load(refresh:boolean):Promise<StoreSnapshot>;prepare(id:string,version:string,revision:string):Promise<StorePreview>;apply(ticket:string,trust:boolean):Promise<unknown>;cancel(ticket:string):Promise<void>};
@@ -43,11 +44,11 @@ export default function PluginStore({bridge,onChanged}:{bridge:StoreBridge;onCha
     {data?.notice&&<p className="store-note" role="status">{data.notice}</p>}
     <div className="store-layout">
       <div className="store-list" aria-label="商店插件">
-        {entries.map(entry=><button key={entry.id} className={`store-item${selected?.id===entry.id?' selected':''}`} disabled={busy} onClick={()=>{setSelectedID(entry.id);setVersion('');}}><strong>{entry.name}</strong><small>{entry.publisher.kind==='official'?'官方':'社区'}{entry.installedVersion?` · 已安装 ${entry.installedVersion}`:entry.status==='pending-release'?' · 待发布':''}</small></button>)}
+        {entries.map(entry=><button key={entry.id} className={`store-item${selected?.id===entry.id?' selected':''}`} disabled={busy} onClick={()=>{setSelectedID(entry.id);setVersion('');}}><PluginIcon name={entry.name} icon={entry.icon}/><span className="store-item-label"><strong>{entry.name}</strong><small>{entry.publisher.kind==='official'?'官方':'社区'}{entry.installedVersion?` · 已安装 ${entry.installedVersion}`:entry.status==='pending-release'?' · 待发布':''}</small></span></button>)}
         {!entries.length&&<p className="empty">{busy?'正在读取目录…':query?'没有匹配的插件':'暂无插件'}</p>}
       </div>
       {selected&&<section className="store-detail" aria-label={`${selected.name} 详情`}>
-        <h2>{selected.name}</h2><small>{selected.id}</small><p className="store-summary">{selected.summary}</p>
+        <div className="store-detail-title"><PluginIcon name={selected.name} icon={selected.icon}/><h2>{selected.name}</h2></div><small>{selected.id}</small><p className="store-summary">{selected.summary}</p>
         <p className="store-source">{selected.source.repository?.replace('https://github.com/','')??'源码地址待登记'}</p>
         {releases.length>0&&<label className="store-version">版本<select value={release?.version??''} disabled={busy} onChange={event=>setVersion(event.target.value)}>{releases.map(item=><option value={item.version} key={item.version}>{item.version}</option>)}</select></label>}
         {selected.installedVersion&&<p className="store-note">本地版本 {selected.installedVersion}</p>}

@@ -1,3 +1,4 @@
+import PluginIcon from '../../../../packages/ui-components/PluginIcon';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Events } from '@wailsio/runtime';
 import { disposePaste, escapeAction, filterPasteResults, MAX_PASTE_TEXT_BYTES, pasteBackspaceText, readPastedImage } from './paste';
@@ -11,7 +12,7 @@ import type { SettingsSchema } from '../../../../plugins/system-settings/fronten
 import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenSettings, OpenPluginCommand, OpenPluginCommandWithInput, DetachShortcutSettings, DetachTrustedView, CloseTrustedView, ClosePluginView, StartPasteSearch, ClearPaste, OpenPasteCommand, ResetToSearch } from '../bindings/sinan/apps/desktop/hostservice';
 
 type Command = { uiView?: string; view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
-type Plugin = { disabled?: boolean; changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
+type Plugin = { icon?: string; disabled?: boolean; changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
 type SearchItem = { pasteId?: string; icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
 type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
 type Data = { plugins: Plugin[]; diagnostics: string[] };
@@ -355,7 +356,7 @@ export default function App() {
       <div className="view-header"><button className="back" onClick={() => { setRecovery(false); setError(''); }} aria-label="返回搜索">←</button><h1>恢复入口</h1></div>
       <Recovery available={!!managerCommand} disabled={!!installedManager?.disabled} diagnostics={data.diagnostics} shortcutError={shortcutError} onRefresh={reload} onOpen={openManager}/>
     </section> : active ? <section className="tool">
-      <div className="view-header"><button className="back" aria-label={detached ? "关闭窗口" : "返回搜索"} onClick={() => { if (detached) { void CloseTrustedView(); return; } void (async()=>{if(active.command.uiView)await ClosePluginView();generation.current++;setBusy(false);setActive(undefined);setOutput('');setError('');requestAnimationFrame(()=>searchRef.current?.focus());})(); }}>{detached ? '×' : '←'}</button><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}{(ActiveView || active.command.uiView) && !detached && <button className="detach-button" aria-label="独立窗口" title={`独立窗口（${formatShortcut(detachShortcut)}）`} onClick={() => void detachView()}>↗</button>}</div>
+      <div className="view-header"><button className="back" aria-label={detached ? "关闭窗口" : "返回搜索"} onClick={() => { if (detached) { void CloseTrustedView(); return; } void (async()=>{if(active.command.uiView)await ClosePluginView();generation.current++;setBusy(false);setActive(undefined);setOutput('');setError('');requestAnimationFrame(()=>searchRef.current?.focus());})(); }}>{detached ? '×' : '←'}</button><PluginIcon name={active.plugin.name} icon={active.plugin.icon} className="header-plugin-icon"/><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}{(ActiveView || active.command.uiView) && !detached && <button className="detach-button" aria-label="独立窗口" title={`独立窗口（${formatShortcut(detachShortcut)}）`} onClick={() => void detachView()}>↗</button>}</div>
       <>{active.command.uiView ? <div className="embedded-plugin-slot" aria-label="插件内容"/> : ActiveView ? <PluginViewBoundary key={`${active.plugin.id}/${active.command.id}`} onRecover={openRecovery}><ActiveView plugins={data.plugins} onChanged={syncPlugins} onRecover={openRecovery} onOpenStore={openStore} /></PluginViewBoundary> : <div className="tool-body">
         <form onSubmit={event => {
           event.preventDefault();
@@ -388,7 +389,7 @@ export default function App() {
       {hasQuery && <>
         <div id="search-results" className="command-list" role="listbox" aria-label="搜索结果">
           {commands.map((item, index) => <button ref={element => { commandRefs.current[index] = element; }} className={`command ${index === selected ? 'selected' : ''}`} key={item.key} data-search-key={item.key} id={`search-result-${index}`} role="option" aria-selected={index === selected} onClick={() => choose(index)}>
-            <span className="command-icon">{item.icon ? <img src={item.icon} alt="" /> : item.kind === 'process' ? '↔' : '✧'}</span><span><strong>{item.title}</strong><small>{item.subtitle}</small></span><span className="open">↵</span>
+            <PluginIcon name={data.plugins.find(plugin=>plugin.id===item.pluginId)?.name??item.title} icon={item.icon||data.plugins.find(plugin=>plugin.id===item.pluginId)?.icon} className="command-icon"/><span><strong>{item.title}</strong><small>{item.subtitle}</small></span><span className="open">↵</span>
           </button>)}
           {!commands.length && <div className="empty">{searching ? '搜索中…' : '没有匹配的命令'}</div>}
         </div>

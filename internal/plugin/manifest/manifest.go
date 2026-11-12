@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"sinan/internal/inputmatch"
+	"sinan/internal/plugin/icon"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -22,6 +23,7 @@ var commandPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 type Manifest struct {
+	Icon             string        `json:"icon,omitempty"`
 	ID               string        `json:"id"`
 	Name             string        `json:"name"`
 	Version          string        `json:"version"`
@@ -93,6 +95,9 @@ func Load(dir string) (Manifest, error) {
 }
 
 func (m Manifest) Validate() error {
+	if !icon.ValidPath(m.Icon) {
+		return errors.New("插件图标必须是包内 SVG、PNG 或 JPEG 相对路径")
+	}
 	if !ValidID(m.ID) || strings.TrimSpace(m.Name) == "" || !versionPattern.MatchString(m.Version) {
 		return errors.New("插件 ID、名称或版本无效")
 	}

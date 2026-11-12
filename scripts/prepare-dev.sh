@@ -4,6 +4,7 @@ set -eu
 if [ "$(go env GOOS)" = darwin ]; then
   mkdir -p .sinan-dev/packages/app-search/backend
   cp plugins/system-app-search/manifest.json .sinan-dev/packages/app-search/manifest.json
+  cp plugins/system-app-search/icon.svg .sinan-dev/packages/app-search/icon.svg
   go build -o .sinan-dev/packages/app-search/backend/plugin ./plugins/system-app-search/cmd
   if [ ! -d .sinan-dev/plugins/system.app-search ]; then
     ./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install .sinan-dev/packages/app-search
