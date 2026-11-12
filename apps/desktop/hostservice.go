@@ -13,13 +13,14 @@ import (
 	"sinan/internal/search"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
-	"sinan/plugins/system-plugin-store/catalog"
+	"sinan/plugins/system-plugin-manager/catalog"
 	"strconv"
 	"sync"
 )
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	migrationNotice     string
 	storeMu             sync.Mutex
 	store               *catalog.Service
 	embedded            *embeddedViews
@@ -45,6 +46,9 @@ type HostService struct {
 func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
 func (h *HostService) Refresh() kernel.Snapshot  { return h.uiDiagnostics(h.manager.Refresh()) }
 func (h *HostService) uiDiagnostics(snapshot kernel.Snapshot) kernel.Snapshot {
+	if h.migrationNotice != "" {
+		snapshot.Diagnostics = append(snapshot.Diagnostics, h.migrationNotice)
+	}
 	if h.uiError != "" {
 		snapshot.Diagnostics = append(snapshot.Diagnostics, h.uiError)
 	}
@@ -378,7 +382,7 @@ func trustedView(snapshot kernel.Snapshot, pluginID, commandID string) (string, 
 		}
 		for _, command := range plugin.Commands {
 			key := plugin.ID + "/" + command.View
-			if command.ID == commandID && (key == "system.settings/settings" || key == "system.plugin-manager/manager" || key == "system.plugin-store/store") {
+			if command.ID == commandID && (key == "system.settings/settings" || key == "system.plugin-manager/manager") {
 				return command.Title, key, nil
 			}
 		}

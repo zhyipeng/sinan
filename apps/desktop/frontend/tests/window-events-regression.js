@@ -25,12 +25,13 @@ console.log('PASS: detached settings and unsaved input survive launcher reset ev
 
 await open('plugins');
 const directory = 'input[id="directory"]';
+await page.click('loc=role:button[name="本地安装"]');
 await page.waitForSelector(directory);
 await page.fill(directory, '/tmp/sinan-manager-window-draft');
 await page.click('button[aria-label="独立窗口"]');
 await page.waitForSelector('.shell.detached');
 await page.evaluate(()=>window.navigationFixture.showLauncher());
-await page.waitForFunction(()=>document.querySelector('h1')?.textContent==='插件管理' && document.querySelector('input[id="directory"]')?.value==='/tmp/sinan-manager-window-draft', undefined, {timeout:2000});
+await page.waitForFunction(()=>document.querySelector('h1')?.textContent==='插件中心' && document.querySelector('input[id="directory"]')?.value==='/tmp/sinan-manager-window-draft', undefined, {timeout:2000});
 console.log('PASS: detached plugin manager keeps its page and directory draft');
 
 await page.goto('http://127.0.0.1:9245/tests/keyboard.html');

@@ -2,16 +2,15 @@
 // A manifest view key never becomes an import URL or installed JavaScript path.
 import { Events } from '@wailsio/runtime';
 import { createElement, type ComponentType } from 'react';
-import PluginStore,{type StoreBridge} from '../../../../plugins/system-plugin-store/frontend/PluginStore';
+import type {StoreBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginStore';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
 import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StorePreview, StoreApply, StoreCancel } from '../bindings/sinan/apps/desktop/hostservice';
-type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void;onOpenStore():void};
+type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
-  'system.plugin-manager/manager': ({onChanged,onRecover,onOpenStore}) => createElement(PluginManager,{bridge:managementBridge,onChanged,onRecover,onOpenStore}),
-  'system.plugin-store/store': ({onChanged}) => createElement(PluginStore,{bridge:storeBridge,onChanged}),
+  'system.plugin-manager/manager': ({onChanged,onRecover}) => createElement(PluginManager,{bridge:managementBridge,storeBridge,onChanged,onRecover}),
 };
 // These adapters are private to bundled trusted views, never passed to installed JS.
 const managementBridge: ManagementBridge = {

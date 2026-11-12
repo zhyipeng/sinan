@@ -1,0 +1,11 @@
+{
+  "id": "system.plugin-manager",
+  "name": "插件管理",
+  "version": "0.6.0",
+  "apiVersion": "1",
+  "icon": "icon.svg",
+  "runtime": {"kind": "declarative"},
+  "contributes": {"commands": [{"id": "open", "title": "插件管理", "keywords": ["plugins", "manage", "安装插件", "升级插件"], "view": "manager"}]},
+  "permissions": [],
+  "activationEvents": ["onCommand:open"]
+}

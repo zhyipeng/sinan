@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sinan/internal/kernel"
-	"sinan/plugins/system-plugin-store/catalog"
+	"sinan/plugins/system-plugin-manager/catalog"
 )
 
 func (h *HostService) pluginStore() (*catalog.Service, error) {

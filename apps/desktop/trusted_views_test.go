@@ -12,17 +12,17 @@ import (
 func TestTrustedViewRequiresInstalledBundledDeclaration(t *testing.T) {
 	snapshot := kernel.Snapshot{Plugins: []kernel.PluginInfo{
 		{ID: "system.settings", Commands: []manifest.Command{{ID: "open", Title: "设置", View: "settings"}}},
-		{ID: "system.plugin-manager", Commands: []manifest.Command{{ID: "open", Title: "插件管理", View: "manager"}}},
+		{ID: "system.plugin-manager", Commands: []manifest.Command{{ID: "open", Title: "插件中心", View: "manager"}}},
 		{ID: "system.plugin-store", Commands: []manifest.Command{{ID: "open", Title: "插件商店", View: "store"}}},
 		{ID: "third.party", Commands: []manifest.Command{{ID: "open", View: "settings"}}},
 	}}
-	for _, id := range []string{"system.settings", "system.plugin-manager", "system.plugin-store"} {
+	for _, id := range []string{"system.settings", "system.plugin-manager"} {
 		title, key, err := trustedView(snapshot, id, "open")
 		if err != nil || title == "" || key == "" {
 			t.Fatal("bundled view rejected", err)
 		}
 	}
-	for _, target := range [][2]string{{"third.party", "open"}, {"missing", "open"}, {"system.settings", "missing"}} {
+	for _, target := range [][2]string{{"system.plugin-store", "open"}, {"third.party", "open"}, {"missing", "open"}, {"system.settings", "missing"}} {
 		if _, _, err := trustedView(snapshot, target[0], target[1]); err == nil {
 			t.Fatal("unregistered view accepted")
 		}

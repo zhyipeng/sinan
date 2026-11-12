@@ -11,7 +11,7 @@ import (
 )
 
 func TestBundledPluginArtwork(t *testing.T) {
-	for _, name := range []string{"system-settings", "system-plugin-manager", "system-plugin-store", "system-app-search"} {
+	for _, name := range []string{"system-settings", "system-plugin-manager", "system-app-search"} {
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join("../../plugins", name)
 			mf, err := manifest.Load(dir)

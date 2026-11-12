@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func installProtectedViews(t *testing.T, m *Manager) {
+func installProtectedPlugins(t *testing.T, m *Manager) {
 	t.Helper()
 	for _, dir := range []string{"system-settings", "system-plugin-manager"} {
 		info, err := m.Install(filepath.Join("..", "..", "plugins", dir), false)
@@ -16,18 +16,47 @@ func installProtectedViews(t *testing.T, m *Manager) {
 			t.Fatal("protected installation failed", err)
 		}
 	}
+	// Install the real application-search declaration with an inert executable;
+	// these policy checks must not start a native scan or desktop interaction.
+	source := t.TempDir()
+	for _, name := range []string{"manifest.json", "icon.svg"} {
+		data, err := os.ReadFile(filepath.Join("../../plugins/system-app-search", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(source, name), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(source, "backend"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "backend", "plugin"), []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	info, err := m.Install(source, true)
+	if err != nil || !info.Protected || info.Disabled {
+		t.Fatal("application search is not protected", err)
+	}
 }
 
-func TestSystemViewsRejectDisableAndUninstallWithoutMutation(t *testing.T) {
+func TestBundledPluginsRejectDisableAndUninstallWithoutMutation(t *testing.T) {
 	m := manager(t)
-	installProtectedViews(t, m)
+	installProtectedPlugins(t, m)
 	before := m.settings.Get(enablementNamespace)
-	for _, id := range []string{"system.settings", "system.plugin-manager"} {
+	for _, id := range []string{"system.settings", "system.plugin-manager", "system.app-search"} {
 		if _, err := m.SetPluginEnabled(id, false); err == nil {
-			t.Fatal("system view disabled", id)
+			t.Fatal("bundled plugin disabled", id)
 		}
 		if err := m.Uninstall(id); err == nil {
-			t.Fatal("system view uninstalled", id)
+			t.Fatal("bundled plugin uninstalled", id)
+		}
+		p, err := m.lookup(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := m.UninstallChecked(id, p.fingerprint); err == nil {
+			t.Fatal("checked uninstall bypassed protection", id)
 		}
 		if _, err := os.Stat(filepath.Join(m.root, id, "manifest.json")); err != nil {
 			t.Fatal("rejection removed package", err)
@@ -52,15 +81,15 @@ func TestSystemViewsRejectDisableAndUninstallWithoutMutation(t *testing.T) {
 	}
 }
 
-func TestLegacyDisableEntriesDoNotDisableProtectedViews(t *testing.T) {
+func TestLegacyDisableEntriesDoNotDisableBundledPlugins(t *testing.T) {
 	m := manager(t)
-	installProtectedViews(t, m)
+	installProtectedPlugins(t, m)
 	if _, err := m.Install(source(t, false), false); err != nil {
 		t.Fatal(err)
 	}
 	before := m.settings.Get(enablementNamespace)
 	if _, err := m.settings.Update(enablementNamespace, before.Revision, map[string][]string{
-		"disabled": {"system.settings", "system.plugin-manager", "example.hello"},
+		"disabled": {"system.settings", "system.plugin-manager", "system.app-search", "example.hello"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -87,5 +116,13 @@ func TestLegacyDisableEntriesDoNotDisableProtectedViews(t *testing.T) {
 	after, err := os.ReadFile(path)
 	if err != nil || !bytes.Equal(original, after) {
 		t.Fatal("loading policy rewrote source file")
+	}
+}
+
+func TestProtectionIsLimitedToCurrentBundledIdentities(t *testing.T) {
+	for _, id := range []string{"tools.json", "system.example", "system.plugin-store"} {
+		if protectedPlugin(id) {
+			t.Fatalf("non-bundled identity protected: %s", id)
+		}
 	}
 }

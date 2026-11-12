@@ -31,7 +31,7 @@ func (m *Manager) loadEnablement() {
 			m.disabled[id] = true
 		}
 	}
-	// Ignore valid legacy disable entries for the now-protected system views.
+	// Ignore valid legacy disable entries for the now-protected bundled plugins.
 	// Preserve the source file; malformed policy still follows fail-closed handling.
 	for id := range m.disabled {
 		if protectedPlugin(id) {
@@ -42,7 +42,12 @@ func (m *Manager) loadEnablement() {
 
 // protectedPlugin is host policy, never a package-controlled manifest flag.
 func protectedPlugin(id string) bool {
-	return id == "system.settings" || id == "system.plugin-manager"
+	switch id {
+	case "system.settings", "system.plugin-manager", "system.app-search":
+		return true
+	default:
+		return false
+	}
 }
 
 // SetPluginEnabled persists the desired state before changing the live instance.

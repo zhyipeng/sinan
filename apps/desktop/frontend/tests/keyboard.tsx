@@ -35,7 +35,7 @@ let failEnablement=false;
 const plugin = {uiViews:[{id:'main',title:'',entry:'index.html',bridgeVersion:'1'},{id:'a'.repeat(64),entry:'other.html',bridgeVersion:'1'}],disabled:false,changed:true,id:'example.fixture',name:'Fixture',version:'0.1.0',kind:'process',state:'running',commands};
 const settingsPlugin={protected:true,disabled:false,...settingsManifest,kind:'declarative',state:'installed',commands:settingsManifest.contributes.commands};
 const managerPlugin={protected:true,disabled:false,...managerManifest,kind:'declarative',state:'installed',commands:managerManifest.contributes.commands};
-const appPlugin={disabled:false,id:'system.app-search',name:'应用检索',version:'0.4.0',kind:'process',state:'installed',commands:[],settings:[{id:'directories',title:'额外应用目录',type:'directory-list'}]};
+const appPlugin={protected:true,disabled:false,id:'system.app-search',name:'应用检索',version:'0.4.0',kind:'process',state:'installed',commands:[],settings:[{id:'directories',title:'额外应用目录',type:'directory-list'}]};
 const canvas=document.createElement('canvas'); canvas.width=64; canvas.height=64;
 const icon=canvas.toDataURL('image/png');
 const item = (title: string) => ({icon,key:`example.fixture/demo/${title}`,pluginId:plugin.id,providerId:'demo',commandId:title.toLowerCase(),input:'fixture',title,subtitle:'Fixture',kind:'process',score:.7});
@@ -133,7 +133,7 @@ setTransport({async call(object,_method,_window,args){
       if(args.args[1]==='window')items=[{...item('Window'),commandId:'window',providerId:'$commands',input:'',title:'独立窗口'}];
       if(args.args[1]==='unknown-view')items=[item('Unregistered')];
       if(args.args[1]==='settings')items=[{...item('Settings'),key:'system.settings/$commands/open',pluginId:'system.settings',commandId:'open',title:'设置',kind:'declarative'}];
-      if(args.args[1]==='plugins')items=managerPresent?[{...item('Manager'),key:'system.plugin-manager/$commands/open',pluginId:managerManifest.id,commandId:'open',title:'插件管理',kind:'declarative'}]:[];
+      if(args.args[1]==='plugins')items=managerPresent?[{...item('Manager'),key:'system.plugin-manager/$commands/open',pluginId:managerManifest.id,commandId:'open',title:'插件中心',kind:'declarative'}]:[];
       items=items.filter(item=>![plugin,settingsPlugin,managerPlugin,appPlugin].find(plugin=>plugin.id===item.pluginId)?.disabled);
       if(items.length===0)done=true;
       queueMicrotask(publish);return;

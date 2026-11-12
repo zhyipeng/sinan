@@ -600,6 +600,19 @@ func (m *Manager) Stop(id string) error {
 }
 
 func (m *Manager) Uninstall(id string) error {
+	return m.uninstall(id, "")
+}
+
+// UninstallChecked removes only the package reviewed by a migration or caller.
+// The fingerprint check and removal share the normal mutation lock.
+func (m *Manager) UninstallChecked(id, expected string) error {
+	if len(expected) != 64 {
+		return errors.New("请先核验待卸载插件")
+	}
+	return m.uninstall(id, expected)
+}
+
+func (m *Manager) uninstall(id, expected string) error {
 	if protectedPlugin(id) {
 		return errors.New("系统插件不允许卸载")
 	}
@@ -613,6 +626,13 @@ func (m *Manager) Uninstall(id string) error {
 	if p == nil || !manifest.ValidID(id) {
 		m.mu.Unlock()
 		return errors.New("插件不存在")
+	}
+	if expected != "" {
+		actual, err := packageFingerprint(p.dir)
+		if err != nil || p.development || actual != expected || p.fingerprint != expected {
+			m.mu.Unlock()
+			return errors.New("插件文件已变化，未卸载")
+		}
 	}
 	delete(m.plugins, id)
 	m.mu.Unlock()

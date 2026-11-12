@@ -170,3 +170,19 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .store-detail-title { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .store-detail-title .plugin-icon { width: 42px; height: 42px; border-radius: 10px; font-size: 20px; }
 .store-detail-title h2 { margin: 0; }
+
+/* Plugin center keeps navigation quiet and gives details the available width. */
+.center-navigation { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.center-tabs, .center-utilities { display: flex; gap: 6px; }
+.center-tabs button { border-radius: 0; padding: 10px 8px 13px; border-bottom: 2px solid transparent; font-size: 13px; }
+.center-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.center-tabs small { margin-left: 5px; color: var(--muted); font-size: 11px; }
+.center-utilities button, .center-more > button { font-size: 12px; }
+.plugin-center .store-body { padding: 0; overflow: visible; max-height: none; }
+.plugin-center .store-layout { grid-template-columns: 220px minmax(0,1fr); }
+.plugin-center .store-toolbar input { min-width: 0; }
+.center-plugin-actions { justify-content: flex-start; max-width: none; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.center-browse { margin-top: 12px; color: var(--accent); font-size: 12px; }
+.center-more { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 20px; }
+.plugin-center .store-item-label small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+@media (max-width: 600px) { .plugin-center .store-layout { grid-template-columns: 160px minmax(0,1fr); gap: 12px; } }

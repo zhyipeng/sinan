@@ -24,9 +24,3 @@ if [ ! -d .sinan-dev/plugins/system.plugin-manager ]; then
 else
   ./bin/sinanctl -plugins .sinan-dev/plugins upgrade plugins/system-plugin-manager
 fi
-
-if [ ! -d .sinan-dev/plugins/system.plugin-store ]; then
-  ./bin/sinanctl -plugins .sinan-dev/plugins install plugins/system-plugin-store
-else
-  ./bin/sinanctl -plugins .sinan-dev/plugins upgrade plugins/system-plugin-store
-fi

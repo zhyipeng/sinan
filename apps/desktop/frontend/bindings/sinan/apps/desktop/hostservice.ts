@@ -21,10 +21,10 @@ import * as storage$0 from "../../internal/storage/models.js";
 import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as scaffold$0 from "../../plugins/system-plugin-manager/scaffold/models.js";
+import * as catalog$0 from "../../plugins/system-plugin-manager/catalog/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as catalog$0 from "../../plugins/system-plugin-store/catalog/models.js";
+import * as scaffold$0 from "../../plugins/system-plugin-manager/scaffold/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports

@@ -20,8 +20,8 @@ export default function Recovery({available,disabled,diagnostics,shortcutError,o
     finally{if(alive.current)setBusy(false);}
   }
   return <div className="recovery tool-body">
-    <p className="settings-note">{disabled?'插件管理已禁用，可重新启用。':available?'插件管理已安装，可重新检查状态或恢复本地包。':'插件管理不可用，请从本地目录恢复。'}</p>
-    <div className="recovery-actions"><button disabled={busy} onClick={()=>void perform(async()=>{})}>重新检查</button>{available&&<button disabled={busy} onClick={onOpen}>打开插件管理</button>}{disabled&&<button disabled={busy} onClick={()=>void perform(async()=>{await SetPluginEnabled('system.plugin-manager',true);})}>启用插件管理</button>}</div>
+    <p className="settings-note">{disabled?'插件中心已禁用，可重新启用。':available?'插件中心已安装，可重新检查状态或恢复本地包。':'插件中心不可用，请从本地目录恢复。'}</p>
+    <div className="recovery-actions"><button disabled={busy} onClick={()=>void perform(async()=>{})}>重新检查</button>{available&&<button disabled={busy} onClick={onOpen}>打开插件中心</button>}{disabled&&<button disabled={busy} onClick={()=>void perform(async()=>{await SetPluginEnabled('system.plugin-manager',true);})}>启用插件中心</button>}</div>
     <form className="install" onSubmit={event=>{
       event.preventDefault();
       void perform(async()=>{

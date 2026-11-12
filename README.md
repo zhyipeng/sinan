@@ -19,8 +19,8 @@ make dev
 - [插件开发协议](docs/plugin-protocol.md)
 - [AI 协作开发约定](AGENTS.md)
 
-## 插件商店
+## 插件中心
 
-`make dev` 会准备插件商店。搜索“插件商店”，或从插件管理进入，可浏览、搜索、查看详情、安装和手动更新。界面复用主窗口页头、返回与拆出。JSON 工具 0.4.1 已上架，提供 macOS Apple Silicon 和 Intel 安装包；其他未发布插件仍显示“待发布”。
+`make dev` 会准备统一的插件中心。搜索“插件中心”“插件管理”或“插件商店”均可进入；默认管理已安装插件，在“发现”中浏览、搜索、安装和手动更新。界面复用主窗口页头、返回与拆出。JSON 工具 0.4.1 已上架，提供 macOS Apple Silicon 和 Intel 安装包；其他未发布插件仍显示“待发布”。
 
-已有日常实例需使用本次构建，并在插件管理中安装 `plugins/system-plugin-store`。目录契约与信任边界见[插件商店文档](docs/plugin-store.md)。
+已有日常实例使用新版宿主后，会迁移已知未修改的旧包；本地修改或未知版本保留并提示处理。中心包位于 `plugins/system-plugin-manager`。目录契约与信任边界见[插件商店文档](docs/plugin-store.md)。

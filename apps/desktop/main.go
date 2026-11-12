@@ -17,6 +17,7 @@ import (
 	"sinan/internal/platform"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/theme"
+	pluginmanager "sinan/plugins/system-plugin-manager"
 )
 
 //go:embed all:frontend/dist
@@ -75,7 +76,13 @@ func run() error {
 		}
 	}
 	defer manager.Close()
-	host := &HostService{manager: manager, probeEnabled: *uiProbe}
+	migrationNotice := ""
+	if !*uiProbe && !*acceptance {
+		if err := pluginmanager.Migrate(manager); err != nil {
+			migrationNotice = err.Error()
+		}
+	}
+	host := &HostService{manager: manager, probeEnabled: *uiProbe, migrationNotice: migrationNotice}
 	appURL := "/"
 	if *acceptance {
 		appURL = "/?acceptance=1"

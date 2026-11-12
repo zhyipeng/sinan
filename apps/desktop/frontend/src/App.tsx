@@ -288,12 +288,6 @@ export default function App() {
     if (detached) { void CloseTrustedView(); return; }
     generation.current++; setActive(undefined); setRecovery(true); setBusy(false); setOutput(''); setError('');
   }
-  function openStore() {
-    const plugin=data.plugins.find(item=>item.id==='system.plugin-store'&&!item.disabled);
-    const command=plugin?.commands.find(item=>item.view==='store');
-    if(!plugin||!command){setError('插件商店尚未安装或已禁用。');return;}
-    generation.current++;setRecovery(false);setActive({plugin,command});setBusy(false);setOutput('');setError('');
-  }
   function openManager() {
     if (!managerPlugin || !managerCommand) { openRecovery(); return; }
     generation.current++; setRecovery(false); setActive({plugin:managerPlugin,command:managerCommand}); setBusy(false); setOutput(''); setError('');
@@ -357,7 +351,7 @@ export default function App() {
       <Recovery available={!!managerCommand} disabled={!!installedManager?.disabled} diagnostics={data.diagnostics} shortcutError={shortcutError} onRefresh={reload} onOpen={openManager}/>
     </section> : active ? <section className="tool">
       <div className="view-header"><button className="back" aria-label={detached ? "关闭窗口" : "返回搜索"} onClick={() => { if (detached) { void CloseTrustedView(); return; } void (async()=>{if(active.command.uiView)await ClosePluginView();generation.current++;setBusy(false);setActive(undefined);setOutput('');setError('');requestAnimationFrame(()=>searchRef.current?.focus());})(); }}>{detached ? '×' : '←'}</button><PluginIcon name={active.plugin.name} icon={active.plugin.icon} className="header-plugin-icon"/><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}{(ActiveView || active.command.uiView) && !detached && <button className="detach-button" aria-label="独立窗口" title={`独立窗口（${formatShortcut(detachShortcut)}）`} onClick={() => void detachView()}>↗</button>}</div>
-      <>{active.command.uiView ? <div className="embedded-plugin-slot" aria-label="插件内容"/> : ActiveView ? <PluginViewBoundary key={`${active.plugin.id}/${active.command.id}`} onRecover={openRecovery}><ActiveView plugins={data.plugins} onChanged={syncPlugins} onRecover={openRecovery} onOpenStore={openStore} /></PluginViewBoundary> : <div className="tool-body">
+      <>{active.command.uiView ? <div className="embedded-plugin-slot" aria-label="插件内容"/> : ActiveView ? <PluginViewBoundary key={`${active.plugin.id}/${active.command.id}`} onRecover={openRecovery}><ActiveView plugins={data.plugins} onChanged={syncPlugins} onRecover={openRecovery} /></PluginViewBoundary> : <div className="tool-body">
         <form onSubmit={event => {
           event.preventDefault();
           const current = generation.current;
