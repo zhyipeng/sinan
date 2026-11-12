@@ -104,6 +104,55 @@ func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (direc
 	success = true
 	return directory, cleanup, nil
 }
+
+// StageLocal snapshots a local ZIP before extracting it with the same limits as store assets.
+// Callers must clean up after both preview and apply; no source files are modified.
+func StageLocal(source string) (directory string, cleanup func(), err error) {
+	if !filepath.IsAbs(source) || !strings.EqualFold(filepath.Ext(source), ".zip") {
+		return "", nil, errors.New("请选择 ZIP 插件包的绝对路径")
+	}
+	info, err := os.Stat(source)
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 64<<20 {
+		return "", nil, errors.New("ZIP 插件包不可读取或超过 64 MiB")
+	}
+	file, err := os.Open(source)
+	if err != nil {
+		return "", nil, errors.New("无法读取 ZIP 插件包")
+	}
+	defer file.Close()
+	work, err := os.MkdirTemp("", "sinan-local-package-")
+	if err != nil {
+		return "", nil, errors.New("无法创建插件暂存目录")
+	}
+	cleanup = func() { _ = os.RemoveAll(work) }
+	success := false
+	defer func() {
+		if !success {
+			cleanup()
+		}
+	}()
+	archive := filepath.Join(work, "package.zip")
+	target, err := os.OpenFile(archive, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return "", cleanup, errors.New("无法暂存 ZIP 插件包")
+	}
+	n, copyErr := io.Copy(target, io.LimitReader(file, (64<<20)+1))
+	closeErr := target.Close()
+	if copyErr != nil || closeErr != nil || n != info.Size() || n > 64<<20 {
+		return "", cleanup, errors.New("ZIP 插件包读取失败、已变化或超过 64 MiB")
+	}
+	directory = filepath.Join(work, "plugin")
+	if err = os.Mkdir(directory, 0700); err != nil {
+		return "", cleanup, errors.New("无法创建插件暂存目录")
+	}
+	if err = extract(archive, directory); err != nil {
+		return "", cleanup, err
+	}
+	_ = os.Remove(archive)
+	success = true
+	return directory, cleanup, nil
+}
+
 func extract(archive, directory string) error {
 	zipped, err := zip.OpenReader(archive)
 	if err != nil {

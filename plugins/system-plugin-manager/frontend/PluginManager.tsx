@@ -8,6 +8,7 @@ export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]; 
 export type PackagePreview = {id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean};
 export type ManagementBridge = DataBridge & ProjectBridge & {
   chooseInstallDirectory(): Promise<string>;
+  chooseInstallArchive(): Promise<string>;
   trustDevelopment(id:string,fingerprint:string):Promise<unknown>;
   refresh(): Promise<ManagedSnapshot>;
   stop(id: string): Promise<void>;
@@ -66,14 +67,14 @@ export default function PluginManager({bridge, onChanged, onRecover,onOpenStore}
   function changeDirectory(value: string) {
     setDirectory(value);setPreview(undefined);setTrust(false);setError('');setNotice('');
   }
-  async function chooseInstallDirectory() {
+  async function chooseInstallSource(archive = false) {
     if(pending.current||busy||projectBusy)return;
     pending.current=true;setBusy(true);
     try {
-      const selected=await bridge.chooseInstallDirectory();
+      const selected=await (archive?bridge.chooseInstallArchive():bridge.chooseInstallDirectory());
       if(selected&&alive.current)changeDirectory(selected);
     } catch(reason) {
-      if(alive.current)setError(reason instanceof Error?reason.message:'无法选择目录，请重试。');
+      if(alive.current)setError(reason instanceof Error?reason.message:'无法选择插件包，请重试。');
     } finally {pending.current=false;if(alive.current)setBusy(false);}
   }
   return <div className="management management-body">
@@ -91,7 +92,7 @@ export default function PluginManager({bridge, onChanged, onRecover,onOpenStore}
           {data.uiEnabled&&plugin.uiViews?.map(view=><button key={view.id} disabled={busy||projectBusy||plugin.disabled||plugin.changed} aria-label={`打开 ${plugin.name} ${view.title||view.id}`} onClick={()=>void perform(()=>bridge.openView!(plugin.id,view.id))}>打开 {view.title||view.id}</button>)}
         </div>
       </div>)}
-      {!busy&&!data.plugins.length&&<p className="empty">还没有插件，从本地目录安装一个。</p>}
+      {!busy&&!data.plugins.length&&<p className="empty">还没有插件，从本地目录或 ZIP 安装一个。</p>}
     </div>
     <form className="install" onSubmit={event=>{
       event.preventDefault();
@@ -106,7 +107,7 @@ export default function PluginManager({bridge, onChanged, onRecover,onOpenStore}
       },preview.installedVersion?'插件已升级。':'插件已安装。');
     }}>
       <label htmlFor="directory">安装 / 升级插件</label>
-      <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallDirectory()}>选择目录</button><button className="primary" disabled={busy||projectBusy||!directory.trim()||!!preview&&(!preview.changed||preview.kind==='process'&&!trust)}>{!preview?'检查':!preview.changed?'无需升级':preview.installedVersion?'升级':'安装'}</button></div>
+      <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()||!!preview&&(!preview.changed||preview.kind==='process'&&!trust)}>{!preview?'检查':!preview.changed?'无需升级':preview.installedVersion?'升级':'安装'}</button></div>
       {preview&&<div className="package-preview" role="status"><strong>{preview.name}</strong><span>{preview.installedVersion?`${preview.installedVersion} → ${preview.version}`:preview.version}</span><button type="button" disabled={busy||projectBusy} onClick={inspect}>重新检查</button></div>}
       {preview?.kind==='process'&&preview.changed&&<label className="trust"><input type="checkbox" checked={trust} onChange={event=>setTrust(event.target.checked)}/>信任此原生插件，允许其以当前用户权限运行</label>}
     </form>

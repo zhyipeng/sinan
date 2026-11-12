@@ -111,3 +111,54 @@ func TestRedirectCannotEscapeApprovedGitHubHosts(t *testing.T) {
 		t.Fatal("untrusted redirect followed")
 	}
 }
+
+func TestLocalStageSnapshotAndCleanup(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "plugin.ZIP")
+	if err := os.WriteFile(source, archive(t, []string{"manifest.json", "backend/plugin"}, false), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dir, cleanup, err := StageLocal(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if err = os.WriteFile(source, []byte("replaced"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil || string(data) != "fixture" {
+		t.Fatal("staged snapshot changed with source")
+	}
+	info, err := os.Stat(filepath.Join(dir, "backend/plugin"))
+	if err != nil || info.Mode().Perm()&0111 == 0 {
+		t.Fatal("executable mode lost")
+	}
+	cleanup()
+	if _, err = os.Stat(filepath.Dir(dir)); !os.IsNotExist(err) {
+		t.Fatal("local staging not removed")
+	}
+}
+
+func TestLocalStageRejectsUnsafeAndOversizeArchives(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "plugin.zip")
+	for _, data := range [][]byte{[]byte("not a zip"), archive(t, []string{"manifest.json", "../escape"}, false), archive(t, []string{"nested/manifest.json"}, false), archive(t, []string{"manifest.json", "link"}, true)} {
+		if err := os.WriteFile(source, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := StageLocal(source); err == nil {
+			t.Fatal("unsafe local ZIP accepted")
+		}
+	}
+	file, err := os.Create(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = file.Truncate((64 << 20) + 1)
+	file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = StageLocal(source); err == nil {
+		t.Fatal("oversized local archive accepted")
+	}
+}

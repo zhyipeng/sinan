@@ -45,6 +45,13 @@ export function CancelSearch(sequence: number): $CancellablePromise<void> {
     return $Call.ByID(640499065, sequence);
 }
 
+/**
+ * ChooseInstallArchive is exposed only to bundled trusted views.
+ */
+export function ChooseInstallArchive(): $CancellablePromise<string> {
+    return $Call.ByID(459611197);
+}
+
 export function ChooseInstallDirectory(): $CancellablePromise<string> {
     return $Call.ByID(599771664);
 }

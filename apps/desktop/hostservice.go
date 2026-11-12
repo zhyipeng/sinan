@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"os"
 	"sinan/internal/kernel"
+	"sinan/internal/plugin/distribution"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/search"
 	"sinan/internal/storage"
@@ -180,12 +182,22 @@ func (h *HostService) SavePluginSettings(pluginID string, revision uint64, value
 func (h *HostService) ClearHistory() error { h.cancelSearch(); return h.manager.ClearUsage() }
 
 func (h *HostService) PreviewPackage(directory string) (kernel.PackagePreview, error) {
-	return h.manager.PreviewPackage(directory)
+	source, cleanup, err := localPackageSource(directory)
+	if err != nil {
+		return kernel.PackagePreview{}, err
+	}
+	defer cleanup()
+	return h.manager.PreviewPackage(source)
 }
 func (h *HostService) ApplyPackage(directory string, trustNative bool, fingerprint, installedFingerprint string) (kernel.PluginInfo, error) {
 	h.cancelSearch()
 	defer h.cancelSearch()
-	result, err := h.manager.ApplyPackage(directory, trustNative, fingerprint, installedFingerprint)
+	source, cleanup, err := localPackageSource(directory)
+	if err != nil {
+		return kernel.PluginInfo{}, err
+	}
+	defer cleanup()
+	result, err := h.manager.ApplyPackage(source, trustNative, fingerprint, installedFingerprint)
 	if err == nil && h.launcher != nil {
 		h.launcher.closePlugin(result.ID)
 	}
@@ -475,4 +487,12 @@ func (h *HostService) OpenPluginCommandWithInput(ctx context.Context, pluginID, 
 		return false, h.pluginUIUnavailable()
 	}
 	return false, h.ui.OpenCommandWithInput(pluginID, commandID, input)
+}
+
+// Directory installs retain their existing behavior; ZIPs are staged per operation.
+func localPackageSource(source string) (string, func(), error) {
+	if info, err := os.Stat(source); err == nil && info.IsDir() {
+		return source, func() {}, nil
+	}
+	return distribution.StageLocal(source)
 }

@@ -6,7 +6,7 @@ import PluginStore,{type StoreBridge} from '../../../../plugins/system-plugin-st
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, TrustDevelopmentPlugin, StoreCatalog, StorePreview, StoreApply, StoreCancel } from '../bindings/sinan/apps/desktop/hostservice';
+import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StorePreview, StoreApply, StoreCancel } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void;onOpenStore():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -17,6 +17,7 @@ export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> =
 const managementBridge: ManagementBridge = {
   async trustDevelopment(id,fingerprint){return await TrustDevelopmentPlugin(id,fingerprint);},
   async chooseInstallDirectory(){return await ChooseInstallDirectory();},
+  async chooseInstallArchive(){return await ChooseInstallArchive();},
   async chooseDirectory(){return await ChoosePluginDirectory();},
   async createProject(options){return await CreatePluginProject(options);},
   async listData(){return await PluginData()??[];},

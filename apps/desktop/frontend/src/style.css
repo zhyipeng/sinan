@@ -57,7 +57,7 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .install { margin-top: 24px; }
 .install > label:first-child { font-size: 13px; font-weight: 550; }
 .install-row { display: flex; gap: 10px; margin: 11px 0; }
-.install-row input { flex: 1; border: 1px solid var(--line); border-radius: 7px; background: var(--sinan-surface); padding: 10px 12px; color: inherit; }
+.install-row input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--sinan-surface); padding: 10px 12px; color: inherit; }
 .trust { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .trust input { accent-color: var(--accent); }
 

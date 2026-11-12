@@ -36,3 +36,20 @@ func (h *HostService) choosePluginDirectory(ctx context.Context, title string, c
 func (h *HostService) CreatePluginProject(options scaffold.Options) (scaffold.Result, error) {
 	return scaffold.Create(options)
 }
+
+// ChooseInstallArchive is exposed only to bundled trusted views.
+func (h *HostService) ChooseInstallArchive(ctx context.Context) (string, error) {
+	if h.launcher == nil || application.Get() == nil {
+		return "", errors.New("当前运行模式不支持文件选择")
+	}
+	window := h.launcher.caller(ctx)
+	if window == nil {
+		return "", errors.New("窗口不可用")
+	}
+	finish := h.launcher.beginDialog(window)
+	defer finish()
+	return application.Get().Dialog.OpenFile().CanChooseFiles(true).
+		CanChooseDirectories(false).AddFilter("ZIP 插件包", "*.zip").
+		SetTitle("选择 ZIP 插件包").SetButtonText("选择 ZIP").
+		AttachToWindow(window).PromptForSingleSelection()
+}
