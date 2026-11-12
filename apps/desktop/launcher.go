@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	launcherWidth     = 680
+	launcherWidth     = 800
 	launcherMinHeight = 50
-	launcherMaxHeight = 560
+	launcherMaxHeight = 600
 )
 
 // launcher owns only native Shell behavior. Plugin business remains in the runtime.
@@ -225,6 +225,9 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	window.SetTitle(title)
 	window.SetAlwaysOnTop(false)
 	window.SetResizable(true)
+	x, y := window.Position()
+	window.SetSize(launcherWidth, launcherMaxHeight)
+	window.SetPosition(x, y)
 	application.InvokeSync(func() { platform.DetachPanel(window.NativeWindow()) })
 	window.DispatchWailsEvent(&application.CustomEvent{Name: "view:detached", Sender: "kernel.views"})
 	window.Show()

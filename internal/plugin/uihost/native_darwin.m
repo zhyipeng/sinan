@@ -199,8 +199,8 @@ static void positionPanel(NSWindow *window) {
         if (NSMouseInRect(NSEvent.mouseLocation, screen.frame, NO)) { target = screen; break; }
     NSRect work = target.visibleFrame;
     NSRect frame = window.frame;
-    frame.size.width = MIN(680, work.size.width);
-    frame.size.height = MIN(530, work.size.height * 0.8 - 16);
+    frame.size.width = MIN(800, work.size.width);
+    frame.size.height = MIN(600, work.size.height * 0.8 - 16);
     frame.origin.x = NSMidX(work) - frame.size.width / 2;
     frame.origin.y = NSMaxY(work) - work.size.height * 0.2 - frame.size.height;
     [window setFrame:frame display:YES];
@@ -454,13 +454,13 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         [configuration setURLSchemeHandler:delegate forURLScheme:@"sinan-plugin"];
         [configuration.userContentController addScriptMessageHandler:delegate name:@"sinan"];
         if (delegate.bridgeVersion == 2) [configuration.userContentController addScriptMessageHandlerWithReply:delegate contentWorld:WKContentWorld.pageWorld name:@"sinanCall"];
-        WKWebView *view = [[WKWebView alloc] initWithFrame:(delegate.probe ? NSMakeRect(0,0,560,240) : NSMakeRect(0,0,640,480)) configuration:configuration];
+        WKWebView *view = [[WKWebView alloc] initWithFrame:(delegate.probe ? NSMakeRect(0,0,560,240) : NSMakeRect(0,0,800,600)) configuration:configuration];
         delegate.view = view;
         view.navigationDelegate = delegate;
         view.UIDelegate = delegate;
         NSWindow *window;
         if (delegate.attached) {
-            window = [[SinanMainPanel alloc] initWithContentRect:NSMakeRect(0,0,680,530) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
+            window = [[SinanMainPanel alloc] initWithContentRect:NSMakeRect(0,0,800,600) styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
             window.level = NSFloatingWindowLevel;
             window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
             ((NSPanel *)window).hidesOnDeactivate = NO;
@@ -472,15 +472,15 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
         [delegate applyTheme:bundle[@"theme"] toWindow:window];
         window.releasedWhenClosed = NO;
         if (delegate.attached) {
-            NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0,0,680,530)];
+            NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0,0,800,600)];
             window.contentView = container;
-            view.frame = NSMakeRect(0,0,680,530-SinanHeaderHeight);
+            view.frame = NSMakeRect(0,0,800,600-SinanHeaderHeight);
             view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
             [container addSubview:view];
             NSString *headerTitle = bundle[@"headerTitle"];
             if (!headerTitle.length) headerTitle = bundle[@"title"] ?: @"司南插件";
             SinanPanelHeader *header = [[SinanPanelHeader alloc] initWithTitle:headerTitle source:bundle[@"headerSource"] target:delegate];
-            header.frame = NSMakeRect(0,530-SinanHeaderHeight,680,SinanHeaderHeight);
+            header.frame = NSMakeRect(0,600-SinanHeaderHeight,800,SinanHeaderHeight);
             header.theme = delegate.theme;
             [header refreshTheme];
             header.needsLayout = YES;
@@ -666,7 +666,7 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
 
 SinanEmbeddedRect sinanUIEmbeddedRect(double width, double height, int detached, int flipped) {
     double available = MAX(0,height-58);
-    double body = detached ? available : MIN(430,available);
+    double body = detached ? available : MIN(542,available);
     return (SinanEmbeddedRect){0,flipped ? MIN(58,MAX(0,height)) : MAX(0,height-58-body),MAX(0,width),body};
 }
 

@@ -340,7 +340,7 @@ export default function App() {
     if (plugin && command) { setActive({ plugin, command }); setInput(pasted?.kind==='text' ? pasted.text : item.input); setOutput(''); setError(''); }
   }
 
-  return <main ref={shellRef} className={`shell${detached ? " detached" : ""}`}
+  return <main ref={shellRef} className={`shell${active || recovery ? " plugin-view" : ""}${detached ? " detached" : ""}`}
     onPointerEnter={event => { pointerPosition.current = { x: event.screenX, y: event.screenY }; }}
     onPointerMove={event => {
       const previous = pointerPosition.current;

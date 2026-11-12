@@ -18,7 +18,7 @@ button:disabled { opacity: .45; cursor: default; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 input, textarea { min-width: 0; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.shell { width: 100%; height: auto; max-height: 560px; overflow: hidden; }
+.shell { width: 100%; height: auto; max-height: 600px; overflow: hidden; }
 .search { height: 50px; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
 .compass { width: 22px; height: 22px; flex-shrink: 0; color: var(--accent); }
 .compass-tip { fill: var(--accent); stroke: none; }
@@ -28,7 +28,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round
 .search input::placeholder { color: var(--sinan-placeholder); }
 .manage-button { position: relative; font-size: 24px; line-height: 24px; color: var(--muted); padding: 3px 8px 8px; }
 .warning-dot { position: absolute; top: 2px; right: 1px; width: 6px; height: 6px; border-radius: 50%; background: var(--sinan-warning); }
-.command-list { padding: 6px 8px; max-height: 392px; overflow-y: auto; border-top: 1px solid var(--line); }
+.command-list { padding: 6px 8px; max-height: 520px; overflow-y: auto; border-top: 1px solid var(--line); }
 .command { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 10px 12px; border-radius: 7px; }
 .command:hover { background: transparent; }
 .command.selected { background: var(--sinan-selected); }
@@ -92,10 +92,11 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .management-recovery { margin-top: 18px; text-align: right; font-size: 11px; color: var(--muted); }
 .recovery-actions { margin-top: 12px; }
 
+.plugin-view { height: 600px; display: flex; flex-direction: column; }
 .detached { max-height: none; height: 100vh; }
-.detached .tool { display: flex; flex-direction: column; height: 100%; }
-.detached .view-header { flex-shrink: 0; }
-.detached .settings-body, .detached .management-body { flex: 1; min-height: 0; max-height: none; }
+.plugin-view > section { display: flex; flex-direction: column; height: 100%; }
+.plugin-view .view-header { flex-shrink: 0; }
+.plugin-view .tool-body, .plugin-view .settings-body, .plugin-view .management-body { flex: 1; min-height: 0; max-height: none; }
 .detach-button { color: var(--muted); font-size: 18px; }
 
 /* Data management follows the existing rows, typography and blue focus style. */
@@ -130,7 +131,7 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .project-result p { font-size: 12px; overflow-wrap: anywhere; }
 
 .embedded-plugin-slot { height: 430px; flex: 1; min-height: 0; }
-.detached .embedded-plugin-slot { height: auto; }
+.plugin-view .embedded-plugin-slot { height: auto; }
 
 /* Store uses the same trusted header, spacing and theme as plugin management. */
 .store-body { padding: 20px; max-height: 430px; overflow-y: auto; }
@@ -150,7 +151,7 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .store-preview { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .store-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .store-detail .primary { padding: 8px 14px; font-size: 12px; }
-.detached .store-body { flex: 1; min-height: 0; max-height: none; }
+.plugin-view .store-body { flex: 1; min-height: 0; max-height: none; }
 
 /* Frozen paste preview shares the search row; the adjacent field only filters. */
 .paste-preview { flex: 0 1 200px; min-width: 48px; max-width: 38%; height: 34px; display: flex; align-items: center; padding: 0 9px; border: 1px dashed var(--sinan-muted); border-radius: 6px; background: var(--sinan-surface); overflow: hidden; }
