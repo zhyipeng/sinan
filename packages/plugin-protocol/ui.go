@@ -27,3 +27,11 @@ type UIRequest struct {
 	Revision  uint64          `json:"revision,omitempty"`
 	Value     json.RawMessage `json:"value,omitempty"`
 }
+
+// UILaunchContext contains only input explicitly passed when this view opened.
+// A nil Input means a normal open; an empty string is still an explicit input.
+type UILaunchContext struct {
+	CommandID string         `json:"commandId,omitempty"`
+	Input     *string        `json:"input,omitempty"`
+	Image     *UILaunchImage `json:"image,omitempty"`
+}

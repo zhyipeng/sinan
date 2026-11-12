@@ -6,6 +6,31 @@ export interface CommandResult {
     "dismiss"?: boolean;
 }
 
+/**
+ * InputMatcher declares local matching without activating a plugin process.
+ * Matchers on a command are ORed. Regex uses Go/RE2 syntax and substring matching.
+ */
+export interface InputMatcher {
+    "kind": string;
+    "pattern"?: string;
+    "jsonTypes"?: string[] | null;
+    "minLength"?: number;
+    "maxLength"?: number;
+}
+
+/**
+ * PasteContent is sent only by the trusted Shell after an explicit paste.
+ * Exactly one of Text or Image must be present. Images are normalized to PNG.
+ */
+export interface PasteContent {
+    "text"?: string | null;
+    "image"?: PasteImage | null;
+}
+
+export interface PasteImage {
+    "dataBase64": string;
+}
+
 export interface ThemeDefinition {
     "version": string;
     "id": string;

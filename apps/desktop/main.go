@@ -167,11 +167,7 @@ func run() error {
 			}
 			host.stopRecording(window)
 		})
-		window.RegisterKeyBinding("escape", func(_ application.Window) {
-			if host.launcher.isMain(window) {
-				window.Hide()
-			}
-		})
+
 		return window
 	}
 	window := newShell(appURL, false)
@@ -188,6 +184,10 @@ func run() error {
 			host.uiError = "无法确定 UI 客体程序位置"
 		} else {
 			controller, err := uiwindows.New(manager, filepath.Join(filepath.Dir(executable), "sinan-ui-host"), func(event uiwindows.Event) {
+				if event.ResetToSearch {
+					go host.showMain()
+					return
+				}
 				if event.OpenSettings {
 					_ = host.openSettings()
 					return

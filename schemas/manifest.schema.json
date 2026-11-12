@@ -105,6 +105,135 @@
                 "maxLength": 64,
                 "pattern": "^[a-z][a-z0-9-]*$",
                 "description": "只引用同一插件已声明的 uiViews ID；由宿主打开独立客体，不进入可信组件。"
+              },
+              "inputMatchers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "description": "本地内容匹配规则，OR 关系；支持普通命令和 HTML 桥 2 视图命令，不支持可信组件 view 或 searchOnly；每插件最多 32 条。长度按 UTF-8 字节计。",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "regex",
+                        "json",
+                        "image"
+                      ]
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "description": "Go/RE2 正则，子串匹配；需全串时使用 ^ 和 $。宿主另检查字节长度和最多 256 条编译指令。"
+                    },
+                    "jsonTypes": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 6,
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "object",
+                          "array",
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    },
+                    "minLength": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65536
+                    },
+                    "maxLength": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65536
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "const": "regex"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "pattern"
+                        ],
+                        "not": {
+                          "required": [
+                            "jsonTypes"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "const": "json"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "jsonTypes"
+                        ],
+                        "not": {
+                          "required": [
+                            "pattern"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "const": "image"
+                          }
+                        }
+                      },
+                      "then": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "pattern"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "jsonTypes"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "minLength"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "maxLength"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
               }
             },
             "allOf": [
@@ -134,6 +263,51 @@
                       }
                     ]
                   }
+                }
+              },
+              {
+                "if": {
+                  "required": [
+                    "inputMatchers"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "required": [
+                      "view"
+                    ]
+                  },
+                  "properties": {
+                    "searchOnly": {
+                      "const": false
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "inputMatchers": {
+                      "contains": {
+                        "properties": {
+                          "kind": {
+                            "const": "image"
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "inputMatchers"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "uiView"
+                  ]
                 }
               }
             ]

@@ -40,6 +40,14 @@ static BOOL matchesDetachShortcut(NSEvent *event, NSString *shortcut, NSWindow *
     if ([responder respondsToSelector:@selector(hasMarkedText)] && [(id<NSTextInputClient>)responder hasMarkedText]) return NO;
     return matchesDetachKey(event.keyCode, event.modifierFlags, shortcut);
 }
+// Escape navigation belongs to the host, while an active IME candidate keeps
+// its first Escape so the native and trusted WebViews follow the same rule.
+static BOOL matchesResetKey(NSEvent *event, NSWindow *window) {
+    if (event.type != NSEventTypeKeyDown || event.keyCode != 53 || event.isARepeat) return NO;
+    id responder = window.firstResponder;
+    if ([responder respondsToSelector:@selector(hasMarkedText)] && [(id<NSTextInputClient>)responder hasMarkedText]) return NO;
+    return YES;
+}
 static NSString *detachTooltip(NSString *shortcut) {
     NSDictionary *symbols = @{@"Cmd":@"⌘", @"Ctrl":@"⌃", @"Alt":@"⌥", @"Shift":@"⇧"};
     NSMutableString *label = [NSMutableString stringWithString:@"独立窗口（"];
@@ -529,7 +537,9 @@ SinanUIProbeReport sinanUIProbe(const char *bundleJSON, const char *targetURL, u
                     }
                 }
                 if (event) {
-                    if (matchesDetachShortcut(event, @"Cmd+Comma", window)) {
+                    if (matchesResetKey(event,window)) {
+                        if (sinanUIWindowAction(handle,4)) delegate.done = YES;
+                    } else if (matchesDetachShortcut(event, @"Cmd+Comma", window)) {
                         sinanUIWindowAction(handle, 3);
                     } else if (delegate.attached && matchesDetachShortcut(event, delegate.detachShortcut, window))
                         delegate.detachRequested = YES;
@@ -713,6 +723,7 @@ void *sinanUIEmbeddedCreate(const char *json, unsigned long long handle, void *n
         delegate.embeddedKeyMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
             SinanUIProbe *current = weak;
             if (!current || current.revoked || current.view.hidden || current.view.window != event.window) return event;
+            if (matchesResetKey(event,event.window)) { sinanUIEmbeddedAction(current.handle,3); return nil; }
             if (matchesDetachShortcut(event,@"Cmd+Comma",event.window)) { sinanUIEmbeddedAction(current.handle,2); return nil; }
             if (matchesDetachShortcut(event,current.detachShortcut,event.window)) { sinanUIEmbeddedAction(current.handle,1); return nil; }
             return event;

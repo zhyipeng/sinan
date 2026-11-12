@@ -153,3 +153,9 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 .store-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .store-detail .primary { padding: 8px 14px; font-size: 12px; }
 .detached .store-body { flex: 1; min-height: 0; max-height: none; }
+
+/* Frozen paste preview shares the search row; the adjacent field only filters. */
+.paste-preview { flex: 0 1 200px; min-width: 48px; max-width: 38%; height: 34px; display: flex; align-items: center; padding: 0 9px; border: 1px dashed var(--sinan-muted); border-radius: 6px; background: var(--sinan-surface); overflow: hidden; }
+.paste-preview span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.paste-preview.image { flex: 0 0 64px; justify-content: center; padding: 2px; }
+.paste-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }

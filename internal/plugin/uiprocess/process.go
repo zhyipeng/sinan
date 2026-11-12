@@ -270,12 +270,12 @@ func (p *Process) serve() {
 			}
 			res.OK = p.session.Active()
 		case "window-action":
-			if !hello || req.Version != 0 || req.URL != "" || len(req.Message) > 0 || len(req.Report) > 0 || p.options.WindowAction == nil || (req.WindowAction != "settings" && (!p.options.Panel || (req.WindowAction != "detach" && req.WindowAction != "back"))) {
+			if !hello || req.Version != 0 || req.URL != "" || len(req.Message) > 0 || len(req.Report) > 0 || p.options.WindowAction == nil || ((req.WindowAction != "settings" && req.WindowAction != "reset") && (!p.options.Panel || (req.WindowAction != "detach" && req.WindowAction != "back"))) {
 				invalid = true
 				break
 			}
 			res.OK = p.session.Active() && p.options.WindowAction(req.WindowAction)
-			if res.OK && req.WindowAction == "back" {
+			if res.OK && (req.WindowAction == "back" || req.WindowAction == "reset") {
 				p.session.Revoke()
 			}
 		case "resource":

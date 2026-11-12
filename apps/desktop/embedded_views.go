@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"sinan/internal/paste"
 	"sinan/internal/plugin/uihost"
 	"sinan/internal/plugin/uiview"
 	"sinan/internal/theme"
@@ -33,6 +34,12 @@ type embeddedViews struct {
 }
 
 func (h *HostService) openEmbedded(ctx context.Context, id, viewID, commandID string) error {
+	return h.openEmbeddedWithInput(ctx, id, viewID, commandID, nil)
+}
+func (h *HostService) openEmbeddedWithInput(ctx context.Context, id, viewID, commandID string, input *string) error {
+	return h.openEmbeddedPrepared(ctx, id, viewID, commandID, input, nil, nil)
+}
+func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, commandID string, input *string, content *paste.Content, check func() bool) error {
 	window := h.launcher.caller(ctx)
 	if window == nil {
 		return errors.New("窗口不可用")
@@ -44,8 +51,14 @@ func (h *HostService) openEmbedded(ctx context.Context, id, viewID, commandID st
 	state.mu.Unlock()
 	var session *uiview.Session
 	var err error
-	if commandID != "" {
-		session, err = h.manager.OpenUICommand(ctx, id, commandID)
+	if content != nil {
+		session, err = h.manager.OpenUICommandWithPaste(ctx, id, commandID, content)
+	} else if commandID != "" {
+		if input == nil {
+			session, err = h.manager.OpenUICommand(ctx, id, commandID)
+		} else {
+			session, err = h.manager.OpenUICommandWithInput(ctx, id, commandID, *input)
+		}
 	} else {
 		session, err = h.manager.OpenUIView(ctx, id, viewID)
 	}
@@ -78,6 +91,10 @@ func (h *HostService) openEmbedded(ctx context.Context, id, viewID, commandID st
 		shortcut = h.detachShortcuts.State().Shortcut
 	}
 	nativeView, err = uihost.PrepareEmbedded(deadline, session, nativeWindow, config, shortcut, func(kind int) {
+		if kind == 3 {
+			go h.resetWindow(window)
+			return
+		}
 		if kind == 2 {
 			_ = h.openSettings()
 			return
@@ -91,7 +108,7 @@ func (h *HostService) openEmbedded(ctx context.Context, id, viewID, commandID st
 	}
 	entry = &embeddedEntry{view: nativeView, session: session, window: window}
 	state.mu.Lock()
-	if state.sequence[window] != sequence || !session.Active() {
+	if state.sequence[window] != sequence || !session.Active() || check != nil && !check() {
 		state.mu.Unlock()
 		nativeView.Close()
 		return errors.New("插件页面打开已取消")

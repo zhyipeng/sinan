@@ -75,6 +75,9 @@ Object.assign(window,{navigationFixture:fixture});
 setTransport({async call(object,_method,_window,args){
   if(object!==objectNames.Call)return;
   switch(args.methodID){
+    case 100521191:
+      recording=false;queueMicrotask(()=>window._wails.dispatchWailsEvent({name:'launcher:reset',data:null}));return;
+    case 2044716687:return;
     case 3516089106:
       window._wails.dispatchWailsEvent({name:'launcher:show',data:null});
       window._wails.dispatchWailsEvent({name:'settings:open',data:null});
@@ -104,7 +107,7 @@ setTransport({async call(object,_method,_window,args){
       detaches++;
       window._wails.dispatchWailsEvent({name:'view:detached',data:null});
       return;
-    case 2354522669:
+    case 2354522669: case 887690023:
       if(!uiEnabled)throw new Error('独立插件窗口尚未启用');
       if(plugin.disabled||plugin.changed||args.args[0]!==plugin.id||args.args[1]!=='window')throw new Error('视图不可用');
       commandOpenArgs=[...args.args];
@@ -127,7 +130,7 @@ setTransport({async call(object,_method,_window,args){
       queueMicrotask(()=>window._wails.dispatchWailsEvent({name:'shortcut:changed',data:shortcut}));return shortcut;
     case 1083380061:
       sequence=String(args.args[0]);items=args.args[1]==='apps'?[item('Application')]:['Alpha','Beta','Gamma'].map(item);done=false;
-      if(args.args[1]==='window')items=[{...item('Window'),commandId:'window',providerId:'$commands',title:'独立窗口'}];
+      if(args.args[1]==='window')items=[{...item('Window'),commandId:'window',providerId:'$commands',input:'',title:'独立窗口'}];
       if(args.args[1]==='unknown-view')items=[item('Unregistered')];
       if(args.args[1]==='settings')items=[{...item('Settings'),key:'system.settings/$commands/open',pluginId:'system.settings',commandId:'open',title:'设置',kind:'declarative'}];
       if(args.args[1]==='plugins')items=managerPresent?[{...item('Manager'),key:'system.plugin-manager/$commands/open',pluginId:managerManifest.id,commandId:'open',title:'插件管理',kind:'declarative'}]:[];

@@ -11,7 +11,7 @@ import (
 	protocol "sinan/packages/plugin-protocol"
 )
 
-func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Session, view protocol.UIView, req protocol.UIRequest) (json.RawMessage, error) {
+func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Session, view protocol.UIView, req protocol.UIRequest, launch protocol.UILaunchContext) (json.RawMessage, error) {
 	if err := m.beginOperation(); err != nil {
 		return nil, err
 	}
@@ -43,6 +43,10 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 	if err = ctx.Err(); err != nil {
 		m.mutationMu.Unlock()
 		return nil, err
+	}
+	if req.Method == "launch.get" {
+		defer m.mutationMu.Unlock()
+		return marshalUIResult(launch)
 	}
 	if req.Method == "storage.get" || req.Method == "storage.put" {
 		defer m.mutationMu.Unlock()

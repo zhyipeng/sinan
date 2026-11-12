@@ -15,7 +15,8 @@ import (
 	protocol "sinan/packages/plugin-protocol"
 )
 
-const maxFrameBytes = 1 << 20
+// Allows a bounded 4 MiB launch image after base64 encoding.
+const maxFrameBytes = 6 << 20
 const maxRequests = 256
 const maxResourceBytes = 8 << 20
 

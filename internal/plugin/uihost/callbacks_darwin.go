@@ -125,7 +125,7 @@ func sinanUIWindowAction(handle C.ulonglong, kind C.int) (result C.int) {
 	if !binding.session.Active() {
 		return 0
 	}
-	if kind != 1 && kind != 2 && kind != 3 {
+	if kind != 1 && kind != 2 && kind != 3 && kind != 4 {
 		return 0
 	}
 	action := "detach"
@@ -134,6 +134,9 @@ func sinanUIWindowAction(handle C.ulonglong, kind C.int) (result C.int) {
 	}
 	if kind == 3 {
 		action = "settings"
+	}
+	if kind == 4 {
+		action = "reset"
 	}
 	if client, ok := binding.session.(focusSession); ok && client.WindowAction(action) == nil {
 		return 1

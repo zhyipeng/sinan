@@ -49,6 +49,7 @@ demo: dev
 
 test: frontend
 	node --test packages/plugin-sdk/theme/runtime.test.mjs
+	node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs
 	SINAN_NATIVE_UI_TEST=0 go test -race -p 1 ./...
 
 ui-probe:

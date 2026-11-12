@@ -3,11 +3,13 @@ package uiview
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,21 +40,23 @@ const (
 // Session identity is the host-held object, never a plugin ID supplied by a page.
 // Binding is descriptive metadata, not a credential for reopening a session.
 type Session struct {
-	caller     func(context.Context, protocol.UIRequest) (json.RawMessage, error)
-	calls      chan struct{}
-	callWindow time.Time
-	callCount  int
-	mu         sync.Mutex
-	binding    Binding
-	bundle     *Bundle
-	entry      string
-	ready      bool
-	revoked    bool
-	messages   int
-	done       chan struct{}
-	signaled   chan struct{}
-	listeners  map[uint64]func()
-	sequence   uint64
+	caller         func(context.Context, protocol.UIRequest) (json.RawMessage, error)
+	calls          chan struct{}
+	callWindow     time.Time
+	callCount      int
+	mu             sync.Mutex
+	binding        Binding
+	bundle         *Bundle
+	launchImage    Resource
+	launchImageURL string
+	entry          string
+	ready          bool
+	revoked        bool
+	messages       int
+	done           chan struct{}
+	signaled       chan struct{}
+	listeners      map[uint64]func()
+	sequence       uint64
 }
 
 func NewSession(binding Binding, bundle *Bundle) (*Session, error) {
@@ -71,6 +75,9 @@ func (s *Session) Resource(url string) (Resource, bool) {
 	defer s.mu.Unlock()
 	if s.revoked {
 		return Resource{}, false
+	}
+	if s.launchImageURL != "" && url == s.launchImageURL {
+		return Resource{MIME: s.launchImage.MIME, Data: bytes.Clone(s.launchImage.Data)}, true
 	}
 	return s.bundle.Resource(url)
 }
@@ -97,6 +104,8 @@ func (s *Session) revokeLocked() func() {
 	}
 	s.revoked = true
 	s.bundle = nil
+	s.launchImage = Resource{}
+	s.launchImageURL = ""
 	close(s.done)
 	listeners := make([]func(), 0, len(s.listeners))
 	for _, listener := range s.listeners {
@@ -243,7 +252,7 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		if len(fields) > 3 || fields["revision"] != nil || fields["value"] != nil || req.CommandID == "" {
 			return nil, errors.New("命令请求无效")
 		}
-	case "storage.get":
+	case "storage.get", "launch.get":
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}
@@ -275,4 +284,17 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		return nil, errors.New("UI 返回值超过限制或无效")
 	}
 	return result, nil
+}
+
+// AttachLaunchImage is called only during kernel session construction. Resource
+// URLs are scoped to the session and remain subject to normal revoke/budgets.
+func (s *Session) AttachLaunchImage(data []byte, width, height int) protocol.UILaunchImage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.revoked || s.ready || s.launchImageURL != "" {
+		return protocol.UILaunchImage{}
+	}
+	s.launchImageURL = "sinan-plugin://" + s.binding.PluginID + "/__sinan_input/" + strings.ToLower(rand.Text()) + ".png"
+	s.launchImage = Resource{MIME: "image/png", Data: bytes.Clone(data)}
+	return protocol.UILaunchImage{URL: s.launchImageURL, MIMEType: "image/png", Width: width, Height: height, Bytes: len(data)}
 }

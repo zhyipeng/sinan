@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Events } from '@wailsio/runtime';
+import { disposePaste, escapeAction, filterPasteResults, MAX_PASTE_TEXT_BYTES, pasteBackspaceText, readPastedImage } from './paste';
+import type { PastedInput } from './paste';
+import type { ClipboardEvent } from 'react';
 import { pluginViews } from './pluginViews';
 import { keyCombination, formatShortcut } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Recovery from './Recovery';
 import PluginViewBoundary from './PluginViewBoundary';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
-import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenSettings, OpenPluginCommand, DetachShortcutSettings, DetachTrustedView, CloseTrustedView, ClosePluginView } from '../bindings/sinan/apps/desktop/hostservice';
+import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenSettings, OpenPluginCommand, OpenPluginCommandWithInput, DetachShortcutSettings, DetachTrustedView, CloseTrustedView, ClosePluginView, StartPasteSearch, ClearPaste, OpenPasteCommand, ResetToSearch } from '../bindings/sinan/apps/desktop/hostservice';
 
 type Command = { uiView?: string; view?: string; id: string; title: string; keywords?: string[] | null; execution?: string };
 type Plugin = { disabled?: boolean; changed?: boolean; id: string; name: string; version: string; kind: string; state: string; settings?: SettingsSchema[] | null; commands: Command[] };
-type SearchItem = { icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
+type SearchItem = { pasteId?: string; icon?: string; key: string; pluginId: string; providerId: string; commandId: string; input: string; title: string; subtitle: string; kind: string; score: number };
 type SearchUpdate = { queryId: string; items: SearchItem[]; pending: number; failures: string[]; done: boolean };
 type Data = { plugins: Plugin[]; diagnostics: string[] };
 function normalize(snapshot: { plugins: (Omit<Plugin, 'commands'> & { commands: Command[] | null })[] | null; diagnostics: string[] | null }): Data {
@@ -19,12 +22,19 @@ function normalize(snapshot: { plugins: (Omit<Plugin, 'commands'> & { commands: 
 export default function App() {
   const [data, setData] = useState<Data>({ plugins: [], diagnostics: [] });
   const [query, setQuery] = useState('');
+  const [pasted, setPasted] = useState<PastedInput>();
+  const [pasteReading, setPasteReading] = useState(false);
+  const pastedRef = useRef<PastedInput>();
+  const pasteLoading = useRef(0);
+  const pasteSearchSequence = useRef(0);
+  const escapeRef = useRef<() => void>(() => {});
   const [commands, setCommands] = useState<SearchItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchFailures, setSearchFailures] = useState(0);
   const searchSequence = useRef(Date.now() * 1000);
   const activeSequence = useRef('');
   const [selection, setSelection] = useState({ key: '', manual: false });
+  const latestPlugins = useRef(data.plugins);latestPlugins.current=data.plugins;
   const pointerPosition = useRef<{ x: number; y: number }>();
   const [active, setActive] = useState<{ plugin: Plugin; command: Command }>();
   const [input, setInput] = useState('');
@@ -61,6 +71,10 @@ export default function App() {
       // A stale/broadcast launcher event must never reset a detached tool.
       if (detachedRef.current) return;
       generation.current++;
+      pasteLoading.current++;
+      disposePaste(pastedRef.current);pastedRef.current=undefined;setPasted(undefined);setPasteReading(false);
+      void ClearPaste(pasteSearchSequence.current).catch(()=>{});
+      activeSequence.current='';setSearchItems([]);setCommands([]);setSearching(false);setSearchFailures(0);
       setRecovery(false); setActive(undefined); setQuery(''); setSelection({ key: '', manual: false });
       setInput(''); setOutput(''); setError(''); setBusy(false);
       void LauncherStatus().then(setShortcutError).catch(() => {});
@@ -68,6 +82,7 @@ export default function App() {
       requestAnimationFrame(() => searchRef.current?.focus());
     };
     const offShow = Events.On('launcher:show', reset);
+    const offReset = Events.On('launcher:reset', reset);
     const offPlugin = Events.On('plugin-view:open', event => {
       const view = event.data as {pluginId:string;viewId:string;commandId:string;title:string};
       const current=++generation.current;
@@ -107,7 +122,7 @@ export default function App() {
     const offDetachShortcut = Events.On('detach-shortcut:changed', event => applyDetachShortcut(event.data as {active:string;shortcut:string;revision:number}));
     const offDetached = Events.On('view:detached', () => { detachedRef.current = true; setDetached(true); });
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
-    return () => { offShow(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); };
+    return () => { offShow(); offReset(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); };
   }, []);
 
   useEffect(() => {
@@ -124,12 +139,18 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  const hasQuery = query.trim().length > 0;
+  const hasQuery = query.trim().length > 0 || !!pasted;
+  const [searchItems, setSearchItems] = useState<SearchItem[]>([]);
+  useEffect(() => {
+    if (!pasted) return;
+    const next=filterPasteResults(searchItems, query, data.plugins);
+    setCommands(next);setSelection(current=>current.manual && next.some(item=>item.key===current.key) ? current : {key:next[0]?.key ?? '',manual:false});
+  }, [pasted, searchItems, query, data]);
   useEffect(() => Events.On('search:update', event => {
     const update = event.data as SearchUpdate;
     if (update.queryId !== activeSequence.current) return;
     const next = update.items ?? [];
-    setCommands(next);
+    setSearchItems(next);setCommands(pastedRef.current ? filterPasteResults(next, searchRef.current?.value ?? '', latestPlugins.current) : next);
     // Follow ranking until the user chooses a row. Keep key and intent in one
     // state update so keyboard events and provider results can safely share a batch.
     setSelection(current => current.manual && next.some(item => item.key === current.key)
@@ -145,11 +166,62 @@ export default function App() {
     setCommands([]); setSearchFailures(0);
     if (!connected || !hasQuery || recovery || active) { setSearching(false); return; }
     setSearching(true);
-    void StartSearch(sequence, query).catch(() => {
-      if (activeSequence.current === String(sequence)) { setSearching(false); setError('搜索请求失败，请重试。'); }
+    const request = pasted ? (() => {
+      pasteSearchSequence.current=sequence;
+      return StartPasteSearch(sequence, pasted.kind==='text' ? {text:pasted.text} : {image:{dataBase64:pasted.dataBase64}});
+    })() : StartSearch(sequence, query);
+    void request.catch((reason: unknown) => {
+      if (activeSequence.current === String(sequence)) { setSearching(false); setError(reason instanceof Error ? reason.message : '搜索请求失败，请重试。'); }
     });
     return () => { activeSequence.current = ''; void CancelSearch(sequence).catch(() => {}); };
-  }, [query, connected, recovery, active, data]);
+  }, [pasted ? 'paste' : query, pasted, connected, recovery, active, data]);
+
+  function clearPasteState() {
+    pasteLoading.current++;disposePaste(pastedRef.current);pastedRef.current=undefined;setPasted(undefined);setPasteReading(false);
+    setSearchItems([]);setCommands([]);activeSequence.current='';
+    void ClearPaste(pasteSearchSequence.current).catch(()=>{});
+  }
+  function backspacePaste() {
+    if (!pasted) return;
+    const text=pasteBackspaceText(pasted);
+    clearPasteState();setQuery(text);setSelection({key:'',manual:false});setOutput('');setError('');
+    requestAnimationFrame(()=>searchRef.current?.focus());
+  }
+  function resetShell() {
+    generation.current++;clearPasteState();
+    setActive(undefined);setRecovery(false);setQuery('');setInput('');setOutput('');setError('');setBusy(false);
+    setSelection({key:'',manual:false});setSearching(false);setSearchFailures(0);
+    requestAnimationFrame(()=>searchRef.current?.focus());
+  }
+  escapeRef.current=()=>{
+    if (escapeAction(!!active || !!pasted || pasteReading || recovery || detached || busy || !!output,query)==='hide') { void HideLauncher();return; }
+    if (!detached) resetShell();
+    void ResetToSearch().catch(()=>setError('无法返回主输入框，请重试。'));
+  };
+  useEffect(()=>{
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key!=='Escape' || event.repeat || event.isComposing)return;
+      event.preventDefault();event.stopPropagation();escapeRef.current();
+    };
+    window.addEventListener('keydown',escape,true);
+    return ()=>{window.removeEventListener('keydown',escape,true);disposePaste(pastedRef.current);};
+  },[]);
+  async function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
+    if (query.length || pasted || active || detached) return;
+    const image=Array.from(event.clipboardData.items).find(item=>item.kind==='file' && item.type.startsWith('image/'))?.getAsFile();
+    const text=event.clipboardData.getData('text/plain');
+    if(!image && !text)return;
+    event.preventDefault();
+    const ticket=++pasteLoading.current;setPasteReading(true);
+    const openedAt=generation.current;
+    try {
+      if (!image && new TextEncoder().encode(text).length>MAX_PASTE_TEXT_BYTES) throw new Error('粘贴文本超过 64 KiB');
+      const next:PastedInput=image ? await readPastedImage(image) : {kind:'text',text};
+      if(ticket!==pasteLoading.current || openedAt!==generation.current || searchRef.current?.value) {disposePaste(next);return;}
+      setSearchItems([]);setCommands([]);pastedRef.current=next;setPasted(next);setQuery('');setOutput('');setError('');setSelection({key:'',manual:false});
+    } catch(reason) {if(ticket===pasteLoading.current)setError(reason instanceof Error ? reason.message : '无法读取粘贴内容');}
+    finally {if(ticket===pasteLoading.current)setPasteReading(false);}
+  }
 
   const ActiveView = active?.command.view ? pluginViews[`${active.plugin.id}/${active.command.view}`] : undefined;
   async function detachView() {
@@ -248,7 +320,7 @@ export default function App() {
     if (plugin && command?.uiView) {
       const current = generation.current;
       void perform(async () => {
-        const embedded = await OpenPluginCommand(plugin.id, command.id);
+        const embedded = await (item.pasteId ? OpenPasteCommand(plugin.id,command.id,item.pasteId) : item.input ? OpenPluginCommandWithInput(plugin.id, command.id, item.input) : OpenPluginCommand(plugin.id, command.id));
         if (!embedded && current === generation.current) await HideLauncher();
       });
       return;
@@ -257,14 +329,14 @@ export default function App() {
     if (plugin && command?.execution === 'direct') {
       const current = generation.current;
       void perform(async () => {
-        const result = await Execute(plugin.id, command.id, item.input);
+        const result = await Execute(plugin.id, command.id, pasted?.kind==='text' ? pasted.text : item.input);
         if (current !== generation.current) return;
         if (result.dismiss) await HideLauncher();
         else setOutput(result.text);
       });
       return;
     }
-    if (plugin && command) { setActive({ plugin, command }); setInput(item.input); setOutput(''); setError(''); }
+    if (plugin && command) { setActive({ plugin, command }); setInput(pasted?.kind==='text' ? pasted.text : item.input); setOutput(''); setError(''); }
   }
 
   return <main ref={shellRef} className={`shell${detached ? " detached" : ""}`}
@@ -301,9 +373,12 @@ export default function App() {
       </div>}</>
     </section> : <section className="launcher">
       <div className="search">
-        <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>
-        <input ref={searchRef} autoFocus spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder="搜索…" value={query} onChange={event => { setQuery(event.target.value); setSelection({ key: '', manual: false }); setOutput(''); setError(''); }} onKeyDown={event => {
+        {pasted ? <div className={`paste-preview ${pasted.kind}`} aria-label={pasted.kind==='image' ? '粘贴图片预览' : '粘贴文本预览'}>
+          {pasted.kind==='image' ? <img src={pasted.previewURL} alt="粘贴的图片" /> : <span>{pasted.text.replace(/\s+/g,' ').trim().slice(0,160)}</span>}
+        </div> : <svg className="compass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>}
+        <input ref={searchRef} autoFocus spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder={pasted ? "筛选结果…" : pasteReading ? "正在读取图片…" : "搜索…"} onPaste={event=>void handlePaste(event)} value={query} onChange={event => { pasteLoading.current++;setPasteReading(false);setQuery(event.target.value); setSelection({ key: '', manual: false }); setOutput(''); setError(''); }} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
+          if (event.key === 'Backspace' && pasted && query.length===0) {event.preventDefault();backspacePaste();return;}
           if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1); }
           if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1); }
           if (event.key === 'Enter' && hasQuery) { event.preventDefault(); choose(selected); }
@@ -317,7 +392,7 @@ export default function App() {
           </button>)}
           {!commands.length && <div className="empty">{searching ? '搜索中…' : '没有匹配的命令'}</div>}
         </div>
-        <footer><span>{commands.length} 个结果{searching ? ' · 搜索中…' : searchFailures ? ` · ${searchFailures} 个来源暂不可用` : ''}</span><span>↑ ↓ 选择　↵ 打开　esc 隐藏</span></footer>
+        <footer><span>{commands.length} 个结果{searching ? ' · 搜索中…' : searchFailures ? ` · ${searchFailures} 个来源暂不可用` : ''}</span><span>↑ ↓ 选择　↵ 打开　esc 返回 / 隐藏</span></footer>
       </>}
     </section>}
     {!active && output && <output aria-live="polite">{output}</output>}

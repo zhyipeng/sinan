@@ -7,10 +7,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
 	"sinan/internal/kernel"
+	"sinan/internal/paste"
 	"sinan/internal/plugin/uiprocess"
 	"sinan/internal/plugin/uiview"
 	"sinan/internal/theme"
@@ -22,6 +24,7 @@ type Event struct {
 	PluginID       string `json:"pluginId"`
 	ViewID         string `json:"viewId"`
 	ReturnToSearch bool   `json:"returnToSearch"`
+	ResetToSearch  bool   `json:"resetToSearch"`
 	Detached       bool   `json:"detached"`
 	Failed         bool   `json:"failed"`
 }
@@ -46,6 +49,7 @@ type Controller struct {
 	closed             bool
 	opening            map[string]*windowEntry
 	active             sync.WaitGroup
+	sequence           uint64
 }
 
 func New(manager *kernel.Manager, executable string, onExit func(Event)) (*Controller, error) {
@@ -70,7 +74,17 @@ func (c *Controller) OpenCommand(pluginID, commandID string) error {
 	})
 }
 
-func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error), prepare func(context.Context) (*uiview.Session, error)) (err error) {
+// A result with input always gets a fresh session, so reuse cannot lose the new
+// input or overwrite an already detached editor.
+func (c *Controller) OpenCommandWithInput(pluginID, commandID, input string) error {
+	return c.open(func(ctx context.Context) (uiview.Binding, error) {
+		return c.manager.ResolveUICommand(ctx, pluginID, commandID)
+	}, func(ctx context.Context) (*uiview.Session, error) {
+		return c.manager.OpenUICommandWithInput(ctx, pluginID, commandID, input)
+	}, true)
+}
+
+func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error), prepare func(context.Context) (*uiview.Session, error), fresh ...bool) (err error) {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -119,6 +133,10 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 	pluginID, viewID := binding.PluginID, binding.ViewID
 	key = pluginID + "/" + viewID
 	c.mu.Lock()
+	if len(fresh) > 0 && fresh[0] {
+		c.sequence++
+		key += "/input/" + strconv.FormatUint(c.sequence, 10)
+	}
 	if c.closed {
 		c.mu.Unlock()
 		return errors.New("UI 运行时已关闭")
@@ -166,6 +184,21 @@ func (c *Controller) open(resolve func(context.Context) (uiview.Binding, error),
 	options := c.options
 	c.mu.Unlock()
 	options.WindowAction = func(action string) bool {
+		if action == "reset" {
+			c.mu.Lock()
+			available := !c.closed && c.opening[key] == owned && owned.process != nil
+			if available {
+				owned.attached = false
+				if c.panel == owned {
+					c.panel = nil
+				}
+			}
+			c.mu.Unlock()
+			if available && c.onExit != nil {
+				go c.onExit(Event{PluginID: pluginID, ViewID: viewID, ReturnToSearch: true, ResetToSearch: true})
+			}
+			return available
+		}
 		if action == "settings" {
 			c.mu.Lock()
 			available := !c.closed && c.opening[key] == owned && owned.process != nil
@@ -338,4 +371,12 @@ func (c *Controller) ReleaseMain() {
 	if entry != nil && entry.session != nil {
 		entry.session.Revoke()
 	}
+}
+
+func (c *Controller) OpenCommandWithPaste(pluginID, commandID string, content *paste.Content) error {
+	return c.open(func(ctx context.Context) (uiview.Binding, error) {
+		return c.manager.ResolveUICommand(ctx, pluginID, commandID)
+	}, func(ctx context.Context) (*uiview.Session, error) {
+		return c.manager.OpenUICommandWithPaste(ctx, pluginID, commandID, content)
+	}, true)
 }

@@ -14,7 +14,9 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"sinan/internal/inputmatch"
 	"sinan/internal/kernel"
+	"sinan/internal/paste"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -25,6 +27,7 @@ type Backend interface {
 
 type Item struct {
 	Icon       string  `json:"icon,omitempty"`
+	PasteID    string  `json:"pasteId,omitempty"`
 	Key        string  `json:"key"`
 	PluginID   string  `json:"pluginId"`
 	ProviderID string  `json:"providerId"`
@@ -57,13 +60,17 @@ type provider struct {
 }
 
 func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit func(Update)) {
-	query = strings.TrimSpace(query)
-	if query == "" || len(query) > 4096 {
+	rawInput := query
+	if len(rawInput) <= inputmatch.MaxInputBytes {
+		query = strings.TrimSpace(query)
+	}
+	if len(rawInput) > inputmatch.MaxInputBytes || query == "" {
 		if ctx.Err() == nil {
 			emit(Update{QueryID: queryID, Items: []Item{}, Failures: []string{}, Done: true})
 		}
 		return
 	}
+	matcher := inputmatch.NewQuery(rawInput)
 	snapshot := c.Backend.Snapshot()
 	results := map[string]Item{}
 	providers := []provider{}
@@ -82,17 +89,26 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 				return
 			}
 			fields := append([]string{plugin.Name, command.Title}, command.Keywords...)
-			if !commandTextMatches(fields, query) {
+			contentMatched := matcher.MatchAny(command.InputMatchers)
+			if !contentMatched && (len(query) > 4096 || !commandTextMatches(fields, query)) {
 				continue
 			}
 			score := .85
+			input := ""
+			if contentMatched {
+				input = rawInput
+				score = .95
+			}
 			if strings.EqualFold(command.Title, query) {
 				score = 1
 			}
 			key := plugin.ID + "/$commands/" + command.ID
-			results[key] = Item{Key: key, PluginID: plugin.ID, ProviderID: "$commands", CommandID: command.ID, Title: command.Title, Subtitle: plugin.Name, Kind: plugin.Kind, Score: score}
+			results[key] = Item{Key: key, PluginID: plugin.ID, ProviderID: "$commands", CommandID: command.ID, Input: input, Title: command.Title, Subtitle: plugin.Name, Kind: plugin.Kind, Score: score}
 		}
 		for _, p := range plugin.SearchProviders {
+			if len(query) > 4096 {
+				continue
+			}
 			if utf8.RuneCountInString(query) < p.MinLength || !strings.HasPrefix(strings.ToLower(query), strings.ToLower(p.Prefix)) {
 				continue
 			}
@@ -200,4 +216,74 @@ func validatedIcon(value string) string {
 		return ""
 	}
 	return value
+}
+
+// QueryPaste evaluates only declared content matchers. Keyword filtering is
+// applied to this result set in the Shell, never by querying unrelated commands.
+func (c *Coordinator) QueryPaste(ctx context.Context, queryID, pasteID string, content *paste.Content, emit func(Update)) {
+	items := make([]Item, 0)
+	if content == nil {
+		if ctx.Err() == nil {
+			emit(Update{QueryID: queryID, Done: true, Items: []Item{}})
+		}
+		return
+	}
+	text, isText := content.Text()
+	matcher := inputmatch.NewQuery(text)
+	remaining := inputmatch.MaxQueryMatchers
+	for _, plugin := range c.Backend.Snapshot().Plugins {
+		if plugin.Disabled {
+			continue
+		}
+		for _, command := range plugin.Commands {
+			if ctx.Err() != nil {
+				return
+			}
+			if command.SearchOnly {
+				continue
+			}
+			matched := false
+			if isText {
+				matched = matcher.MatchAny(command.InputMatchers)
+			} else {
+				for _, rule := range command.InputMatchers {
+					if remaining <= 0 {
+						break
+					}
+					remaining--
+					if rule.Kind == "image" {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				continue
+			}
+			items = append(items, Item{Key: plugin.ID + "/$commands/" + command.ID, PluginID: plugin.ID, ProviderID: "$commands", CommandID: command.ID, PasteID: pasteID, Title: command.Title, Subtitle: plugin.Name, Kind: plugin.Kind, Score: .95})
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Title != items[j].Title {
+			return items[i].Title < items[j].Title
+		}
+		return items[i].Key < items[j].Key
+	})
+	available := map[string]bool{}
+	for _, plugin := range c.Backend.Snapshot().Plugins {
+		available[plugin.ID] = !plugin.Disabled
+	}
+	filtered := items[:0]
+	for _, item := range items {
+		if available[item.PluginID] {
+			filtered = append(filtered, item)
+		}
+	}
+	items = filtered
+	if len(items) > 100 {
+		items = items[:100]
+	}
+	if ctx.Err() == nil {
+		emit(Update{QueryID: queryID, Items: items, Done: true, Failures: []string{}})
+	}
 }

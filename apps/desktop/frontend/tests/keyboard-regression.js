@@ -118,7 +118,11 @@ await page.waitForFunction(()=>document.querySelector('[aria-label="录入呼出
 await page.click(recorder);
 await page.waitForFunction(()=>document.querySelector('[aria-label="录入呼出快捷键"]').getAttribute('aria-pressed')==='true');
 await page.keyboard.press('Escape');
-await page.waitForFunction(()=>!window.navigationFixture.counts().recording);
+await page.waitForFunction(()=>!window.navigationFixture.counts().recording&&document.querySelector('[aria-label="搜索命令"]')?.value==='');
+await page.fill(query, 'settings');
+await page.waitForSelector('.command');
+await page.keyboard.press('Enter');
+await page.waitForSelector(recorder);
 await page.click(recorder);
 await page.waitForFunction(()=>document.querySelector('[aria-label="录入呼出快捷键"]').getAttribute('aria-pressed')==='true');
 await page.evaluate(()=>window.navigationFixture.captureShortcut());

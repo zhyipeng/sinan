@@ -18,23 +18,26 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
-	storeMu          sync.Mutex
-	store            *catalog.Service
-	embedded         *embeddedViews
-	themeMu          sync.Mutex
-	ui               *uiwindows.Controller
-	uiError          string
-	shortcuts        *shortcutController
-	detachShortcuts  *shortcutController
-	shortcutConfigMu sync.Mutex
-	probeEnabled     bool
-	manager          *kernel.Manager
-	launcher         *launcher
-	recordMu         sync.Mutex
-	recordingWindow  *application.WebviewWindow
-	searchMu         sync.Mutex
-	searchSequence   uint64
-	searchCancel     context.CancelFunc
+	storeMu             sync.Mutex
+	store               *catalog.Service
+	embedded            *embeddedViews
+	themeMu             sync.Mutex
+	ui                  *uiwindows.Controller
+	uiError             string
+	shortcuts           *shortcutController
+	detachShortcuts     *shortcutController
+	shortcutConfigMu    sync.Mutex
+	probeEnabled        bool
+	manager             *kernel.Manager
+	launcher            *launcher
+	recordMu            sync.Mutex
+	recordingWindow     *application.WebviewWindow
+	searchMu            sync.Mutex
+	searchSequence      uint64
+	searchCancel        context.CancelFunc
+	pasted              *stagedPaste
+	pasteClearedThrough uint64
+	pasteParseMu        sync.Mutex
 }
 
 func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
@@ -80,7 +83,13 @@ func (h *HostService) LauncherStatus() string {
 
 // StartSearch belongs to the trusted Shell. Sequence numbers also reject
 // out-of-order Wails invocations before they can supersede a newer query.
+func queryID(sequence uint64) string { return strconv.FormatUint(sequence, 10) }
 func (h *HostService) StartSearch(ctx context.Context, sequence uint64, query string) {
+	h.startQuery(ctx, sequence, nil, func(ctx context.Context, emit func(search.Update)) {
+		(&search.Coordinator{Backend: h.manager}).Query(ctx, queryID(sequence), query, emit)
+	})
+}
+func (h *HostService) startQuery(ctx context.Context, sequence uint64, selection *stagedPaste, run func(context.Context, func(search.Update))) {
 	if h.launcher == nil {
 		return
 	}
@@ -89,25 +98,31 @@ func (h *HostService) StartSearch(ctx context.Context, sequence uint64, query st
 		return
 	}
 	h.searchMu.Lock()
-	if sequence <= h.searchSequence {
+	if sequence <= h.searchSequence || selection != nil && sequence <= h.pasteClearedThrough {
 		h.searchMu.Unlock()
 		return
 	}
 	if h.searchCancel != nil {
 		h.searchCancel()
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	// Wails cancels a binding context as soon as the call returns. Search is
+	// asynchronous: retain window values, but let the search/window lifecycle
+	// own cancellation instead of the short-lived IPC request.
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	h.searchSequence = sequence
 	h.searchCancel = cancel
+	h.pasted = selection
 	h.searchMu.Unlock()
-	coordinator := search.Coordinator{Backend: h.manager}
-	go coordinator.Query(ctx, strconv.FormatUint(sequence, 10), query, func(update search.Update) {
-		h.searchMu.Lock()
-		defer h.searchMu.Unlock()
-		if h.searchSequence == sequence && ctx.Err() == nil && h.launcher.isMain(window) {
-			window.DispatchWailsEvent(&application.CustomEvent{Name: "search:update", Data: update, Sender: "kernel.search"})
-		}
-	})
+	go func() {
+		defer cancel()
+		run(ctx, func(update search.Update) {
+			h.searchMu.Lock()
+			defer h.searchMu.Unlock()
+			if h.searchSequence == sequence && ctx.Err() == nil && h.launcher.isMain(window) {
+				window.DispatchWailsEvent(&application.CustomEvent{Name: "search:update", Data: update, Sender: "kernel.search"})
+			}
+		})
+	}()
 }
 
 func (h *HostService) CancelSearch(ctx context.Context, sequence uint64) {
@@ -448,4 +463,16 @@ func (h *HostService) ClearPluginData(pluginID, token string) error {
 // TrustDevelopmentPlugin belongs only to the bundled management view.
 func (h *HostService) TrustDevelopmentPlugin(id, fingerprint string) (kernel.PluginInfo, error) {
 	return h.manager.TrustDevelopmentPlugin(id, fingerprint)
+}
+
+// OpenPluginCommandWithInput passes only a user-selected result's input into a
+// fresh session. It never publishes input through shared Wails events.
+func (h *HostService) OpenPluginCommandWithInput(ctx context.Context, pluginID, commandID, input string) (bool, error) {
+	if h.embedded != nil {
+		return true, h.openEmbeddedWithInput(ctx, pluginID, "", commandID, &input)
+	}
+	if h.ui == nil {
+		return false, h.pluginUIUnavailable()
+	}
+	return false, h.ui.OpenCommandWithInput(pluginID, commandID, input)
 }

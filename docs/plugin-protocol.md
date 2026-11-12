@@ -62,7 +62,7 @@ UTF-8 JSON 对象按换行分帧，stdout 只能输出协议消息。请求使�
 
 取消为本协议扩展，通知本身无 ID，插件仍需结束原请求并响应，例如 `error.code: -32800`。搜索结果动作只能引用当前插件声明的命令。宿主忽略非法结果、约束分数并生成跨来源唯一键。
 
-单条消息上限约 1 MiB，命令输入上限 64 KiB，搜索查询上限 4096 字节，每批搜索最多采用 20 项。搜索预算 2 秒，取消宽限 500 ms；不合作插件会被终止。命令预算仍为 5 秒，调用错误或超时会终止进程。停止后下一次调用可重新激活，卸载则使旧实例失效。
+单条消息上限约 1 MiB，命令输入上限 64 KiB，动态 Provider 搜索查询上限 4096 字节（本地声明式内容匹配另有 64 KiB 上限），每批搜索最多采用 20 项。搜索预算 2 秒，取消宽限 500 ms；不合作插件会被终止。命令预算仍为 5 秒，调用错误或超时会终止进程。停止后下一次调用可重新激活，卸载则使旧实例失效。
 
 ## SDK 与工具
 
@@ -222,7 +222,7 @@ const doc = await readData();
 await writeData(doc.revision, { text: input });
 ```
 
-SDK 文件需复制到插件 ui/；它只包装 Promise 请求，不包含 Wails Bridge。对应请求为 command.execute / storage.get / storage.put，调用不接受插件 ID、路径或额外字段。身份来自宿主 Session；配置、安装、Shell、其他插件和任意后端 RPC 不可访问。每会话在途最多 1 个、每分钟 120 次、500 ms 预算，请求 64 KiB、响应 192 KiB。SDK 最多排队 8 个调用。
+SDK 文件需复制到插件 ui/；它只包装 Promise 请求，不包含 Wails Bridge。对应请求为 command.execute / storage.get / storage.put / launch.get，调用不接受插件 ID、路径或额外字段。身份来自宿主 Session；配置、安装、Shell、其他插件和任意后端 RPC 不可访问。每会话在途最多 1 个、每分钟 120 次、500 ms 预算，请求 64 KiB、响应 192 KiB。SDK 最多排队 8 个调用。
 
 storage.get / put 返回 `{revision, value}`；未保存时为 `{revision:0,value:null}`。每插件一个最大 32 KiB JSON 值；put 必须携带当前 revision，冲突要求重新读取，损坏文件拒绝覆盖。包外数据在升级/卸载后保留，清理仅由可信管理入口提供，不向页面开放。页面关闭可能发生写入已提交但回执丢失，重开应读取当前版本。命令超时或撤销沿用强制终止后端，其他会话应重新打开。
 
@@ -259,3 +259,69 @@ CLI：先退出持有相同根目录的宿主，运行 `sinanctl -plugins 路径
 普通 macOS 打开路径现将独立配置的 WKWebView 作为主 NSWindow 的原生内容子视图，复用可信 React 页头。`OpenPluginCommand` 在可信窗口上下文中返回是否已在同窗呈现；成功后定向发送 plugin-view:open，页面就绪再提交替换。`ClosePluginView` 仅移除调用窗口的动态内容；返回、设置导航和窗口角色切换均撤销相应旧会话，迟到打开通过窗口序号拒绝。拆出复用同一窗口/内容树并更新窗口归属。
 
 受限页面资源和命令调用直接适配内核会话，保留总计 256 次请求、8 MiB 资源交付预算、1 小时既有寿命上限，以及会话自己的消息/调用预算。没有新增第三方 Wails 方法或 UI 桥动作。UI 原生控制器与宿主同进程，WebKit 页面上下文独立，但不承诺独占渲染进程或 native 故障隔离；后端 stdio API 1、UI 桥 2 不变。
+
+
+## 声明式输入匹配与打开参数
+
+API 1 的增量可选字段 `commands[].inputMatchers` 用于本地匹配主输入框，多个规则 OR，不激活后端。支持普通命令或桥 2 HTML 视图命令，不支持可信组件 `view` 或 `searchOnly`。例如：
+
+```json
+{
+  "id": "open",
+  "title": "JSON 工具",
+  "uiView": "editor",
+  "inputMatchers": [
+    {"kind": "json", "jsonTypes": ["object", "array"]}
+  ]
+}
+```
+
+通用正则示例：
+
+```json
+{"kind":"regex","pattern":"(?i)^https?://[^\\s]+$","minLength":8,"maxLength":2048}
+```
+
+`regex` 使用 Go/RE2 语法，默认子串匹配，全串需 `^` / `$`；不支持反向引用、前后查找。`json` 校验整段输入，只允许显式声明的 `object`、`array`、`string`、`number`、`boolean`、`null`。`minLength` / `maxLength` 为 UTF-8 字节数，省略或 0 不增加限制，统一受 64 KiB 上限约束。匹配和传参均使用未裁剪的原文。
+
+每命令最多 8 条、每插件最多 32 条，每次搜索最多评估 256 条。正则最多 256 字节、256 条编译指令；编译缓存最多 256 条、不保存输入。每次查询按输入字节 × 指令数累计最多 8,388,608 工作量，超过则跳过该规则。JSON 每查询最多校验一次；这不是毫秒级硬实时保证。名称/拼音及动态 Provider 仍最多接收 4096 字节去空白查询。
+
+用户选中内容结果后，可信 Shell 经 `OpenPluginCommandWithInput` 创建新会话；HTML 桥 2 在 ready 后读取：
+
+```js
+import { ready, readLaunch } from './bridge.js';
+ready();
+const launch = await readLaunch(); // {commandId?: string, input?: string}
+if (launch.input !== undefined) {
+  // 作为本次打开输入；普通打开不带 input，可恢复插件自己的草稿。
+}
+```
+
+请求必须恰为 `{"method":"launch.get"}`，不得添加身份、路径或参数。结果只来自当前会话，重复读取仍为同一份打开参数，不能读取后续主输入框内容或其他会话。无需 storage 声明，不授予其他能力；沿用就绪、实例/指纹、撤销、在途/频率和响应预算。带参数打开仅桥 2 支持；输入最多 64 KiB，编码后超过 192 KiB 时在打开前拒绝。空字符串与省略 input 有区别。
+
+旧宿主会拒绝新清单字段；使用此能力须同步更新宿主与插件。完整约束与验证见 [ADR 0043](adr/0043-declarative-input-matching.md)。
+
+
+## 粘贴模式与图片输入
+
+可信 Shell 的空主输入框显式粘贴后，宿主只按该内容生成匹配结果；旁边输入关键词仅过滤这组结果，不启动动态 Provider，也不改变将要传入的内容。图片插件声明：
+
+```json
+{"id":"open","title":"图片工具","uiView":"editor","inputMatchers":[{"kind":"image"}]}
+```
+
+`image` 规则没有 `pattern`、`jsonTypes` 或文本长度参数，必须关联桥 2 HTML 视图。它不匹配文件名或路径字符串。JSON 对象/数组声明与既有行为保持。
+
+用户选中图片结果后，页面在 ready 后调用 `readLaunch()`：
+
+```js
+const launch = await readLaunch();
+if (launch.image) {
+  const { url, mimeType, width, height, bytes } = launch.image;
+  // url 是当前会话的 sinan-plugin: 图片资源，可直接赋给 img.src。
+}
+```
+
+图片为经过验证的静态 PNG，最多 4 MiB、16,777,216 像素；原尺寸保留，不保证动画/原文件元数据。图片地址随机生成，只在当前会话可读，撤销后不可访问，不会在普通打开或其他会话中复用。没有图片时省略 image；图片打开不附带 input。沿用 CSP 和总计 8 MiB 会话资源交付预算，固定包资源预算不变。不要把图片正文塞进普通 `execute` 或草稿请求。
+
+可信 Shell 通过临时 pasteId 选择图片，不向页面开放主输入框、系统剪贴板、任意路径或安装导航接口。页面 `launch.get` 的请求形状、调用频率和 192 KiB 返回预算不变。helper 私有管道帧上限增至 6 MiB，公开后端消息上限不变；使用图片时须同步更新宿主与 helper。Esc 的统一返回由可信宿主原生路径处理，插件无需声明额外能力。详见 [ADR 0044](adr/0044-paste-mode-and-escape.md)。

@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
+	"sinan/internal/inputmatch"
+	"sinan/internal/paste"
 	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
 )
@@ -20,12 +23,27 @@ const maxUISessions = 16
 func (m *Manager) OpenUIView(ctx context.Context, id, viewID string) (*uiview.Session, error) {
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
-	return m.openUIViewLocked(ctx, id, viewID)
+	return m.openUIViewLocked(ctx, id, viewID, protocol.UILaunchContext{})
 }
 
 // OpenUICommand resolves the current installed command and opens its view under
 // one mutation lock, so reload/upgrade cannot replace the binding in between.
 func (m *Manager) OpenUICommand(ctx context.Context, id, commandID string) (*uiview.Session, error) {
+	return m.openUICommand(ctx, id, commandID, nil)
+}
+
+// OpenUICommandWithInput binds input to a newly prepared view, never global state.
+func (m *Manager) OpenUICommandWithInput(ctx context.Context, id, commandID, input string) (*uiview.Session, error) {
+	if len(input) > inputmatch.MaxInputBytes || !utf8.ValidString(input) {
+		return nil, errors.New("打开参数无效或超过 64 KiB")
+	}
+	encoded, err := marshalUIResult(protocol.UILaunchContext{CommandID: commandID, Input: &input})
+	if err != nil || len(encoded) > uiview.MaxCallResultBytes {
+		return nil, errors.New("打开参数编码后超过 UI 返回预算")
+	}
+	return m.openUICommand(ctx, id, commandID, &input)
+}
+func (m *Manager) openUICommand(ctx context.Context, id, commandID string, input *string) (*uiview.Session, error) {
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -37,13 +55,20 @@ func (m *Manager) OpenUICommand(ctx context.Context, id, commandID string) (*uiv
 	}
 	for _, command := range p.manifest.Contributes.Commands {
 		if command.ID == commandID && command.UIView != "" {
-			return m.openUIViewLocked(ctx, id, command.UIView)
+			if input != nil {
+				for _, view := range p.manifest.Contributes.UIViews {
+					if view.ID == command.UIView && view.BridgeVersion != protocol.UIRequestBridgeVersion {
+						return nil, errors.New("打开参数需要 UI 桥 2")
+					}
+				}
+			}
+			return m.openUIViewLocked(ctx, id, command.UIView, protocol.UILaunchContext{CommandID: commandID, Input: input})
 		}
 	}
 	return nil, errors.New("命令不存在或未声明独立视图")
 }
 
-func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string) (*uiview.Session, error) {
+func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string, launch protocol.UILaunchContext, images ...*paste.Content) (*uiview.Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -110,8 +135,13 @@ func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string) (*uiv
 	if err != nil {
 		return nil, err
 	}
+	if len(images) > 0 && images[0] != nil && images[0].IsImage() {
+		data, width, height := images[0].Image()
+		image := session.AttachLaunchImage(data, width, height)
+		launch.Image = &image
+	}
 	session.ConfigureCaller(func(ctx context.Context, req protocol.UIRequest) (json.RawMessage, error) {
-		return m.callUIView(ctx, p, session, *declaration, req)
+		return m.callUIView(ctx, p, session, *declaration, req, launch)
 	})
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -169,4 +199,38 @@ func uiHeaderTitle(name, title string) (string, string) {
 		return title, name
 	}
 	return name, ""
+}
+
+// OpenUICommandWithPaste rechecks the current declaration before transferring
+// an explicit paste into a view, including after plugin reload or upgrade.
+func (m *Manager) OpenUICommandWithPaste(ctx context.Context, id, commandID string, content *paste.Content) (*uiview.Session, error) {
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	p, err := m.lookup(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, command := range p.manifest.Contributes.Commands {
+		if command.ID != commandID || command.UIView == "" || content == nil || !content.Matches(command.InputMatchers) {
+			continue
+		}
+		launch := protocol.UILaunchContext{CommandID: commandID}
+		if text, ok := content.Text(); ok {
+			launch.Input = &text
+		}
+		encoded, err := marshalUIResult(launch)
+		if err != nil || len(encoded) > uiview.MaxCallResultBytes {
+			return nil, errors.New("粘贴参数编码后超过 UI 返回预算")
+		}
+		for _, view := range p.manifest.Contributes.UIViews {
+			if view.ID == command.UIView && view.BridgeVersion != protocol.UIRequestBridgeVersion {
+				return nil, errors.New("粘贴输入需要 UI 桥 2")
+			}
+		}
+		return m.openUIViewLocked(ctx, id, command.UIView, launch, content)
+	}
+	return nil, errors.New("此插件命令不匹配当前粘贴内容")
 }

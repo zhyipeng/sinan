@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"sinan/internal/inputmatch"
 	protocol "sinan/packages/plugin-protocol"
 )
 
@@ -56,14 +57,15 @@ type SearchProvider struct {
 }
 
 type Command struct {
-	View       string   `json:"view,omitempty"`
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	Keywords   []string `json:"keywords,omitempty"`
-	Message    string   `json:"message,omitempty"`
-	Execution  string   `json:"execution,omitempty"`
-	SearchOnly bool     `json:"searchOnly,omitempty"`
-	UIView     string   `json:"uiView,omitempty"`
+	View          string                  `json:"view,omitempty"`
+	ID            string                  `json:"id"`
+	Title         string                  `json:"title"`
+	Keywords      []string                `json:"keywords,omitempty"`
+	Message       string                  `json:"message,omitempty"`
+	Execution     string                  `json:"execution,omitempty"`
+	SearchOnly    bool                    `json:"searchOnly,omitempty"`
+	UIView        string                  `json:"uiView,omitempty"`
+	InputMatchers []protocol.InputMatcher `json:"inputMatchers,omitempty"`
 }
 
 func ValidID(id string) bool { return idPattern.MatchString(id) && len(id) <= 128 }
@@ -122,7 +124,30 @@ func (m Manifest) Validate() error {
 		views[view.ID] = true
 	}
 	seen := map[string]bool{}
+	matcherCount := 0
 	for _, c := range m.Contributes.Commands {
+		matcherCount += len(c.InputMatchers)
+		if len(c.InputMatchers) > inputmatch.MaxMatchersPerCommand || matcherCount > inputmatch.MaxMatchersPerPlugin {
+			return errors.New("输入匹配规则数量超过限制")
+		}
+		if len(c.InputMatchers) > 0 {
+			if c.View != "" || c.SearchOnly {
+				return errors.New("输入匹配不支持可信组件视图或 searchOnly 命令")
+			}
+			for _, view := range m.Contributes.UIViews {
+				if view.ID == c.UIView && view.BridgeVersion != protocol.UIRequestBridgeVersion {
+					return errors.New("输入匹配需要 UI 桥 2")
+				}
+			}
+			for _, rule := range c.InputMatchers {
+				if rule.Kind == "image" && c.UIView == "" {
+					return errors.New("图片匹配仅支持 HTML 视图命令")
+				}
+				if err := inputmatch.Validate(rule); err != nil {
+					return err
+				}
+			}
+		}
 		if c.Execution != "" && c.Execution != "direct" {
 			return errors.New("命令执行模式无效")
 		}

@@ -362,3 +362,29 @@ func TestStopDoesNotWaitForDescendantStderr(t *testing.T) {
 		t.Fatal("UI reaping waited for descendant stderr")
 	}
 }
+
+func TestResetReturnsFromAttachedAndDetachedGuests(t *testing.T) {
+	for _, panel := range []bool{false, true} {
+		s := session(t)
+		opts := options("reset")
+		opts.Panel = panel
+		called := make(chan string, 1)
+		opts.WindowAction = func(action string) bool { called <- action; return true }
+		p, err := Start(context.Background(), s, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.Wait()
+		select {
+		case action := <-called:
+			if action != "reset" {
+				t.Fatal("wrong navigation action")
+			}
+		default:
+			t.Fatal("reset was not delivered")
+		}
+		if s.Active() {
+			t.Fatal("reset retained the old guest session")
+		}
+	}
+}

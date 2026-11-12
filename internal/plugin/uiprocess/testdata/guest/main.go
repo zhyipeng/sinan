@@ -75,6 +75,12 @@ func main() {
 			os.Exit(18)
 		}
 	}
+	if mode == "reset" {
+		time.Sleep(100 * time.Millisecond)
+		_ = c.WindowAction("reset")
+		_ = c.Finish(json.RawMessage(`{"reset":true}`))
+		return
+	}
 	if mode == "back" {
 		time.Sleep(100 * time.Millisecond)
 		_ = c.WindowAction("back")

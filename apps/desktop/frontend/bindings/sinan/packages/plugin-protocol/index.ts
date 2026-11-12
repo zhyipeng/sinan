@@ -3,6 +3,9 @@
 
 export type {
     CommandResult,
+    InputMatcher,
+    PasteContent,
+    PasteImage,
     ThemeDefinition,
     ThemeState,
     UIView

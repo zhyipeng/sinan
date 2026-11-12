@@ -60,6 +60,10 @@ export function ClearHistory(): $CancellablePromise<void> {
     return $Call.ByID(2575679692);
 }
 
+export function ClearPaste(sequence: number): $CancellablePromise<void> {
+    return $Call.ByID(2044716687, sequence);
+}
+
 export function ClearPluginData(pluginID: string, token: string): $CancellablePromise<void> {
     return $Call.ByID(1111664535, pluginID, token);
 }
@@ -104,11 +108,23 @@ export function LauncherStatus(): $CancellablePromise<string> {
     return $Call.ByID(1864886877);
 }
 
+export function OpenPasteCommand(pluginID: string, commandID: string, id: string): $CancellablePromise<boolean> {
+    return $Call.ByID(1271478963, pluginID, commandID, id);
+}
+
 /**
  * OpenPluginCommand accepts command identity only; the kernel resolves its view.
  */
 export function OpenPluginCommand(pluginID: string, commandID: string): $CancellablePromise<boolean> {
     return $Call.ByID(2354522669, pluginID, commandID);
+}
+
+/**
+ * OpenPluginCommandWithInput passes only a user-selected result's input into a
+ * fresh session. It never publishes input through shared Wails events.
+ */
+export function OpenPluginCommandWithInput(pluginID: string, commandID: string, input: string): $CancellablePromise<boolean> {
+    return $Call.ByID(887690023, pluginID, commandID, input);
 }
 
 /**
@@ -174,6 +190,13 @@ export function RepairSystemPlugin(directory: string, fingerprint: string, insta
     return $Call.ByID(3812136400, directory, fingerprint, installedFingerprint);
 }
 
+/**
+ * ResetToSearch is trusted window navigation, never an HTML bridge capability.
+ */
+export function ResetToSearch(): $CancellablePromise<void> {
+    return $Call.ByID(100521191);
+}
+
 export function ResizeLauncher(height: number): $CancellablePromise<void> {
     return $Call.ByID(2198789619, height);
 }
@@ -207,9 +230,12 @@ export function Snapshot(): $CancellablePromise<kernel$0.Snapshot> {
 }
 
 /**
- * StartSearch belongs to the trusted Shell. Sequence numbers also reject
- * out-of-order Wails invocations before they can supersede a newer query.
+ * No clipboard monitoring: only explicit Shell paste events reach this service.
  */
+export function StartPasteSearch(sequence: number, value: protocol$0.PasteContent): $CancellablePromise<void> {
+    return $Call.ByID(3724675536, sequence, value);
+}
+
 export function StartSearch(sequence: number, query: string): $CancellablePromise<void> {
     return $Call.ByID(1083380061, sequence, query);
 }
