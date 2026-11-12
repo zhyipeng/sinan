@@ -9,3 +9,5 @@ node_modules/
 /bin/
 /.sinan-dev/
 *.log
+sinan-official-plugins
+sinan-plugin-registry

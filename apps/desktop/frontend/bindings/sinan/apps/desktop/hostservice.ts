@@ -22,6 +22,9 @@ import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as scaffold$0 from "../../plugins/system-plugin-manager/scaffold/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as catalog$0 from "../../plugins/system-plugin-store/catalog/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -213,6 +216,22 @@ export function StartSearch(sequence: number, query: string): $CancellablePromis
 
 export function Stop(pluginID: string): $CancellablePromise<void> {
     return $Call.ByID(110346107, pluginID);
+}
+
+export function StoreApply(ticket: string, trustNative: boolean): $CancellablePromise<kernel$0.PluginInfo> {
+    return $Call.ByID(2256398400, ticket, trustNative);
+}
+
+export function StoreCancel(ticket: string): $CancellablePromise<void> {
+    return $Call.ByID(3438246222, ticket);
+}
+
+export function StoreCatalog(refresh: boolean): $CancellablePromise<catalog$0.View> {
+    return $Call.ByID(3259617907, refresh);
+}
+
+export function StorePreview(id: string, version: string, revision: string): $CancellablePromise<catalog$0.Preview> {
+    return $Call.ByID(45076872, id, version, revision);
 }
 
 export function ThemeSettings(): $CancellablePromise<protocol$0.ThemeState> {

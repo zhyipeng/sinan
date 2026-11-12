@@ -20,7 +20,7 @@ export type ManagementBridge = DataBridge & ProjectBridge & {
 };
 const states: Record<string,string> = {installed:'已安装',activating:'启动中',activated:'已激活',running:'运行中',deactivated:'已停止',failed:'运行失败',disabled:'已禁用'};
 
-export default function PluginManager({bridge, onChanged, onRecover}: {bridge: ManagementBridge; onChanged(): Promise<void>; onRecover(): void}) {
+export default function PluginManager({bridge, onChanged, onRecover,onOpenStore}: {bridge: ManagementBridge; onChanged(): Promise<void>; onRecover(): void;onOpenStore?():void}) {
   const [data,setData]=useState<ManagedSnapshot>({plugins:[],diagnostics:[]});
   const [busy,setBusy]=useState(true);
   const [showCreate,setShowCreate]=useState(false);
@@ -76,7 +76,7 @@ export default function PluginManager({bridge, onChanged, onRecover}: {bridge: M
     } finally {pending.current=false;if(alive.current)setBusy(false);}
   }
   return <div className="management management-body">
-    <div className="management-toolbar"><span>{data.plugins.length} 个插件</span><button disabled={busy||projectBusy} onClick={()=>void perform(async()=>{})}>刷新</button><button disabled={busy||projectBusy} onClick={()=>setShowCreate(value=>!value)} aria-expanded={showCreate}>创建插件</button></div>
+    <div className="management-toolbar"><span>{data.plugins.length} 个插件</span><button disabled={busy||projectBusy} onClick={()=>void perform(async()=>{})}>刷新</button><button disabled={busy||projectBusy} onClick={()=>setShowCreate(value=>!value)} aria-expanded={showCreate}>创建插件</button>{onOpenStore&&<button disabled={busy||projectBusy} onClick={onOpenStore}>插件商店</button>}</div>
     <div className="plugins">
       {data.plugins.map(plugin=><div className="plugin" key={plugin.id}>
         <div><strong>{plugin.name}</strong><small>{plugin.version}{plugin.development?' · 开发链接':''} · {states[plugin.state]??plugin.state}{plugin.changed?' · 文件有变更':''}</small></div>

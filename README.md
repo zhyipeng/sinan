@@ -2,220 +2,25 @@
 
 基于 Wails 3 的插件驱动桌面效率平台，对标 uTools，采用 All-in-Plugin 架构。
 
-应用检索、设置、插件管理等业务功能均通过插件提供，宿主负责插件运行所需的基础机制。
+## 特性
+- **全插件架构**：核心业务功能（检索、设置、管理）皆为插件。
+- **故障隔离**：基于 Go 独立进程运行插件，保障宿主稳定。
+- **高扩展性**：支持插件 UI 独立承载与隔离。
 
-## 项目指导方案
-
-- [架构指导方案](docs/architecture.md)：项目定位、边界、技术选型、实施路线与验收标准。
-- [原始规划存档](docs/references/plugin-architecture-planning.md)：来源会话的规划正文，供追溯。
-- [开发约定](AGENTS.md)：后续开发及 AI 协作需要遵守的规则。
-- [下一轮开发计划](docs/next-iteration.md)：多 Provider 搜索、运行时并行与取消、插件 UI 隔离验证。
-
-## 当前进度
-
-Phase 1 最小运行原型已实现，已在本机 macOS arm64 验证：
-
-- Wails 3 + React / TypeScript 命令 Shell。
-- Manifest 校验、目录发现、本地目录安装、停止和卸载。
-- 包内容变更检测、显式重载、保留配置的升级与初始化失败回退。
-- 声明式插件与按需激活的 Go 独立进程插件。
-- JSON-RPC 2.0 stdio 握手、命令调用、超时终止和失败隔离。
-- 宿主 CLI、协议类型、Go 插件 SDK，以及应用检索与设置系统插件。
-- 宿主搜索协调、静态命令索引、动态来源并行合并、请求取消及来源失败隔离。
-- 配置服务、可信设置组件插件、额外应用目录及桌面历史清除入口。
-- 固定测试页的 UI 隔离原型，已在 Chromium 和 WKWebView 进行负向探测；macOS 插件 UI 已默认启用，跨平台承载仍待实现。
-
-首版 macOS 应用检索插件已实现名称匹配、应用图标与直接启动。设置插件支持目录、历史清除和快捷键；本地插件管理界面由 `system.plugin-manager` 提供。插件 UI 在 macOS 默认启用，可用 `-plugin-ui=false` 显式关闭；SQLite、插件市场和远程更新尚未实现。
-
-## 搜索交互
-
-- macOS 默认使用 **Command + Space** 切换显示与隐藏，其他平台默认 Control + Space，可在设置中修改。
-- 空输入仅显示 50 DIP 高的无边框搜索框；输入文字筛选插件命令，窗口随结果数量展开或收缩。
-- macOS 在鼠标所在显示器的原生可用区域呼出，水平居中，顶部位于可用高度的 20%。
-- 默认选中当前排名第一项；方向键或鼠标手动选择后保持该项，修改查询时恢复默认选择。上下键选择，回车打开命令，Escape 或失焦隐藏；应用继续驻留。
-- 点击菜单栏 / 托盘中的司南图标，选择“显示司南”找回窗口，选择“退出司南”结束应用。
-- 搜索“插件管理”或 `plugins`，也可点击搜索框右侧 `···` 打开管理插件。管理插件缺失时进入宿主恢复入口；快捷键注册错误也可在恢复入口查看。
-
-三屏定位、20% 纵向位置和全屏呼出已获用户确认。搜索与 UI 原型的实现及验证边界见 [ADR 0003](docs/adr/0003-search-and-ui-prototype.md)。
-
-## 本地启动
-
-需要 Go 1.26+、Node.js 22.12+、npm、make、Wails CLI 3.0.0；macOS 还需 Xcode Command Line Tools。Go 启动器可通过自动工具链选择下载所需版本。
-
-```sh
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+## 快速开始
+需要 Go 1.26+、Node.js 22.12+：
+```bash
 make setup
 make dev
 ```
 
-再次运行前先从托盘退出当前实例。`make dev` 构建宿主与 CLI，在项目 `.sinan-dev/` 中准备应用检索（macOS）、设置和插件管理三个系统插件并打开窗口。脚本仅对仓库自带的应用检索插件使用信任安装；重复执行会升级已有系统插件，相同内容不重启。`make demo` 作为兼容别名保留，不再安装 demo 插件。
+## 开发文档
+- [架构指导方案](docs/architecture.md)
+- [插件开发协议](docs/plugin-protocol.md)
+- [AI 协作开发约定](AGENTS.md)
 
-普通启动使用 `make run`，默认插件目录为 `os.UserConfigDir()/Sinan/plugins`；在 macOS 中即 `~/Library/Application Support/Sinan/plugins`。若尚未安装管理插件，点击 `···`，在恢复入口中检查并恢复本仓库 `plugins/system-plugin-manager` 的绝对路径，再进入插件管理安装其他包；原生插件需勾选信任。
+## 插件商店
 
-```sh
-make build       # bin/sinan、bin/sinanctl
-make package     # macOS: bin/Sinan.app（本地未签名应用包）
-make test        # 无弹窗回归：前端构建与 Go 竞态测试，包含无界面子进程
-```
+`make dev` 会准备插件商店。搜索“插件商店”，或从插件管理进入，可浏览、搜索、查看详情、安装和手动更新。界面复用主窗口页头、返回与拆出。当前 JSON 工具没有发布包，显示“待发布”。
 
-`make test` 强制关闭真实 WebView 测试，不受外部 `SINAN_NATIVE_UI_TEST=1` 影响。真实桌面 UI、原生探测和浏览器交互回归均移出日常回归，仅在明确要求 UI 验证时单独运行。
-
-按需运行的键盘导航浏览器回归需要本机 `ego-browser` CLI：先运行 `npm --prefix apps/desktop/frontend run dev`，再在另一终端运行 `npm --prefix apps/desktop/frontend run test:keyboard`。固定测试页控制慢结果到达时机，覆盖搜索未结束时的上下键、同批次增量更新、鼠标静止、结果插入和回车打开选中项；不会连接真实插件。
-
-前端资源嵌入宿主，修改后用 `make build` 或 `make dev` 重新构建。当前尚未配置 Wails 热重载工作流；仅打开前端 Vite 页面无法调用桌面宿主。
-
-## 独立插件验证
-
-完成一次 `make dev` 构建后，从托盘退出司南，再使用 CLI：
-
-```sh
-./bin/sinanctl -plugins .sinan-dev/plugins list
-./bin/sinanctl -plugins .sinan-dev/plugins search calculator
-./bin/sinanctl -plugins .sinan-dev/plugins settings system.app-search
-./bin/sinanctl -plugins .sinan-dev/plugins reload system.app-search
-```
-
-CLI 所启动的进程在命令结束时回收；桌面内可持续运行并通过“停止”终止。CLI 与桌面不能同时打开同一个插件根目录；宿主生命周期内持有目录独占锁，即使只读 CLI 命令也需先退出桌面。
-
-更多细节见 [当前插件接口](docs/plugin-protocol.md) 和 [ADR 0001](docs/adr/0001-phase-one-runtime.md)。独立进程提供故障隔离，原生插件仍以当前用户权限运行。
-
-## UI 隔离原型
-
-```sh
-./bin/sinan -ui-probe -plugins .sinan-dev/probe-plugins
-```
-
-此开发模式展示固定隔离页并输出 `ISOLATION_PROBE` 布尔报告，不注册热键或托盘。原型验证逻辑隔离与受限消息桥，不提供任意插件 HTML 加载、完整导航防护或渲染进程隔离。
-
-macOS 可进一步运行不含 Wails Bridge 的原生边界验证宿主：
-
-```sh
-make ui-probe
-```
-
-该命令依次检查正常关闭、消息洪泛、禁用插件，以及脚本调用错误、JavaScript 卡死、可响应慢页面六种模式。它把编译进程序的固定测试夹具安装到独立临时根目录，使用非持久 WKWebView、自定义资源 Scheme 和导航决策代理，不读取日常插件目录。父进程持有内核会话，独立客体进程通过会话专属 stdio 管道逐次读取资源，不复制整包资源。启动须完成管道与页面握手，撤销后通知退出，超时强制终止并回收。每次自动关闭验证窗口，只输出固定诊断字段；正常模式接受 close，洪泛模式 `budgetRevoked=true`，禁用模式 `lifecycleRevoked=true`；各模式均应退出 0，且旧资源和消息都被拒绝，`separateProcess`、`childReaped`、`startupHandshake` 和 `eventLoopResponsive` 均为 true。正对照 HTTP 服务可访问，客体的网络和导航尝试不得到达该服务。故障模式额外输出 `failure=script-error` 或 `failure=unresponsive`，检查会话失效后在同一内核打开正常客体；慢页面须完成原生响应探测后正常关闭。故障与响应预算见 [ADR 0016](docs/adr/0016-ui-renderer-failure-probes.md)。命令目前要求 macOS+cgo，基础验证见 [ADR 0012](docs/adr/0012-native-ui-boundary-probe.md)，会话接入见 [ADR 0013](docs/adr/0013-ui-session-revocation.md)，进程监督见 [ADR 0014](docs/adr/0014-ui-guest-supervision.md)。
-
-可复用的资源快照构建器位于 `internal/plugin/uiview`，限制根目录、归属、资源类型、数量和体积，拒绝符号链接及非规范资源 URL。Manifest 现可通过 `contributes.uiViews` 声明入口、桥版本和受限能力（桥 1 无权限，桥 2 可显式声明本插件命令与私有文档）；内核准备接口只接受已声明视图 ID。Shell 不加载第三方 HTML；可通过插件管理在主面板打开视图，按需拆出独立窗口，细节见 [ADR 0015](docs/adr/0015-declared-ui-views.md)。
-
-内核会话准备接口固定读取已安装包的 `ui/` 子目录，绑定插件实例、包指纹、声明视图 ID 和桥版本，资源加载前后检查包内容。停止、禁用、重载、升级、卸载、配置保存及检测到包文件变化时撤销会话；回退相同包也不会让旧句柄复活。外部文件变化在刷新或打开会话等校验点发现，尚无文件监听。每插件最多 4 个、每宿主最多 16 个活动会话，此接口不暴露给 Wails 或插件进程。
-
-## 临时窗口验收
-
-```sh
-make ui-acceptance
-```
-
-直接进入临时实例的插件管理，找到「窗口验收」并点击「打开 输入测试」。关闭窗口后还可搜索「窗口验收」并回车直接打开。页面可测试中文输入、关闭和模拟卡死；正常退出后清理临时目录，不修改日常插件。为测试 Command + Space，建议先退出日常实例。完整点测步骤见[独立窗口手动验收](docs/ui-acceptance.md)。
-
-## 独立插件窗口（开发期）
-
-```sh
-make dev-ui
-# 已构建时：./bin/sinan -plugins .sinan-dev/plugins
-```
-
-默认启动不启用。开启后，在插件管理中可打开包内 `contributes.uiViews` 声明的视图，也可搜索通过 `uiView` 关联的命令并回车打开；不会自动安装测试插件。若日常实例正在运行，先通过托盘退出，再启动开发实例。`make build` 构建固定的 `sinan-ui-host`，`make package` 将它一并放入应用包；缺少它时保留 Shell 并显示诊断。
-
-客体窗口可关闭、缩放、输入；重复打开会聚焦并保留输入，新窗口在鼠标所在屏幕居中，标题可由视图声明。关闭、插件停用或宿主退出会撤销并回收。原生自动测试已覆盖页面焦点、普通关闭、拒绝探测动作与运行超过 8 秒；中文输入法和全屏焦点尚需实机验证。没有操作系统沙箱或 CPU/内存硬配额，目前不适合公共第三方分发。见 [ADR 0017](docs/adr/0017-desktop-plugin-windows.md)。
-
-## 应用检索
-
-`make dev` 后搜索 `计算器`、`calculator` 或 `safari`，使用上下键选择并回车直接打开应用。扫描标准系统应用目录、`/Applications` 和 `~/Applications`，同时支持英文文件名、系统本地化名称和英文词首字母（如 `vsc`）。图标随结果展示。
-
-没有缓存时，索引在首次查询建立。有缓存时，重启后先提供快照结果，同时后台校验；超过一分钟后的查询也会触发后台扫描，完成后下一次查询使用新索引。可搜索并执行“刷新应用索引”立即重建。支持拼音全拼、首字母（如 `jisuanqi` / `jsq`），宿主按成功动作的频率和近期使用轻量加权。可在设置中添加额外应用目录。此插件以可信原生进程运行，用途声明不提供操作系统沙箱；具体边界见 [ADR 0004](docs/adr/0004-application-search.md)。
-
-应用索引快照保存在插件根目录的 `.sinan-state/cache/system.app-search/applications-v1.json`，不含查询、使用历史或图标。目录配置变化、缓存格式不兼容或损坏时重新扫描；缓存不可写不影响搜索。后台校验完成前可能短暂显示旧结果，启动前仍会检查应用是否存在。插件升级保留缓存。详见 [ADR 0009](docs/adr/0009-application-index-cache.md)。
-
-自动扫描复用未变化应用的元数据及图标；手动“刷新应用索引”强制重读。使用历史存放在插件根目录的 `.sinan-state/usage.json`，只保存动作摘要、次数和时间，最多 4096 条。退出桌面后可运行以下命令清除开发实例的记录，然后重新启动：
-
-```sh
-./bin/sinanctl -plugins .sinan-dev/plugins clear-history
-```
-
-拼音、多音字、历史加权和并发写入的限制见 [ADR 0005](docs/adr/0005-search-refinement.md)。
-
-## 设置
-
-搜索“设置”或 `settings`，回车打开。额外应用目录每行一个绝对路径，保存后下一次搜索生效，标准目录保留。可直接清除使用历史，无需退出桌面。
-
-在“呼出快捷键”中点击当前组合键，然后按下新组合，点击“保存快捷键”立即生效并在重启后保留。“恢复默认”填回默认组合，仍需保存。录入期间按当前呼出热键会录入该组合；失焦、离开设置或 30 秒后结束录入。注册冲突时保留原热键；可从托盘重新打开窗口。支持 Command / Ctrl / Alt（可叠加 Shift）与字母、数字、空格、方向键等标准按键。系统保留组合键可能无法录入或注册，其他平台尚未实机验证。机制见 [ADR 0008](docs/adr/0008-configurable-launcher-shortcut.md)。
-
-设置界面属于 `system.settings` 插件，组件随宿主构建；卸载该插件不会删除配置。配置保存在插件根目录的 `.sinan-state/settings.json`，损坏或未知版本的文件保留原样并阻止覆盖。实现边界见 [ADR 0006](docs/adr/0006-settings-service-and-view.md)。
-
-仅用 CLI 时可在退出桌面实例后查看配置：
-
-```sh
-./bin/sinanctl -plugins .sinan-dev/plugins settings system.app-search
-./bin/sinanctl -plugins .sinan-dev/plugins set-settings system.app-search 0 '{"directories":[]}'
-```
-
-第二个命令中的 `0` 需替换为当前读取到的 revision；空列表清空额外目录。当前仅支持目录列表配置，不支持凭据存储。
-
-## 插件管理、升级与重载
-
-打开搜索框右侧 `···`，刷新可发现“文件有变更”，点击对应插件的“重载”应用安装目录中的修改。替换为外部插件包时，填写包目录并点击“检查”，查看版本变化后再安装或升级；原生包需重新勾选信任。配置和使用历史保留，候选初始化失败时恢复旧包。
-
-管理界面属于可信组件插件 `system.plugin-manager`，组件随宿主构建，不加载安装包中的 JavaScript。支持停止和卸载，包括卸载管理插件自身；卸载自身后自动进入恢复入口。管理界面渲染失败时仍可返回搜索或打开恢复入口。宿主恢复入口检查状态、恢复声明式管理包，并可重新启用被禁用的管理插件，不提供日常插件列表操作。编译进宿主的组件代码故障仍须重新构建修复；离线损坏且未注册的安装目录可能需人工修复。详见 [ADR 0010](docs/adr/0010-plugin-management-view.md)。
-
-插件行末的“禁用”会持久停止该插件，移出静态命令和动态搜索，并阻止直接执行；重启、重载、升级及重新安装同 ID 包均保留禁用状态。“启用”恢复按需激活，不立即启动进程。原有“停止”只结束当前进程，下次调用仍可激活。禁用管理插件自身后，点击 `···` 可在恢复入口重新启用。目录设置、缓存、历史和原生信任记录不因禁用而删除。详见 [ADR 0011](docs/adr/0011-plugin-enablement.md)。
-
-退出桌面后也可使用 CLI：
-
-```sh
-./bin/sinanctl -plugins .sinan-dev/plugins inspect .sinan-dev/packages/app-search
-./bin/sinanctl -plugins .sinan-dev/plugins -trust-native upgrade .sinan-dev/packages/app-search
-./bin/sinanctl -plugins .sinan-dev/plugins reload system.app-search
-./bin/sinanctl -plugins .sinan-dev/plugins disable system.app-search
-./bin/sinanctl -plugins .sinan-dev/plugins enable system.app-search
-```
-
-升级回退只覆盖当前升级事务；重载不会撤销直接编辑过的文件，设置等可信组件代码修改仍需重建宿主。完整边界与中断恢复见 [ADR 0007](docs/adr/0007-plugin-upgrade-and-reload.md)。
-
-启用策略位于核心设置文件的保留命名空间 `$plugins`，插件设置接口不可读写。写入失败时保持当前状态；启用策略或整个设置文件损坏、无法读取时阻止插件激活并保留文件，需离线修复后重启，不会自动覆盖或重置为全部启用。
-
-### JSON 格式化插件
-
-JSON 工具（`tools.json`）是可独立分发的官方插件，源码已迁至同级独立仓库 `../sinan-official-plugins/plugins/json-tool`；本体只保留应用检索、设置和插件管理三个内置插件。`make dev` / `make dev-ui` 不再自动构建或安装 JSON 工具，也不会卸载现有开发实例中已安装的 JSON 工具或清理其草稿。
-
-```sh
-make -C ../sinan-official-plugins test build
-# 先退出使用 .sinan-dev/plugins 的宿主，再显式安装；已有版本使用 upgrade。
-./bin/sinanctl -plugins .sinan-dev/plugins -trust-native install ../sinan-official-plugins/bin/plugins/json-tool
-make dev-ui
-```
-
-可选兼容命令 `make json-plugin` 仅委托外部仓库构建，不再生成本体的 `bin/plugins/json-tool`；仓库位于其他位置时设置 `OFFICIAL_PLUGINS_DIR`。支持格式化、压缩、错误行列、保留大整数和草稿保存；Command/Ctrl + Enter 格式化，加 Shift 压缩。原生后端需显式信任，独立进程不是安全沙箱。草稿最大 32 KiB，插件 ID 保持不变。
-
-只有用户明确要求真实 UI 验证时，才执行跨仓原生集成测试：先构建官方插件，再在本体根目录运行下列命令（会启动原生窗口，不属于日常回归）：
-
-```sh
-SINAN_JSON_PLUGIN_PACKAGE="$(cd ../sinan-official-plugins/bin/plugins/json-tool && pwd)" \
-SINAN_NATIVE_UI_TEST=1 go test ./internal/plugin/uiwindows -run '^TestNativeHostJSONPluginCallsAndDraftRestart$' -count=1
-```
-
-同级 `../sinan-plugin-registry` 只登记 JSON 工具资料，目前没有可安装版本；GitHub 仓库、目录发布及商店接入尚未建立。仓库边界与迁移决策见 [ADR 0034](docs/adr/0034-official-plugin-repositories.md)。
-
-### 插件私有数据管理
-
-插件管理底部的“插件数据”可查看私有文档占用，清理已安装或卸载后保留的数据。清理须二次确认，会关闭该插件 HTML 页面，保留设置、历史、包和缓存；文件变化后需重新确认。CLI 对应 `data`、`clear-data ID 检查指纹`，先退出使用同目录的桌面宿主。详见 [ADR 0030](docs/adr/0030-plugin-data-management.md)。
-
-设置 → 外观支持浅色、深色和跟随系统（默认），选择自动保存并同步已打开的窗口。JSON 工具已适配；第三方 HTML 可使用主题 CSS 变量和只读 SDK 通知，见[主题协议](docs/plugin-protocol.md#主题数据协议-v1)。当前预留主题扩展接口，尚未支持安装主题插件。
-
-窗口内按 `Command + ,`（macOS）或 `Ctrl + ,`（其他平台）进入设置；设置已拆出时直接聚焦该窗口。macOS 隔离插件窗口也支持此入口。
-
-
-### 创建插件项目
-
-插件管理右上角“创建插件”支持 **Go 后端 + React 界面**、**React 界面（无后端）**两种模板。填写名称、确认插件 ID、选择父目录后，在该目录下新建独立项目；已有同名目录不会被覆盖。生成后先运行 `npm ci`，再运行 `npm run build`，再安装构建出的 `dist/plugin`。创建过程不会执行代码或自动安装插件。详见[插件开发模板](docs/plugin-development.md)。
-
-安装 / 升级插件时，可点击输入框旁的“选择目录”选择已构建的插件包目录，也可手动填写绝对路径。选择后仍需检查包并确认安装；取消选择保留原输入及检查结果。
-
-插件界面现在默认启用，`make run`、`make dev` 均可直接打开已安装的 HTML 插件；`make dev-ui` 保留为 `make dev` 的兼容别名。临时排障可用 `./bin/sinan -plugin-ui=false` 关闭。当前仅 macOS 支持该承载；普通页面打开直接由宿主承载，独立 helper 保留给探测。
-
-
-模板 v3 支持 `node scripts/build.mjs --dev [--plugins-dir 目录]`，将产物链接到默认或指定插件目录；原生开发插件首次在插件管理界面确认信任。模板同时生成 GitHub Release 工作流、可选目录审核 PR 脚本和 `AGENTS.md`，配置方法见[插件开发模板](docs/plugin-development.md)。
-
-新建模板已升级到 v3：React 业务页面默认在主面板使用，返回和拆出由宿主管理；仍保持动态加载与页面隔离。已有项目不会自动转换。
-
-
-动态插件现在在 macOS 的同一个主窗口内容区打开，与插件管理复用同一 React 页头和返回/拆出流程；采用独立 WKWebView 配置保持页面与 Wails Bridge 分离。普通打开不再依赖独立 UI helper，原生 UI 控制器进入宿主进程，边界见 [ADR 0040](docs/adr/0040-same-window-plugin-content.md)。
+已有日常实例需使用本次构建，并在插件管理中安装 `plugins/system-plugin-store`。目录契约与信任边界见[插件商店文档](docs/plugin-store.md)。

@@ -11,12 +11,15 @@ import (
 	"sinan/internal/search"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
+	"sinan/plugins/system-plugin-store/catalog"
 	"strconv"
 	"sync"
 )
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	storeMu          sync.Mutex
+	store            *catalog.Service
 	embedded         *embeddedViews
 	themeMu          sync.Mutex
 	ui               *uiwindows.Controller
@@ -348,7 +351,7 @@ func trustedView(snapshot kernel.Snapshot, pluginID, commandID string) (string, 
 		}
 		for _, command := range plugin.Commands {
 			key := plugin.ID + "/" + command.View
-			if command.ID == commandID && (key == "system.settings/settings" || key == "system.plugin-manager/manager") {
+			if command.ID == commandID && (key == "system.settings/settings" || key == "system.plugin-manager/manager" || key == "system.plugin-store/store") {
 				return command.Title, key, nil
 			}
 		}

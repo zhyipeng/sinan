@@ -13,9 +13,10 @@ func TestTrustedViewRequiresInstalledBundledDeclaration(t *testing.T) {
 	snapshot := kernel.Snapshot{Plugins: []kernel.PluginInfo{
 		{ID: "system.settings", Commands: []manifest.Command{{ID: "open", Title: "设置", View: "settings"}}},
 		{ID: "system.plugin-manager", Commands: []manifest.Command{{ID: "open", Title: "插件管理", View: "manager"}}},
+		{ID: "system.plugin-store", Commands: []manifest.Command{{ID: "open", Title: "插件商店", View: "store"}}},
 		{ID: "third.party", Commands: []manifest.Command{{ID: "open", View: "settings"}}},
 	}}
-	for _, id := range []string{"system.settings", "system.plugin-manager"} {
+	for _, id := range []string{"system.settings", "system.plugin-manager", "system.plugin-store"} {
 		title, key, err := trustedView(snapshot, id, "open")
 		if err != nil || title == "" || key == "" {
 			t.Fatal("bundled view rejected", err)

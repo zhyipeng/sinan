@@ -96,6 +96,7 @@ func run() error {
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
 		OnShutdown: func() {
 			host.cancelSearch()
+			host.closePluginStore()
 			go host.closeEmbeddedAll()
 			if host.ui != nil {
 				host.ui.Close()

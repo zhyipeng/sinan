@@ -133,3 +133,23 @@ output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; max-hei
 
 .embedded-plugin-slot { height: 430px; flex: 1; min-height: 0; }
 .detached .embedded-plugin-slot { height: auto; }
+
+/* Store uses the same trusted header, spacing and theme as plugin management. */
+.store-body { padding: 20px; max-height: 430px; overflow-y: auto; }
+.store-toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
+.store-toolbar input { flex: 1; border: 1px solid var(--line); border-radius: 7px; background: var(--sinan-surface); padding: 10px 12px; color: inherit; }
+.store-toolbar button { flex-shrink: 0; font-size: 12px; }
+.store-layout { display: grid; grid-template-columns: 180px minmax(0,1fr); gap: 20px; }
+.store-list { border-right: 1px solid var(--line); padding-right: 12px; }
+.store-item { width: 100%; text-align: left; padding: 12px 10px; margin-bottom: 4px; }
+.store-item.selected { background: var(--sinan-selected); }
+.store-item strong { display: block; overflow-wrap: anywhere; }
+.store-detail h2 { margin: 0; font-size: 15px; font-weight: 550; }
+.store-summary { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.store-source, .store-note { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.store-version { display: flex; align-items: center; gap: 12px; font-size: 12px; margin: 16px 0; }
+.store-version select { min-width: 110px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; color: inherit; background: var(--sinan-surface); }
+.store-preview { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.store-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.store-detail .primary { padding: 8px 14px; font-size: 12px; }
+.detached .store-body { flex: 1; min-height: 0; max-height: none; }
