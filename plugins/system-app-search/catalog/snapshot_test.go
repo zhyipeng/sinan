@@ -30,6 +30,7 @@ func snapshotFixture(t *testing.T) (*Catalog, string, protocol.SearchParams) {
 func TestWarmSnapshotServesDuringValidationAndRejectsRemovedLaunch(t *testing.T) {
 	c, root, p := snapshotFixture(t)
 	restored := NewWithCache(c.roots, filepath.Dir(c.diskPath))
+	restored.platform = "darwin"
 	if !restored.indexed || len(restored.apps) != 2 {
 		t.Fatal("snapshot not restored")
 	}
@@ -125,6 +126,7 @@ func TestInvalidSnapshotsAndChangedRootsFallBackToDiscovery(t *testing.T) {
 				t.Fatal("invalid cache accepted")
 			}
 			next.read = c.read
+			next.platform = "darwin"
 			if result, err := next.Search(context.Background(), p); err != nil || len(result.Items) != 1 {
 				t.Fatal("cache failure broke discovery", err)
 			}

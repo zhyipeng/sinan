@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -47,28 +47,24 @@ type Catalog struct {
 	refreshMu  sync.Mutex
 	refreshing chan struct{}
 	checked    time.Time
+	platform   string
 	diskPath   string
 }
 
 func New(roots []string) *Catalog {
-	return &Catalog{roots: append([]string(nil), roots...), read: readMetadata, icons: map[string]string{}, launch: func(ctx context.Context, path string) error {
-		// Pass a single absolute application path, never a shell command or a bundle ID.
-		return exec.CommandContext(ctx, "/usr/bin/open", "-a", path).Run()
-	}}
+	return &Catalog{roots: append([]string(nil), roots...), read: readMetadata, icons: map[string]string{}, launch: launchApplication, platform: runtime.GOOS}
 }
 
 func DefaultRoots() []string {
-	roots := []string{"/Applications", "/System/Applications", "/System/Library/CoreServices/Applications"}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		if account, lookupErr := user.Current(); lookupErr == nil {
-			home = account.HomeDir
+	return defaultRoots(runtime.GOOS, os.Getenv, func() (string, error) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			if account, lookupErr := user.Current(); lookupErr == nil {
+				return account.HomeDir, nil
+			}
 		}
-	}
-	if home != "" {
-		roots = append(roots, filepath.Join(home, "Applications"))
-	}
-	return roots
+		return home, err
+	})
 }
 
 // Scanning and persistence never hold the search snapshot lock.
@@ -89,6 +85,7 @@ func (c *Catalog) refresh(ctx context.Context, force bool) error {
 	cache := map[string]cachedApplication{}
 	apps := []Application{}
 	seen := map[string]bool{}
+	desktopIDs := map[string]bool{}
 	for _, root := range c.roots {
 		root, err := filepath.Abs(root)
 		if err != nil {
@@ -115,11 +112,20 @@ func (c *Catalog) refresh(ctx context.Context, force bool) error {
 				}
 				return nil
 			}
-			if strings.EqualFold(filepath.Ext(d.Name()), ".app") {
-				// Follow only .app entry symlinks (Safari uses one); never walk their targets.
+			if applicationEntry(c.platform, path, d.IsDir()) {
+				// XDG roots are ordered: a hidden or invalid user entry masks the
+				// system entry with the same desktop-file ID.
+				if c.platform == "linux" {
+					id := strings.ReplaceAll(relative, string(filepath.Separator), "-")
+					if desktopIDs[id] {
+						return nil
+					}
+					desktopIDs[id] = true
+				}
+				// Resolve entry links, but never recurse into application bundles.
 				resolved, resolveErr := filepath.EvalSymlinks(path)
 				info, statErr := os.Stat(path)
-				if resolveErr == nil && statErr == nil && info.IsDir() && !seen[resolved] && len(apps) < 4096 {
+				if resolveErr == nil && statErr == nil && validApplicationType(c.platform, path, info) && !seen[resolved] && len(apps) < 4096 {
 					seen[resolved] = true
 					stamp := applicationStamp(path, resolved)
 					old, exists := previous[path]
@@ -333,7 +339,7 @@ func (c *Catalog) Execute(ctx context.Context, p protocol.CommandParams) (protoc
 		return protocol.CommandResult{}, errors.New("application unavailable")
 	}
 	info, err := os.Stat(path)
-	if err != nil || !info.IsDir() {
+	if err != nil || !validApplicationType(c.platform, path, info) {
 		return protocol.CommandResult{}, errors.New("application unavailable")
 	}
 	if _, err := c.read(path); err != nil {

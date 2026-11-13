@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,8 +32,10 @@ type Process struct {
 func Start(path, dir string) (*Process, error) {
 	cmd := exec.Command(path)
 	cmd.Dir = dir
-	// Do not forward the host's environment or log arbitrary plugin stderr.
-	cmd.Env = []string{"LANG=en_US.UTF-8"}
+	configureProcess(cmd)
+	// Forward only named desktop/session variables, never the entire host
+	// environment or arbitrary plugin stderr.
+	cmd.Env = processEnvironment(runtime.GOOS, os.Getenv)
 	// nil routes stderr directly to the OS null device. io.Discard would
 	// create a copy goroutine whose pipe can be held open by descendants.
 	cmd.Stderr = nil

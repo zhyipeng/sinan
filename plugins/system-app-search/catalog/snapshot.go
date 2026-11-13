@@ -90,7 +90,7 @@ func (c *Catalog) loadSnapshot() {
 }
 
 func validDiskApplication(app diskApplication, roots []string) bool {
-	if !filepath.IsAbs(app.Path) || filepath.Clean(app.Path) != app.Path || len(app.Path) > 512 || !strings.EqualFold(filepath.Ext(app.Path), ".app") || strings.ContainsRune(app.Path, '\x00') || !utf8.ValidString(app.Path) {
+	if !filepath.IsAbs(app.Path) || filepath.Clean(app.Path) != app.Path || len(app.Path) > 512 || !supportedApplicationPath(app.Path) || strings.ContainsRune(app.Path, '\x00') || !utf8.ValidString(app.Path) {
 		return false
 	}
 	inside := false

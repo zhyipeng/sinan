@@ -139,3 +139,23 @@ func TestImageMatcherRequiresHTMLBridge2(t *testing.T) {
 		t.Fatal("message command accepted image input")
 	}
 }
+
+func TestPlatformExecutableEntry(t *testing.T) {
+	for _, tc := range []struct {
+		platform, path string
+		mode           os.FileMode
+		valid          bool
+	}{
+		{"windows", "plugin.exe", 0600, true},
+		{"windows", "PLUGIN.EXE", 0600, true},
+		{"windows", "plugin.cmd", 0700, false},
+		{"windows", "plugin", 0700, false},
+		{"linux", "plugin", 0700, true},
+		{"linux", "plugin", 0600, false},
+		{"darwin", "plugin", 0700, true},
+	} {
+		if executableEntry(tc.platform, tc.path, tc.mode) != tc.valid {
+			t.Fatal("incorrect platform executable policy")
+		}
+	}
+}

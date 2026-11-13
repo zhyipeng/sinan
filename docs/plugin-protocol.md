@@ -16,9 +16,9 @@
 
 ## 进程入口
 
-`runtime.entry` 指向插件目录内的可执行文件，例如 `backend/plugin`。不支持 shell 命令、参数拼接、平台变量或符号链接。跨平台需单独构建。安装来源不能包含安装目录，总大小上限 64 MiB，最多 2048 个条目。
+`runtime.entry` 指向插件目录内的可执行文件，例如 Unix 的 `backend/plugin` 或 Windows 的 `backend/plugin.exe`；Unix 要求执行位，Windows 要求 `.exe` 后缀。不支持 shell 命令、参数拼接、平台变量或符号链接。跨平台需单独构建。安装来源不能包含安装目录，总大小上限 64 MiB，最多 2048 个条目。
 
-原生插件以当前用户权限运行，安装时必须确认信任。宿主不继承环境变量，stderr 当前丢弃；这些措施不构成安全沙箱。信任记录不防御同一用户改写插件文件。
+原生插件以当前用户权限运行，安装时必须确认信任。宿主只传入显式语言及平台桌面环境白名单，不整表继承环境变量，stderr 当前丢弃；这些措施不构成安全沙箱。信任记录不防御同一用户改写插件文件。环境白名单包含 Windows 系统/用户应用目录、PATH/TEMP，或 Linux HOME/PATH、XDG、显示服务及会话总线信息；详见 [ADR 0051](adr/0051-cross-platform-foundation.md)。
 
 ## JSON-RPC
 

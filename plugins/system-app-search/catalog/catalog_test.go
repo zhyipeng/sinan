@@ -24,6 +24,7 @@ func fixture(t *testing.T) (*Catalog, string) {
 		t.Fatal(err)
 	}
 	c := New([]string{root, root, filepath.Join(root, "absent")})
+	c.platform = "darwin"
 	c.read = func(path string) (metadata, error) {
 		if filepath.Base(path) == "Broken.app" {
 			return metadata{}, errors.New("broken")

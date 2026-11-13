@@ -59,8 +59,10 @@ static char *sinanApplicationIcon(const char *path) {
 import "C"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"os/exec"
 	"unsafe"
 )
 
@@ -86,4 +88,8 @@ func readIcon(path string) string {
 	}
 	defer C.free(unsafe.Pointer(result))
 	return "data:image/png;base64," + C.GoString(result)
+}
+
+func launchApplication(ctx context.Context, path string) error {
+	return exec.CommandContext(ctx, "/usr/bin/open", "-a", path).Run()
 }

@@ -1,0 +1,114 @@
+#!/usr/bin/env node
+// Native, shell-free entry point shared by Make, PowerShell and CI.
+import { spawnSync } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const platform = process.platform;
+const suffix = platform === 'win32' ? '.exe' : '';
+const env = { ...process.env };
+if (platform === 'darwin') {
+  for (const key of ['CGO_CFLAGS', 'CGO_LDFLAGS']) {
+    env[key] = `${env[key] || ''} -mmacosx-version-min=12.0`.trim();
+  }
+  env.MACOSX_DEPLOYMENT_TARGET = '12.0';
+}
+// The pinned Wails version supports GTK3/WebKit 4.1 on Ubuntu 24.04.
+const tags = platform === 'linux' ? ['-tags', 'gtk3'] : [];
+function run(command, args = [], extraEnv = {}) {
+  const result = spawnSync(command, args, { cwd: root, env: { ...env, ...extraEnv }, stdio: 'inherit' });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${command} 执行失败（${result.status ?? result.signal}）`);
+}
+// npm's JS entry avoids passing user paths through cmd.exe on Windows.
+function npm(args) {
+  if (platform !== 'win32') return run('npm', args);
+  const result = spawnSync('where.exe', ['npm.cmd'], { encoding: 'utf8', env });
+  if (result.status !== 0) throw new Error('找不到 npm，请安装 Node.js');
+  const paths = result.stdout.trim().split(/\r?\n/);
+  const cli = paths.map(path => join(dirname(path), 'node_modules/npm/bin/npm-cli.js')).find(existsSync);
+  if (!cli) throw new Error('找不到 npm-cli.js，请检查 Node.js 安装');
+  run(process.execPath, [cli, ...args]);
+}
+const binary = name => join(root, 'bin', name + suffix);
+function bindings() {
+  mkdirSync(join(root, 'apps/desktop/frontend/dist'), { recursive: true });
+  writeFileSync(join(root, 'apps/desktop/frontend/dist/.placeholder'), '');
+  run('wails3', ['generate', 'bindings', ...(tags.length ? ['-f', tags.join(' ')] : []), '-ts', '-i', '-noevents', '-d', 'apps/desktop/frontend/bindings', './apps/desktop']);
+}
+function frontend() {
+  bindings();
+  npm(['--prefix', 'apps/desktop/frontend', 'run', 'build']);
+}
+function build() {
+  frontend();
+  mkdirSync(join(root, 'bin'), { recursive: true });
+  for (const [name, source] of [['sinan', 'desktop'], ['sinanctl', 'cli'], ['sinan-ui-host', 'ui-host']]) {
+    const gui = platform === 'win32' && name === 'sinan' ? ['-ldflags', '-H=windowsgui'] : [];
+    run('go', ['build', ...tags, ...gui, '-o', binary(name), `./apps/${source}`]);
+  }
+}
+function prepare() {
+  const dir = join(root, '.sinan-dev/packages/app-search');
+  mkdirSync(join(dir, 'backend'), { recursive: true });
+  const manifest = JSON.parse(readFileSync(join(root, 'plugins/system-app-search/manifest.json'), 'utf8'));
+  manifest.runtime.entry = `backend/plugin${suffix}`;
+  writeFileSync(join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+  cpSync(join(root, 'plugins/system-app-search/icon.svg'), join(dir, 'icon.svg'));
+  run('go', ['build', '-o', join(dir, 'backend', 'plugin' + suffix), './plugins/system-app-search/cmd']);
+  for (const [id, source, native] of [
+    ['system.app-search', dir, true],
+    ['system.settings', 'plugins/system-settings', false],
+    ['system.plugin-manager', 'plugins/system-plugin-manager', false],
+  ]) {
+    const operation = existsSync(join(root, '.sinan-dev/plugins', id)) ? 'upgrade' : 'install';
+    run(binary('sinanctl'), ['-plugins', '.sinan-dev/plugins', ...(native ? ['-trust-native'] : []), operation, source]);
+  }
+}
+function packageDesktop() {
+  build();
+  if (platform === 'darwin') {
+    const contents = join(root, 'bin/Sinan.app/Contents');
+    mkdirSync(join(contents, 'MacOS'), { recursive: true });
+    mkdirSync(join(contents, 'Resources'), { recursive: true });
+    for (const name of ['sinan', 'sinan-ui-host']) {
+      const destination = join(contents, 'MacOS', name);
+      cpSync(binary(name), destination + '.next');
+      renameSync(destination + '.next', destination);
+    }
+    cpSync(join(root, 'apps/desktop/Info.plist'), join(contents, 'Info.plist'));
+    cpSync(join(root, 'apps/desktop/assets/AppIcon.icns'), join(contents, 'Resources/AppIcon.icns'));
+  } else {
+    // Portable build directory only; OS installers and dependency bundling are pending.
+    const destination = join(root, 'bin', `Sinan-${platform}-${process.arch}`);
+    mkdirSync(destination, { recursive: true });
+    for (const name of ['sinan', 'sinanctl', 'sinan-ui-host']) cpSync(binary(name), join(destination, name + suffix));
+  }
+}
+
+const tasks = {
+  setup() { run('go', ['mod', 'download']); npm(['--prefix', 'apps/desktop/frontend', 'ci']); },
+  bindings,
+  frontend,
+  build,
+  prepare,
+  package: packageDesktop,
+  run() { build(); run(binary('sinan')); },
+  dev() { build(); prepare(); run(binary('sinan'), ['-plugins', '.sinan-dev/plugins']); },
+  test() {
+    frontend();
+    run(process.execPath, ['--test', 'packages/plugin-sdk/theme/runtime.test.mjs']);
+    run(process.execPath, ['--experimental-strip-types', '--test', 'apps/desktop/frontend/tests/paste.test.mjs']);
+    run('go', ['test', ...tags, '-race', '-p', '1', './...'], { SINAN_NATIVE_UI_TEST: '0' });
+  },
+};
+try {
+  const task = tasks[process.argv[2]];
+  if (!Object.hasOwn(tasks, process.argv[2])) throw new Error(`用法：node scripts/desktop.mjs ${Object.keys(tasks).join('|')}`);
+  task();
+} catch (error) {
+  console.error(error.message);
+  process.exitCode = 1;
+}

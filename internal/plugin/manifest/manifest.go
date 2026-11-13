@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -225,10 +226,17 @@ func Executable(dir string, m Manifest) (string, error) {
 		return "", errors.New("插件入口不存在或包含符号链接")
 	}
 	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+	if err != nil || !info.Mode().IsRegular() || !executableEntry(runtime.GOOS, path, info.Mode()) {
 		return "", errors.New("插件入口不是可执行文件")
 	}
 	return path, nil
+}
+
+func executableEntry(platform, path string, mode os.FileMode) bool {
+	if platform == "windows" {
+		return strings.EqualFold(filepath.Ext(path), ".exe")
+	}
+	return mode.Perm()&0111 != 0
 }
 
 func validUICapabilities(view protocol.UIView, mf Manifest) bool {
