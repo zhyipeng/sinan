@@ -4,7 +4,7 @@
 
 ## 特性
 - **全插件架构**：核心业务功能（检索、设置、管理）皆为插件。
-- **故障隔离**：基于 Go 独立进程运行插件，保障宿主稳定。
+- **后端故障隔离**：原生后端运行在 Go 独立进程中；原生 UI 控制器仍与宿主同进程。
 - **高扩展性**：支持插件 UI 独立承载与隔离。
 
 ## 快速开始
@@ -27,4 +27,4 @@ make dev
 
 ## 跨平台适配
 
-Windows 与 Linux 同步适配中。可通过 `node scripts/desktop.mjs setup`、`build`、`dev` 使用无需 Make/sh 的开发入口；Linux 使用 GTK3/WebKitGTK 4.1。已增加两端应用检索及原生构建 CI，HTML 插件 UI、完整发行安装和目标平台验收仍待完成。依赖、命令和能力边界见[跨平台适配](docs/cross-platform.md)。
+Windows 与 Linux 同步适配中。可通过 `node scripts/desktop.mjs setup`、`build`、`dev` 使用无需 Make/sh 的开发入口；Linux 使用 GTK3/WebKitGTK 4.1。已增加两端应用检索、原生构建 CI 和 Shell 适配，并实现待实机验收的 Linux GTK3 隔离内容承载；Windows WebView2、完整发行安装和目标平台验收仍待完成。依赖、命令和能力边界见[跨平台适配](docs/cross-platform.md)。

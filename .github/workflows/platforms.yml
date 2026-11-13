@@ -46,4 +46,5 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           node --test packages/plugin-sdk/theme/runtime.test.mjs
+          node --test internal/plugin/uihost/gtk_bridge.test.mjs
           node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs

@@ -15,13 +15,13 @@ npm run build
 
 ## 主面板呈现
 
-插件默认在主面板内使用，返回和拆出由宿主提供；业务组件不自行创建窗口，也不重复绘制宿主标题栏。用户主动拆出时保留同一页面及 React 状态。动态内容位于同一主窗口的独立 WKWebView 中，复用可信页头；页面仍保持上下文隔离，不注入可信 React 树或获得完整 Wails Bridge。
+插件默认在主面板内使用，返回和拆出由宿主提供；业务组件不自行创建窗口，也不重复绘制宿主标题栏。用户主动拆出时保留同一页面及 React 状态。动态内容位于同一主窗口的独立原生 WebView 中（macOS WKWebView、Linux WebKitGTK），复用可信页头；页面仍保持上下文隔离，不注入可信 React 树或获得完整 Wails Bridge。
 
 `main.jsx` 在 React 挂载后发送一次 ready 握手，避免把握手放入可重复执行的 React effect。前端依赖在本地打包成 JS/CSS，不使用 CDN、内联脚本或 HMR；开发链接仍加载构建后的文件。
 
 ## 使用
 
-在 Sinan 插件管理中填写构建目录的绝对路径，先检查再安装；原生插件需要明确确认信任。插件 UI 默认启用，可用 `-plugin-ui=false` 显式关闭；仅 macOS 已实现承载。创建项目不会自动安装或运行任何代码，也不会初始化 Git。
+在 Sinan 插件管理中填写构建目录的绝对路径，先检查再安装；原生插件需要明确确认信任。插件 UI 默认启用，可用 `-plugin-ui=false` 显式关闭；macOS 与 Linux GTK3 已有承载实现；Linux 尚待实机验收，Windows 暂不支持。创建项目不会自动安装或运行任何代码，也不会初始化 Git。
 
 - `manifest.json`：插件 ID、版本、命令及 UI 视图。
 - `frontend/src/App.jsx`：React 业务界面。

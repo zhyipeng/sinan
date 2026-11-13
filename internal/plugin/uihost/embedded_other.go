@@ -1,4 +1,4 @@
-//go:build !darwin || ios || !cgo
+//go:build (!darwin && !linux) || ios || (darwin && !cgo) || (linux && (!cgo || !gtk3))
 
 package uihost
 

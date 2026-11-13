@@ -383,3 +383,8 @@ Manifest 可选 `icon` 指向包内 SVG、PNG、JPEG，宿主限大小读取及�
 ### 原生 UI 共用边界与 Shell 适配（2026-11-13）
 
 后续将初始导航、GET 资源、实际来源/主 frame、预算及撤销后的调用结果校验统一到 Go 原生 UI 边界，并接入 macOS 普通承载和 helper，为独立 WebView2/WebKitGTK 适配器提供共用机制。Windows 新增光标屏幕和系统主题适配；Linux GTK3 新增 X11 光标屏幕与 GDK 工作区、GNOME 主题偏好读取/观察，Wayland 定位明确回退。两端托盘使用普通应用图标。Windows/Linux 原生插件 UI renderer 仍未实现，不使用可信 Wails WebView 降级承载；边界与验证限制见 [ADR 0053](adr/0053-shared-native-ui-boundary.md)。
+
+
+### GTK3 同窗口隔离内容承载（2026-11-13）
+
+Linux GTK3 现实现独立 ephemeral WebKitContext、独立用户脚本与命名隔离 world 的原生内容子视图，保留 58 DIP 可信页头和现有准备/提交/撤销/拆出路径。GTK 消息信号没有 WKFrameInfo，来源转交通过仅注入顶层文档的隔离 world 限定可信同窗口消息，并在原生/Go 侧继续绑定精确文档和会话；不将页面声明作为来源证明，不暴露 Wails Bridge。要求 WebKitGTK 2.40+ 的 4.1 API，普通嵌入能力与旧独立 helper 分开判定。Windows WebView2 renderer 仍待实现；无窗口回归不等于 GTK 实机验收。见 [ADR 0054](adr/0054-gtk-isolated-plugin-content.md)。

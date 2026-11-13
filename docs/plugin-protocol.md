@@ -152,7 +152,7 @@ Manifest 可在 `contributes.uiViews` 声明最多 4 个视图。声明只提供
 
 ## 桌面开发窗口入口
 
-插件界面默认启用，无需额外启动参数；`-plugin-ui=false` 可显式关闭，`make dev-ui` 是 `make dev` 的兼容别名。当前仅 macOS 支持承载，其他平台或 helper 不可用时返回具体诊断。可信管理组件获取 `PluginUIEnabled()` 后显示包声明视图的打开按钮，调用 `OpenPluginView(pluginId, viewId)`。普通命令执行和可信组件注册不因此改变；页面不会获得这两个 Wails 方法。
+插件界面默认启用，无需额外启动参数；`-plugin-ui=false` 可显式关闭，`make dev-ui` 是 `make dev` 的兼容别名。当前 macOS 与 Linux GTK3 构建已有同窗口承载实现，Linux 尚待实机验收；Windows 或未编译对应适配器时返回具体诊断。旧 helper 支持情况独立判定。可信管理组件获取 `PluginUIEnabled()` 后显示包声明视图的打开按钮，调用 `OpenPluginView(pluginId, viewId)`。普通命令执行和可信组件注册不因此改变；页面不会获得这两个 Wails 方法。
 
 宿主只运行自身目录的固定 `sinan-ui-host`，不会运行包内指定的 UI 程序。窗口控制器复用同一插件/视图，首次等待 ready 后返回；关闭后可重新打开，包变更和启用状态仍由内核会话控制。退出宿主时取消启动并等待所有客体回收，再释放内核。helper 缺失或平台不支持时返回诊断并保留 Shell。客体异步退出事件 `ui:closed` 只发送给可信 Shell，字段为 pluginId / viewId / failed，不传播页面错误原文。
 
@@ -167,7 +167,7 @@ send({ kind: 'ready', version: 1 });
 document.querySelector('#close').addEventListener('click', () => send({ kind: 'close' }));
 ```
 
-脚本应放在包内独立 `.js` 资源中，HTML 以相对路径引用；固定 CSP 不允许内联脚本或远程脚本。此入口目前是 macOS 开发接口，不代表已提供跨平台 JavaScript SDK。
+脚本应放在包内独立 `.js` 资源中，HTML 以相对路径引用；固定 CSP 不允许内联脚本或远程脚本。此入口已有 macOS 与 Linux GTK3 实现，兼容相同 SDK 调用形状；Windows 承载与完整跨平台验收仍待完成。
 
 
 ## 搜索命令打开独立视图
@@ -331,3 +331,6 @@ if (launch.image) {
 Manifest 可加 `"icon": "icon.svg"`，指向包内相对路径的 SVG、PNG 或 JPEG。文件最多 64 KiB，位图宽高各最多 1024 像素；SVG 仅支持静态基础形状及几何/颜色属性，不支持样式、脚本、外部引用、动画或实体。缺省、缺失或无效资源显示插件名首字，不影响插件运行。发布包须包含图标文件。现有搜索结果的 `icon` 优先于插件图标。
 
 商店资料可选 `icon` 为 `data:image/svg+xml;base64,…`（也支持 PNG/JPEG），采用相同资源预算和内容校验；不接受远程图片 URL。API 仍为 1，旧包兼容；旧宿主严格清单解析不支持新增字段，需要升级后再安装带 `icon` 的新包。实现边界见 ADR 0046。
+
+
+Linux GTK3 使用独立 ephemeral WebKitContext 和命名隔离脚本 world。页面的 WebKit 风格 SDK facade 只传递消息，原生端口不注册到页面 world；顶层、精确入口与可信同窗口事件由宿主注入的隔离脚本检查，再进入共用 Go 会话边界。数据包不能自报来源或请求任意插件身份。普通 GTK3 承载要求 WebKitGTK 2.40+，不增加旧独立 helper / ui-probe 的平台支持。协议、预算及验证限制见 [ADR 0054](adr/0054-gtk-isolated-plugin-content.md)。
