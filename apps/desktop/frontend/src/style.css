@@ -875,7 +875,7 @@ output {
   flex: 1;
 }
 
-.store-item strong {
+.store-item strong, .store-card-open strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1051,58 +1051,56 @@ output {
 
 .store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
-  gap: 12px;
-  align-items: stretch;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 8px;
+  align-items: start;
 }
 
 .store-card {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 14px;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
   background: var(--sinan-surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-sm);
   text-align: left;
   content-visibility: auto;
-  contain-intrinsic-size: auto 128px;
+  contain-intrinsic-size: auto 90px;
 }
 
-.store-card:hover:not(:disabled) {
-  background: var(--sinan-surface);
+.store-card:hover {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.07);
 }
 
-.store-card-header {
+/* Keep card navigation separate from installation actions; no nested buttons. */
+.store-card-open {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   min-width: 0;
+  padding: 0;
+  text-align: left;
+  border-radius: var(--radius-xs);
 }
 
-.store-card-id {
-  font-family: var(--font-mono);
+.store-card-open:hover:not(:disabled) {
+  background: transparent;
+}
+
+.store-card-open .plugin-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  border-radius: var(--radius-xs);
+}
+
+.plugin-center .store-card-summary {
+  margin-top: 2px;
   font-size: 11px;
-  color: var(--muted);
-}
-
-.store-card-summary {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: 37px;
-  overflow-wrap: anywhere;
+  line-height: 16px;
 }
 
 .store-card-footer {
@@ -1110,19 +1108,53 @@ output {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  width: 100%;
   min-width: 0;
+  min-height: 26px;
 }
 
-.store-card-repo {
-  font-family: var(--font-mono);
-  font-size: 11px;
+.store-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: var(--muted);
+  font-size: 10.5px;
+}
+
+.store-card-publisher {
+  flex-shrink: 0;
+}
+
+.store-card-publisher.official {
+  color: var(--accent);
+}
+
+.store-card-version {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.store-card-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.store-card-actions button, .store-card .store-actions button {
+  font-size: 11.5px;
+  line-height: 18px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.store-card .store-preview {
+  margin-top: 0;
+}
+
+.store-card .trust {
+  align-items: flex-start;
+  line-height: 1.5;
 }
 
 .store-badge, .store-publisher {

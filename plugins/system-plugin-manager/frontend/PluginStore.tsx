@@ -25,6 +25,7 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
   const [selectedID,setSelectedID]=useState(initialID);
   const [version,setVersion]=useState('');
   const [localBusy,setBusy]=useState(false);
+  const [checkingID,setCheckingID]=useState('');
   const busy=localBusy||disabled;
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -52,8 +53,8 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
     const latestCompatible=data?entry.releases.find(item=>compatible(item,data)):undefined;
     const latestRelease=latestCompatible??entry.releases[0];
     const latestVersion=latestRelease?.version??'';
-    const updatable=Boolean(installedVersion&&latestCompatible&&compare(latestCompatible.version,installedVersion)>0&&!local?.development&&!local?.changed&&!local?.protected);
-    return {...entry,installedVersion,development:!!local?.development,changed:!!local?.changed,protected:!!local?.protected,latestVersion,updatable};
+    const updatable=Boolean(entry.status==='published'&&installedVersion&&latestCompatible&&compare(latestCompatible.version,installedVersion)>0&&!local?.development&&!local?.changed&&!local?.protected);
+    return {...entry,installedVersion,development:!!local?.development,changed:!!local?.changed,protected:!!local?.protected,latestVersion,latestCompatible,updatable};
   });
 
   const searchedEntries=allEntries.filter(entry=>`${entry.name} ${entry.id} ${entry.summary}`.toLowerCase().includes(query.trim().toLowerCase()));
@@ -79,7 +80,23 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
   const selected=selectedID?allEntries.find(entry=>entry.id===selectedID):undefined;
   const releases=selected?.releases??[];
   const release=releases.find(item=>item.version===version)??releases.find(item=>data&&compatible(item,data))??releases[0];
-  const blocked=selected?.development?'开发链接请使用重载':selected?.changed?'请先处理本地文件修改':selected?.protected?'随宿主更新':data?.stale?'请联网刷新后安装':selected?.status==='withdrawn'?'已下架':selected?.status!=='published'?'待发布':!release||!data||!compatible(release,data)?'当前平台或宿主不兼容':'';
+  function blockedFor(entry:Entry, target?:Release) {
+    return entry.development?'开发链接请使用重载':entry.changed?'请先处理本地文件修改':entry.protected?'随宿主更新':data?.stale?'请联网刷新后安装':entry.status==='withdrawn'?'已下架':entry.status!=='published'?'待发布':!target||!data||!compatible(target,data)?'当前平台或宿主不兼容':'';
+  }
+  const blocked=selected?blockedFor(selected,release):'';
+
+  function prepare(entry:Entry, target?:Release) {
+    if(busy||!data||!target||blockedFor(entry,target))return;
+    clearPreview();
+    void perform(async()=>{
+      setCheckingID(entry.id);
+      try {
+        const result=await bridge.prepare(entry.id,target.version,data.revision);
+        if(!alive.current){await bridge.cancel(result.ticket);return;}
+        ticket.current=result.ticket;setPreview(result);setTrust(false);
+      } finally {if(alive.current)setCheckingID('');}
+    });
+  }
   const asset=release?.assets.find(item=>item.os===data?.os&&item.arch===data?.arch);
 
   const filterOptions: [FilterKind, string][] = [
@@ -89,6 +106,18 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
     ['installed', '已安装'],
     ['updatable', '可更新'],
   ];
+
+  const previewPanel = preview&&<div className="store-preview" role="status">
+          <strong>{preview.installedVersion?`${preview.installedVersion} → ${preview.version}`:preview.version}</strong>
+          <p className="store-note">{preview.repository}</p>
+          {preview.kind==='process'&&preview.changed&&<label className="trust"><input type="checkbox" checked={trust} disabled={busy} onChange={event=>setTrust(event.target.checked)}/>信任此原生插件，允许其以当前用户权限运行</label>}
+          <div className="store-actions"><button disabled={busy} onClick={clearPreview}>取消</button><button className="primary" disabled={busy||!preview.changed||preview.kind==='process'&&!trust} onClick={()=>void perform(async()=>{
+            const current=ticket.current;
+            const updating=!!preview.installedVersion;
+            try{await bridge.apply(current,trust);await onChanged();if(alive.current){setNotice(updating?'插件已更新。':'插件已安装。');await load(false);}}
+            finally{ticket.current='';if(alive.current){setPreview(undefined);setTrust(false);}}
+          })}>{!preview.changed?'已是当前内容':preview.installedVersion?(compare(preview.version,preview.installedVersion)<0?'确认降级':'确认更新'):'确认安装'}</button></div>
+        </div>;
 
   return <div className="store-body">
     {selectedID ? <div className="store-detail-view">
@@ -107,21 +136,8 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
         <p className="store-summary">{selected.summary}</p>
         <p className="store-source">{selected.source.repository?.replace('https://github.com/','')??'源码地址待登记'}</p>
         {releases.length>0&&<label className="store-version">版本<select value={release?.version??''} disabled={busy} onChange={event=>setVersion(event.target.value)}>{releases.map(item=><option value={item.version} key={item.version}>{item.version}</option>)}</select></label>}
-        {blocked?<p className="store-note">{blocked}</p>:!preview&&<button className="primary" disabled={busy} onClick={()=>void perform(async()=>{
-          const result=await bridge.prepare(selected.id,release!.version,data!.revision);
-          if(!alive.current){await bridge.cancel(result.ticket);return;}
-          ticket.current=result.ticket;setPreview(result);setTrust(false);
-        })}>{busy?'正在检查…':selected.installedVersion?(compare(release!.version,selected.installedVersion)<0?'检查旧版本':'检查更新'):'检查安装'}</button>}
-        {preview&&<div className="store-preview" role="status">
-          <strong>{preview.installedVersion?`${preview.installedVersion} → ${preview.version}`:preview.version}</strong>
-          <p className="store-note">{preview.repository}</p>
-          {preview.kind==='process'&&preview.changed&&<label className="trust"><input type="checkbox" checked={trust} disabled={busy} onChange={event=>setTrust(event.target.checked)}/>信任此原生插件，允许其以当前用户权限运行</label>}
-          <div className="store-actions"><button disabled={busy} onClick={clearPreview}>取消</button><button className="primary" disabled={busy||!preview.changed||preview.kind==='process'&&!trust} onClick={()=>void perform(async()=>{
-            const current=ticket.current;
-            try{await bridge.apply(current,trust);await onChanged();if(alive.current){setNotice('插件已安装。');await load(false);}}
-            finally{ticket.current='';if(alive.current){setPreview(undefined);setTrust(false);}}
-          })}>{!preview.changed?'已是当前内容':preview.installedVersion?(compare(preview.version,preview.installedVersion)<0?'确认降级':'确认更新'):'确认安装'}</button></div>
-        </div>}
+        {blocked?<p className="store-note">{blocked}</p>:!preview&&<button className="primary" disabled={busy} onClick={()=>prepare(selected,release)}>{checkingID===selected.id?'正在检查…':selected.installedVersion?(compare(release!.version,selected.installedVersion)<0?'检查旧版本':'检查更新'):'检查安装'}</button>}
+        {previewPanel}
         {selected.installedVersion&&renderActions(selected.id)}
       </PluginDetails>}
     </div> : <>
@@ -131,37 +147,40 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
       </div>
       <div className="store-filters" role="group" aria-label="筛选插件目录">
         <div className="store-filter-pills">
-          {filterOptions.map(([kind,label])=><button key={kind} type="button" className="store-filter-pill" aria-pressed={filter===kind} disabled={busy} onClick={()=>{setFilter(kind);setPage(1);}}>{label} <small>{counts[kind]}</small></button>)}
+          {filterOptions.map(([kind,label])=><button key={kind} type="button" className="store-filter-pill" aria-pressed={filter===kind} disabled={busy} onClick={()=>{clearPreview();setFilter(kind);setPage(1);}}>{label} <small>{counts[kind]}</small></button>)}
         </div>
         <span className="store-count">{entries.length} 个插件</span>
       </div>
       {data?.notice&&<p className="store-note" role="status">{data.notice}</p>}
       <div className="store-grid" aria-label="商店插件">
-        {pagedEntries.map(entry=><button key={entry.id} type="button" className="store-card store-item" disabled={busy} onClick={()=>{setSelectedID(entry.id);setVersion('');}}>
-          <div className="store-card-header">
-            <PluginIcon name={entry.name} icon={entry.icon}/>
-            <div className="store-item-label">
-              <strong>{entry.name}</strong>
-              <small className="store-card-id">{entry.id}</small>
+        {pagedEntries.map(entry=>{
+          const reason=blockedFor(entry,entry.latestCompatible);
+          const installed=!!entry.installedVersion&&!entry.updatable;
+          const label=entry.status==='withdrawn'?'已下架':entry.status!=='published'?'待发布':installed?'已安装':!entry.latestCompatible?'不兼容':entry.updatable?'更新':'安装';
+          return <article key={entry.id} className="store-card">
+            <button type="button" className="store-card-open" disabled={busy} aria-label={`查看 ${entry.name} 详情`} onClick={()=>{clearPreview();setSelectedID(entry.id);setVersion('');}}>
+              <PluginIcon name={entry.name} icon={entry.icon}/>
+              <span className="store-item-label">
+                <strong title={entry.name}>{entry.name}</strong>
+                <small className="store-card-summary" title={entry.summary}>{entry.summary||'暂无简介'}</small>
+              </span>
+            </button>
+            <div className="store-card-footer">
+              <div className="store-card-meta">
+                <span className={`store-card-publisher ${entry.publisher.kind==='official'?'official':'community'}`}>{entry.publisher.kind==='official'?'官方':'社区'}</span>
+                {(entry.installedVersion||entry.latestVersion)&&<span className="store-card-version" title={entry.installedVersion?`本地版本 ${entry.installedVersion}${entry.updatable?`，可更新至 ${entry.latestVersion}`:''}`:`版本 ${entry.latestVersion}`}>v{entry.installedVersion||entry.latestVersion}</span>}
+              </div>
+              {preview?.id!==entry.id&&<div className="store-card-actions"><button type="button" className={installed||reason?'':'primary'} disabled={busy||installed||!!reason} title={reason||(installed?'已是当前可用版本':'')} aria-label={`${label} ${entry.name}`} onClick={()=>prepare(entry,entry.latestCompatible)}>{checkingID===entry.id?'正在检查…':label}</button></div>}
             </div>
-            {entry.updatable ? <span className="store-badge updatable">可更新 {entry.latestVersion}</span>
-              : entry.installedVersion ? <span className="store-badge installed">已安装 {entry.installedVersion}</span>
-              : entry.status==='withdrawn' ? <span className="store-badge muted">已下架</span>
-              : entry.status!=='published' ? <span className="store-badge muted">待发布</span>
-              : entry.latestVersion ? <span className="store-badge version">v{entry.latestVersion}</span> : null}
-          </div>
-          <p className="store-card-summary">{entry.summary||'暂无简介'}</p>
-          <div className="store-card-footer">
-            <span className={`store-publisher ${entry.publisher.kind==='official'?'official':'community'}`}>{entry.publisher.kind==='official'?'官方':'社区'}</span>
-            <span className="store-card-repo">{entry.source.repository?.replace('https://github.com/','')??'源码待登记'}</span>
-          </div>
-        </button>)}
+            {preview?.id===entry.id&&previewPanel}
+          </article>;
+        })}
       </div>
       {!entries.length&&<p className="empty">{busy?'正在读取目录…':query||filter!=='all'?'没有匹配的插件':'暂无插件'}</p>}
       {totalPages>1&&<div className="store-pagination" role="navigation" aria-label="目录分页">
-        <button type="button" disabled={busy||currentPage<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>上一页</button>
+        <button type="button" disabled={busy||currentPage<=1} onClick={()=>{clearPreview();setPage(p=>Math.max(1,p-1));}}>上一页</button>
         <span>第 {currentPage} / {totalPages} 页</span>
-        <button type="button" disabled={busy||currentPage>=totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>下一页</button>
+        <button type="button" disabled={busy||currentPage>=totalPages} onClick={()=>{clearPreview();setPage(p=>Math.min(totalPages,p+1));}}>下一页</button>
       </div>}
     </>}
     {error&&<p className="error" role="alert">{error}</p>}{notice&&<p className="settings-notice" role="status">{notice}</p>}
