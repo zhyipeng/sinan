@@ -15,6 +15,7 @@ import (
 	"sinan/internal/development/uiacceptance"
 	"sinan/internal/kernel"
 	"sinan/internal/platform"
+	"sinan/internal/plugin/uihost"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/theme"
 	pluginmanager "sinan/plugins/system-plugin-manager"
@@ -180,13 +181,13 @@ func run() error {
 	window := newShell(appURL, false)
 	host.launcher.window = window
 	host.launcher.newWindow = func() *application.WebviewWindow { return newShell("/", true) }
-	if *pluginUI && !*uiProbe && runtime.GOOS == "darwin" {
+	if *pluginUI && !*uiProbe && uihost.EmbeddedSupported {
 		host.embedded = &embeddedViews{entries: map[*application.WebviewWindow]*embeddedEntry{}, sequence: map[*application.WebviewWindow]uint64{}}
 	}
 	if *pluginUI && !*uiProbe && host.embedded == nil {
 		executable, err := os.Executable()
-		if runtime.GOOS != "darwin" {
-			host.uiError = "插件界面目前仅支持 macOS"
+		if !uihost.Supported {
+			host.uiError = "当前平台尚未实现隔离插件界面"
 		} else if err != nil {
 			host.uiError = "无法确定 UI 客体程序位置"
 		} else {

@@ -18,6 +18,7 @@ import (
 )
 
 type nativeBinding struct {
+	bridge         *nativeBridge
 	embeddedAction func(int)
 	session        Session
 	disable        func() error
@@ -28,13 +29,13 @@ func bindingFor(handle C.ulonglong) *nativeBinding {
 }
 
 //export sinanUISessionResource
-func sinanUISessionResource(handle C.ulonglong, url *C.char) (result *C.char) {
+func sinanUISessionResource(handle C.ulonglong, method, url *C.char) (result *C.char) {
 	defer func() {
 		if recover() != nil {
 			result = nil
 		}
 	}()
-	resource, ok := bindingFor(handle).session.Resource(C.GoString(url))
+	resource, ok := bindingFor(handle).bridge.Resource(C.GoString(method), C.GoString(url))
 	if !ok {
 		return nil
 	}
@@ -46,7 +47,7 @@ func sinanUISessionResource(handle C.ulonglong, url *C.char) (result *C.char) {
 }
 
 //export sinanUISessionMessage
-func sinanUISessionMessage(handle C.ulonglong, data *C.char, length C.int) (result C.int) {
+func sinanUISessionMessage(handle C.ulonglong, source *C.char, mainFrame C.int, data *C.char, length C.int) (result C.int) {
 	defer func() {
 		if recover() != nil {
 			result = 0
@@ -55,7 +56,7 @@ func sinanUISessionMessage(handle C.ulonglong, data *C.char, length C.int) (resu
 	if length < 0 || length > uiview.MaxMessageBytes {
 		return 0
 	}
-	action, err := bindingFor(handle).session.Message(C.GoBytes(unsafe.Pointer(data), length))
+	action, err := bindingFor(handle).bridge.Message(C.GoString(source), mainFrame != 0, C.GoBytes(unsafe.Pointer(data), length))
 	if err != nil {
 		return 0
 	}
@@ -179,7 +180,7 @@ func sinanUIDetachShortcut(handle C.ulonglong) (result *C.char) {
 }
 
 //export sinanUISessionCall
-func sinanUISessionCall(handle C.ulonglong, data *C.char, length C.int) (result *C.char) {
+func sinanUISessionCall(handle C.ulonglong, source *C.char, mainFrame C.int, data *C.char, length C.int) (result *C.char) {
 	defer func() {
 		if recover() != nil {
 			result = nil
@@ -192,13 +193,7 @@ func sinanUISessionCall(handle C.ulonglong, data *C.char, length C.int) (result 
 	if !binding.session.Active() {
 		return nil
 	}
-	caller, ok := binding.session.(interface {
-		Call([]byte) (json.RawMessage, error)
-	})
-	if !ok {
-		return nil
-	}
-	value, err := caller.Call(C.GoBytes(unsafe.Pointer(data), length))
+	value, err := binding.bridge.Call(C.GoString(source), mainFrame != 0, C.GoBytes(unsafe.Pointer(data), length))
 	if err != nil {
 		value, _ = json.Marshal(map[string]string{"error": err.Error()})
 	} else {
@@ -242,4 +237,13 @@ func sinanUIEmbeddedAction(handle C.ulonglong, kind C.int) {
 	if binding.session.Active() && binding.embeddedAction != nil {
 		go binding.embeddedAction(int(kind))
 	}
+}
+
+//export sinanUISessionNavigate
+func sinanUISessionNavigate(handle C.ulonglong, target *C.char, mainFrame C.int) (result C.int) {
+	defer func() { _ = recover() }()
+	if bindingFor(handle).bridge.Navigate(C.GoString(target), mainFrame != 0) {
+		return 1
+	}
+	return 0
 }

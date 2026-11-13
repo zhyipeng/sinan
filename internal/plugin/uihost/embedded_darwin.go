@@ -22,6 +22,8 @@ import (
 	"unsafe"
 )
 
+const EmbeddedSupported = true
+
 type Embedded struct {
 	themeRevision    uint64
 	shortcutRevision uint64
@@ -44,7 +46,11 @@ func PrepareEmbedded(ctx context.Context, session *uiview.Session, window func()
 	value := C.CString(string(data))
 	defer C.free(unsafe.Pointer(value))
 	e := &Embedded{session: session, invoke: invoke, done: make(chan struct{}), themeRevision: state.Revision}
-	e.handle = cgo.NewHandle(&nativeBinding{session: &embeddedSession{Session: session}, embeddedAction: action})
+	bridge, err := newNativeBridge(session, session.EntryURL())
+	if err != nil {
+		return nil, err
+	}
+	e.handle = cgo.NewHandle(&nativeBinding{session: session, bridge: bridge, embeddedAction: action})
 	invoke(func() {
 		if native := window(); native != nil {
 			e.pointer = C.sinanUIEmbeddedCreate(value, C.ulonglong(e.handle), native)

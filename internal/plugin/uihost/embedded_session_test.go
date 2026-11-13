@@ -18,13 +18,16 @@ func TestEmbeddedResourceBudgetsRevokeInsteadOfFallingBack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		adapter := &embeddedSession{Session: session}
+		adapter, err := newNativeBridge(session, session.EntryURL())
+		if err != nil {
+			t.Fatal(err)
+		}
 		for i := 0; i < test.count; i++ {
-			if _, ok := adapter.Resource(session.EntryURL()); !ok {
+			if _, ok := adapter.Resource("GET", session.EntryURL()); !ok {
 				t.Fatalf("premature denial at %d", i)
 			}
 		}
-		if _, ok := adapter.Resource(session.EntryURL()); ok || session.Active() {
+		if _, ok := adapter.Resource("GET", session.EntryURL()); ok || session.Active() {
 			t.Fatal("aggregate resource budget was bypassed")
 		}
 	}

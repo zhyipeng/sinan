@@ -1,7 +1,8 @@
 package platform
 
-// WorkArea uses macOS logical points, Y-down from the primary display's top
-// edge. Negative origins are preserved for screens above or left of it.
+// WorkArea uses platform logical coordinates with Y increasing downward.
+// Negative desktop origins are preserved. Win32 pixel rectangles must first
+// pass through Wails' screen conversion instead of being returned directly.
 type WorkArea struct {
 	X, Y, Width, Height int
 }

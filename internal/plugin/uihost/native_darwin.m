@@ -302,7 +302,7 @@ static void positionPanel(NSWindow *window) {
     if (self.done) return;
     if (self.ready) {
         const char *close = "{\"kind\":\"close\"}";
-        self.closeReceived = sinanUISessionMessage(self.handle, (char *)close, (int)strlen(close)) == 2;
+        self.closeReceived = sinanUISessionMessage(self.handle, (char *)self.entry.UTF8String, 1, (char *)close, (int)strlen(close)) == 2;
     }
     sinanUISessionRevoke(self.handle);
     self.done = YES;
@@ -317,7 +317,7 @@ static void positionPanel(NSWindow *window) {
     NSString *url = task.request.URL.absoluteString;
     NSDictionary *resource = nil;
     if (!self.revoked && url.length <= 1024) {
-        char *encoded = sinanUISessionResource(self.handle, (char *)url.UTF8String);
+        char *encoded = sinanUISessionResource(self.handle, (char *)task.request.HTTPMethod.UTF8String, (char *)url.UTF8String);
         if (encoded) {
             NSData *json = [NSData dataWithBytes:encoded length:strlen(encoded)];
             free(encoded);
@@ -339,7 +339,7 @@ static void positionPanel(NSWindow *window) {
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)action decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
     // Only the single host-requested initial document may navigate. Decisions
     // cover all target frames, including nil targetFrame (new-window requests).
-    BOOL initial = !self.revoked && !self.initialNavigation && action.targetFrame.isMainFrame && [action.request.URL.absoluteString isEqual:self.entry];
+    BOOL initial = !self.revoked && !self.initialNavigation && action.request.URL.absoluteString.length <= 1024 && sinanUISessionNavigate(self.handle,(char *)action.request.URL.absoluteString.UTF8String,action.targetFrame.isMainFrame);
     if (initial) { self.initialNavigation = YES; decisionHandler(WKNavigationActionPolicyAllow); }
     else { self.navigationDenials++; decisionHandler(WKNavigationActionPolicyCancel); }
 }
@@ -370,7 +370,7 @@ static void positionPanel(NSWindow *window) {
     NSData *encoded = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
     if (!encoded || encoded.length > 4096) { self.rejected++; return; }
     if ([body[@"kind"] isEqual:@"ready"] && body.count == 2 && !self.ready && [body[@"version"] isKindOfClass:NSNumber.class] && CFGetTypeID((__bridge CFTypeRef)body[@"version"]) != CFBooleanGetTypeID() && [body[@"version"] doubleValue] == self.bridgeVersion) {
-        if (sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length) != 1) { self.rejected++; return; }
+        if (sinanUISessionMessage(self.handle, (char *)message.frameInfo.request.URL.absoluteString.UTF8String, message.frameInfo.isMainFrame, (char *)encoded.bytes, (int)encoded.length) != 1) { self.rejected++; return; }
         self.ready = YES;
         if (!self.probe) return;
         NSData *target = [NSJSONSerialization dataWithJSONObject:@[self.target] options:0 error:nil];
@@ -399,9 +399,9 @@ static void positionPanel(NSWindow *window) {
         return;
     }
     if (self.ready && (!self.probe || self.guestReport) && [body[@"kind"] isEqual:@"close"] && body.count == 1) {
-        if (sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length) == 2) { self.closeReceived = YES; self.done = YES; return; }
+        if (sinanUISessionMessage(self.handle, (char *)message.frameInfo.request.URL.absoluteString.UTF8String, message.frameInfo.isMainFrame, (char *)encoded.bytes, (int)encoded.length) == 2) { self.closeReceived = YES; self.done = YES; return; }
     } else {
-        (void)sinanUISessionMessage(self.handle, (char *)encoded.bytes, (int)encoded.length);
+        (void)sinanUISessionMessage(self.handle, (char *)message.frameInfo.request.URL.absoluteString.UTF8String, message.frameInfo.isMainFrame, (char *)encoded.bytes, (int)encoded.length);
     }
     self.rejected++;
 }
@@ -411,8 +411,10 @@ static void positionPanel(NSWindow *window) {
     if (!encoded || encoded.length > 65536) { replyHandler(nil,@"UI 请求超过 64 KiB"); return; }
     self.pendingCalls++;
     unsigned long long handle = self.handle;
+    NSString *source = message.frameInfo.request.URL.absoluteString;
+    BOOL mainFrame = message.frameInfo.isMainFrame;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0), ^{
-        char *raw = sinanUISessionCall(handle,(char *)encoded.bytes,(int)encoded.length);
+        char *raw = sinanUISessionCall(handle,(char *)source.UTF8String,mainFrame,(char *)encoded.bytes,(int)encoded.length);
         NSDictionary *response = nil;
         if (raw) { NSData *data = [NSData dataWithBytes:raw length:strlen(raw)]; response = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil]; free(raw); }
         dispatch_async(dispatch_get_main_queue(), ^{

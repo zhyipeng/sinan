@@ -30,7 +30,15 @@ func runNative(data []byte, target string, session Session, disable func() error
 	if control == nil {
 		return Report{}, errors.New("无法创建 UI 撤销信号")
 	}
-	handle := cgo.NewHandle(&nativeBinding{session: session, disable: disable})
+	var config map[string]any
+	_ = json.Unmarshal(data, &config)
+	entry, _ := config["entry"].(string)
+	bridge, err := newNativeBridge(session, entry)
+	if err != nil {
+		C.sinanUIControlFree(control)
+		return Report{}, err
+	}
+	handle := cgo.NewHandle(&nativeBinding{session: session, bridge: bridge, disable: disable})
 	var gateMu sync.Mutex
 	live := true
 	unsubscribe := session.OnRevoke(func() {
@@ -48,8 +56,6 @@ func runNative(data []byte, target string, session Session, disable func() error
 		gateMu.Unlock()
 		handle.Delete()
 	}()
-	var config map[string]any
-	_ = json.Unmarshal(data, &config)
 	if config["theme"] == nil {
 		config["theme"] = theme.Builtins("system", 0)
 	}

@@ -10,6 +10,8 @@ import (
 	"unsafe"
 )
 
+const EmbeddedSupported = false
+
 type Embedded struct{}
 
 func PrepareEmbedded(context.Context, *uiview.Session, func() unsafe.Pointer, protocol.ThemeState, string, func(int), func(func())) (*Embedded, error) {

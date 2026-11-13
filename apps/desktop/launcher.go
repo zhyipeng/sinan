@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -56,7 +57,9 @@ func (l *launcher) showLocked() {
 		return
 	}
 	l.window.SetSize(launcherWidth, launcherMinHeight)
-	id, ok := platform.CursorScreenID()
+	var id string
+	var ok bool
+	application.InvokeSync(func() { id, ok = platform.CursorScreenID() })
 	if !ok {
 		if screen, _ := l.window.GetScreen(); screen != nil {
 			id = screen.ID
@@ -141,7 +144,11 @@ func (l *launcher) status() string { l.mu.Lock(); defer l.mu.Unlock(); return l.
 
 func configureTray(app *application.App, show func()) *application.SystemTray {
 	tray := app.SystemTray.New()
-	tray.SetTemplateIcon(trayIcon)
+	if runtime.GOOS == "darwin" {
+		tray.SetTemplateIcon(trayIcon)
+	} else {
+		tray.SetIcon(appIcon)
+	}
 	tray.SetTooltip("司南")
 	menu := app.NewMenu()
 	menu.Add("显示司南").OnClick(func(_ *application.Context) { go show() })

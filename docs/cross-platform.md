@@ -47,4 +47,10 @@ Windows 通过初始化 COM 的固定线程调用 ShellExecute，不拼接 cmd.e
 3. 各平台呼出、失焦、焦点、拆出、输入法、屏幕缩放、系统主题与托盘适配。Linux 需分别确认 X11、Wayland 的能力与降级。
 4. Windows 全量测试夹具、安装器、Linux 发行格式、签名与对应平台验收。
 
-当前 Windows/Linux HTML 插件 UI 仍明确报告不支持；可信设置与插件中心不依赖该适配。现有非 macOS 光标屏幕定位与系统主题底层仍是回退实现。新增 CI 尚需在远端运行，任何本地交叉编译均不能代替目标平台运行验收。真实 UI 验收仅在用户明确要求时执行。
+当前 Windows/Linux HTML 插件 UI 仍明确报告不支持；可信设置与插件中心不依赖该适配。新增 CI 尚需在远端运行，任何交叉编译或无显示服务器的容器构建均不能代替目标平台运行验收。真实 UI 验收仅在用户明确要求时执行。
+
+## 第二轮进展
+
+原生 renderer 的导航、资源、消息来源与 frame 校验现统一到 Go 会话边界，并已接入 macOS。WebView2 和 WebKitGTK 后续适配器应直接复用该边界；来源和 frame 必须取自引擎事件，不能相信页面自报字段。无窗口回归覆盖拒绝路径、预算与撤销后的迟到响应。
+
+Windows 新增光标屏幕选择，保持 Wails 逻辑工作区转换；Linux GTK3 新增 X11 光标屏幕与工作区查询，Wayland 明确回退。Windows 读取应用主题偏好并同步原生窗口；Linux 使用 GNOME GSettings 读取/观察系统偏好，仅修改应用内 GTK 设置，无对应 Schema 时回退。其他 Linux 桌面的主题来源仍需适配。两端托盘使用普通应用图标。详见 [ADR 0053](adr/0053-shared-native-ui-boundary.md)。

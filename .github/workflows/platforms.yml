@@ -41,7 +41,7 @@ jobs:
       # Keep their Windows migration explicit, while exercising the new adapters.
       - name: Windows platform regression
         if: runner.os == 'Windows'
-        run: go test ./plugins/system-app-search/catalog ./internal/plugin/manifest ./internal/plugin/transport -run 'TestPlatform|TestDesktop'
+        run: go test ./plugins/system-app-search/catalog ./internal/plugin/manifest ./internal/plugin/transport ./internal/plugin/uihost -run 'TestPlatform|TestDesktop|TestNativeBridge|TestEmbeddedResource'
       - name: Windows frontend regression
         if: runner.os == 'Windows'
         run: |

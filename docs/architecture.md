@@ -378,3 +378,8 @@ Manifest 可选 `icon` 指向包内 SVG、PNG、JPEG，宿主限大小读取及�
 ### 插件商店 GitHub 镜像加速（2026-11-13）
 
 按用户指令为插件商店增加可选 GitHub 镜像加速。设置项类型由 `directory-list` 扩展出 `select` 与 `text`，插件中心 0.8.0 在系统设置页声明「GitHub 加速服务」与「自定义加速模板」。目录读取与发行资产下载共用 `internal/plugin/ghmirror` 的模板候选：默认官方优先、失败逐个回退内置镜像（`github.chenc.dev`、`gh-proxy.com`），可选仅官方、指定镜像或自定义模板；模板仅支持 `{url}` 且限 HTTPS。为兼容镜像规范化跳转，允许同主机 HTTPS 重定向，跨主机仍拒绝。镜像只改变请求出口，不读取本机凭据，不改变目录校验、资产摘要、ZIP 限制、指纹与信任流程。详见 [ADR 0052](adr/0052-github-mirror-acceleration.md) 与[插件商店](plugin-store.md)。
+
+
+### 原生 UI 共用边界与 Shell 适配（2026-11-13）
+
+后续将初始导航、GET 资源、实际来源/主 frame、预算及撤销后的调用结果校验统一到 Go 原生 UI 边界，并接入 macOS 普通承载和 helper，为独立 WebView2/WebKitGTK 适配器提供共用机制。Windows 新增光标屏幕和系统主题适配；Linux GTK3 新增 X11 光标屏幕与 GDK 工作区、GNOME 主题偏好读取/观察，Wayland 定位明确回退。两端托盘使用普通应用图标。Windows/Linux 原生插件 UI renderer 仍未实现，不使用可信 Wails WebView 降级承载；边界与验证限制见 [ADR 0053](adr/0053-shared-native-ui-boundary.md)。
