@@ -27,4 +27,4 @@ make dev
 
 ## 跨平台适配
 
-Windows 与 Linux 同步适配中。可通过 `node scripts/desktop.mjs setup`、`build`、`dev` 使用无需 Make/sh 的开发入口；Linux 使用 GTK3/WebKitGTK 4.1。已增加两端应用检索、原生构建 CI 和 Shell 适配，并实现待实机验收的 Linux GTK3 隔离内容承载；Windows WebView2、完整发行安装和目标平台验收仍待完成。依赖、命令和能力边界见[跨平台适配](docs/cross-platform.md)。
+Windows 与 Linux 同步适配中。可通过 `node scripts/desktop.mjs setup`、`build`、`dev` 使用无需 Make/sh 的开发入口；Linux 使用 GTK3/WebKitGTK 4.1。已增加两端应用检索、原生构建 CI 和 Shell 适配，并实现待实机验收的 Linux GTK3 与 Windows WebView2 隔离内容承载；完整发行安装和目标平台验收仍待完成。依赖、命令和能力边界见[跨平台适配](docs/cross-platform.md)。

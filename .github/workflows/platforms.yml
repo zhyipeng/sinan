@@ -41,10 +41,10 @@ jobs:
       # Keep their Windows migration explicit, while exercising the new adapters.
       - name: Windows platform regression
         if: runner.os == 'Windows'
-        run: go test ./plugins/system-app-search/catalog ./internal/plugin/manifest ./internal/plugin/transport ./internal/plugin/uihost -run 'TestPlatform|TestDesktop|TestNativeBridge|TestEmbeddedResource'
+        run: go test ./plugins/system-app-search/catalog ./internal/plugin/manifest ./internal/plugin/transport ./internal/plugin/uihost -run 'TestPlatform|TestDesktop|TestNativeBridge|TestEmbeddedResource|TestWebview'
       - name: Windows frontend regression
         if: runner.os == 'Windows'
         run: |
           node --test packages/plugin-sdk/theme/runtime.test.mjs
-          node --test internal/plugin/uihost/gtk_bridge.test.mjs
+          node --test internal/plugin/uihost/gtk_bridge.test.mjs internal/plugin/uihost/webview_bridge.test.mjs
           node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs

@@ -100,7 +100,7 @@ const tasks = {
   test() {
     frontend();
     run(process.execPath, ['--test', 'packages/plugin-sdk/theme/runtime.test.mjs']);
-    run(process.execPath, ['--test', 'internal/plugin/uihost/gtk_bridge.test.mjs']);
+    run(process.execPath, ['--test', 'internal/plugin/uihost/gtk_bridge.test.mjs', 'internal/plugin/uihost/webview_bridge.test.mjs']);
     run(process.execPath, ['--experimental-strip-types', '--test', 'apps/desktop/frontend/tests/paste.test.mjs']);
     run('go', ['test', ...tags, '-race', '-p', '1', './...'], { SINAN_NATIVE_UI_TEST: '0' });
   },

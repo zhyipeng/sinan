@@ -1,4 +1,4 @@
-//go:build (!darwin && !linux) || ios || (darwin && !cgo) || (linux && (!cgo || !gtk3))
+//go:build (!darwin && !linux && !windows) || (windows && ((!amd64 && !arm64) || native_webview2loader)) || ios || (darwin && !cgo) || (linux && (!cgo || !gtk3))
 
 package uihost
 

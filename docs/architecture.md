@@ -388,3 +388,7 @@ Manifest 可选 `icon` 指向包内 SVG、PNG、JPEG，宿主限大小读取及�
 ### GTK3 同窗口隔离内容承载（2026-11-13）
 
 Linux GTK3 现实现独立 ephemeral WebKitContext、独立用户脚本与命名隔离 world 的原生内容子视图，保留 58 DIP 可信页头和现有准备/提交/撤销/拆出路径。GTK 消息信号没有 WKFrameInfo，来源转交通过仅注入顶层文档的隔离 world 限定可信同窗口消息，并在原生/Go 侧继续绑定精确文档和会话；不将页面声明作为来源证明，不暴露 Wails Bridge。要求 WebKitGTK 2.40+ 的 4.1 API，普通嵌入能力与旧独立 helper 分开判定。Windows WebView2 renderer 仍待实现；无窗口回归不等于 GTK 实机验收。见 [ADR 0054](adr/0054-gtk-isolated-plugin-content.md)。
+
+### Windows 同窗口隔离内容承载（2026-11-14）
+
+Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和原生 Controller，保留可信页头及现有准备/提交/撤销/拆出路径。资源通过每次视图独立的虚拟 HTTPS 源映射到绑定快照，全部资源事件由宿主处理，不映射磁盘目录或启动 HTTP 服务；消息来源取自引擎顶层事件。仅兼容 SDK 窄桥，不注册 Wails Bridge、Host Object 或通用 CDP 接口。临时配置目录可写且可能残留，不将 InPrivate 描述为内存存储或 OS 沙箱。交叉编译、静态检查与无窗口边界测试已通过，Windows 原生 COM 测试仅编译，实际引擎、焦点和缩放仍待实机验收。见 [ADR 0055](adr/0055-webview2-isolated-plugin-content.md)。
