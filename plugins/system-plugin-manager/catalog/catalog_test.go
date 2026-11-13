@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sinan/internal/plugin/ghmirror"
 	"strings"
 	"testing"
 )
@@ -115,5 +116,56 @@ func TestOptionalCatalogArtwork(t *testing.T) {
 		if Validate(entry) == nil {
 			t.Fatal("unsafe catalog artwork accepted")
 		}
+	}
+}
+
+func TestCatalogFallsBackToMirrorWhenOfficialFails(t *testing.T) {
+	_, loader, _, _ := serviceFixture(t)
+	entry := loader.snapshot.Entries[0]
+	raw, _ := json.Marshal(entry)
+	treeSHA, blobSHA := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	mirrorHits := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/https://") {
+			mirrorHits++
+			if strings.Contains(r.URL.Path, "/git/blobs/") {
+				_ = json.NewEncoder(w).Encode(map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString(raw)})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"sha": treeSHA, "tree": []map[string]string{{"path": "plugins/example.store/plugin.json", "sha": blobSHA, "type": "blob"}}})
+			return
+		}
+		w.WriteHeader(http.StatusForbidden) // official endpoint rate limited
+	}))
+	defer server.Close()
+
+	original := ghmirror.Builtins
+	ghmirror.Builtins = []ghmirror.Mirror{{ID: "test", Name: "test", Template: server.URL + "/" + ghmirror.Placeholder}}
+	defer func() { ghmirror.Builtins = original }()
+
+	c := New(t.TempDir())
+	c.base = server.URL
+	c.http = server.Client()
+	c.SetConfig(ghmirror.Config{Mode: "auto"})
+	snapshot, err := c.Load(context.Background(), true)
+	if err != nil || len(snapshot.Entries) != 1 || snapshot.Revision != treeSHA {
+		t.Fatalf("mirror fallback: %+v %v", snapshot, err)
+	}
+	if mirrorHits == 0 {
+		t.Fatal("official failure did not fall back to the mirror")
+	}
+}
+
+func TestCatalogOfficialOnlyReportsRateLimit(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+	c := New(t.TempDir())
+	c.base = server.URL
+	c.http = server.Client()
+	c.SetConfig(ghmirror.Config{Mode: "official"})
+	if _, err := c.Load(context.Background(), true); err == nil || !strings.Contains(err.Error(), "受限") {
+		t.Fatalf("expected rate-limit error, got %v", err)
 	}
 }

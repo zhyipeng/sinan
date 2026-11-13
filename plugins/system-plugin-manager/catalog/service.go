@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/distribution"
+	"sinan/internal/plugin/ghmirror"
 	"sync"
 	"time"
 )
@@ -69,6 +70,18 @@ type Service struct {
 
 func NewService(backend Backend, cacheDir string) *Service {
 	return &Service{Loader: New(cacheDir), Fetcher: distribution.New(), Backend: backend, CacheDir: cacheDir, pending: map[string]pending{}}
+}
+
+// SetMirrorConfig applies the mirror preference to catalog reads and package
+// downloads. It is cheap and safe to call on every store request, so setting
+// changes take effect without recreating the service.
+func (s *Service) SetMirrorConfig(cfg ghmirror.Config) {
+	if client, ok := s.Loader.(*Client); ok {
+		client.SetConfig(cfg)
+	}
+	if fetcher, ok := s.Fetcher.(*distribution.Fetcher); ok {
+		fetcher.SetConfig(cfg)
+	}
 }
 func (s *Service) Load(ctx context.Context, force bool) (View, error) {
 	snapshot, err := s.Loader.Load(ctx, force)

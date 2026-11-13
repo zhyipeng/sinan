@@ -159,3 +159,32 @@ func TestPlatformExecutableEntry(t *testing.T) {
 		}
 	}
 }
+
+func TestSettingTypes(t *testing.T) {
+	base := func() Manifest {
+		return Manifest{ID: "example.test", Name: "Test", Version: "0.1.0", APIVersion: "1", Runtime: Runtime{Kind: "declarative"}, Contributes: Contributions{Commands: []Command{{ID: "hello", Title: "Hello", Message: "hello"}}}}
+	}
+	valid := base()
+	valid.Contributes.Settings = []Setting{
+		{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "auto", Label: "自动"}, {Value: "official", Label: "仅官方"}}},
+		{ID: "template", Title: "模板", Type: "text", Placeholder: "https://x/{url}"},
+		{ID: "directories", Title: "目录", Type: "directory-list"},
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid settings rejected: %v", err)
+	}
+	for name, mutate := range map[string]func(*Manifest){
+		"select-without-options": func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select"}} },
+		"select-bad-value":       func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "Auto", Label: "x"}}}} },
+		"select-dup-option":      func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "a", Label: "a"}, {Value: "a", Label: "b"}}}} },
+		"directory-list-options": func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "directories", Title: "目录", Type: "directory-list", Options: []SettingOption{{Value: "a", Label: "a"}}}} },
+		"text-options":           func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "t", Title: "t", Type: "text", Options: []SettingOption{{Value: "a", Label: "a"}}}} },
+		"unknown-type":           func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "t", Title: "t", Type: "unknown"}} },
+	} {
+		m := base()
+		mutate(&m)
+		if m.Validate() == nil {
+			t.Fatalf("invalid settings accepted: %s", name)
+		}
+	}
+}

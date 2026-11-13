@@ -86,7 +86,7 @@ Go 命令插件继续使用 `sdk.Serve`；搜索插件使用 `sdk.ServeWithHandl
 
 ## 配置与可信视图
 
-应用检索 0.3.0 通过 `contributes.settings` 声明 `[{"id":"directories","title":"额外应用目录","type":"directory-list"}]`。当前每插件最多 16 项，每项最多 16 个目录，写入时验证存在的目录绝对路径。宿主通过 `initialize.params.settings` 提供当前插件的配置，缺失项为空列表；SDK 的 `Handlers.Initialize` 在开始处理命令前读取快照。保存后只停止受影响的进程，下次调用重新激活，无插件侧热更新通知。
+应用检索 0.3.0 通过 `contributes.settings` 声明 `[{"id":"directories","title":"额外应用目录","type":"directory-list"}]`。设置项类型支持 `directory-list`（每项最多 16 个已存在的目录绝对路径）、`select`（以 `options` 提供固定选项，保存单个值）和 `text`（单行文本，最长 2048 字符，可带 `placeholder`）。插件中心 0.8.0 用 `select` 与 `text` 声明 GitHub 加速服务及自定义模板。宿主通过 `initialize.params.settings` 提供当前插件的配置，缺失项为空列表；SDK 的 `Handlers.Initialize` 在开始处理命令前读取快照。保存后只停止受影响的进程，下次调用重新激活，无插件侧热更新通知。
 
 声明式命令可使用 `view` 替代 `message`，与 `execution` 互斥。Shell 只显示构建时注册的可信组件，未知键报错；不会将视图键作为文件路径或 URL 加载。`system.settings/settings` 是首个注册组件。此能力不开放第三方 JS/HTML，详见 [ADR 0006](adr/0006-settings-service-and-view.md)。
 

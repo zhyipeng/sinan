@@ -6,8 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"sinan/internal/kernel"
+	"sinan/internal/plugin/ghmirror"
 	"sinan/plugins/system-plugin-manager/catalog"
 )
+
+// storeMirrorConfig reads the plugin center's GitHub mirror preference. Missing
+// or unreadable settings fall back to the default "auto" behaviour.
+func (h *HostService) storeMirrorConfig() ghmirror.Config {
+	snapshot, err := h.manager.PluginSettings("system.plugin-manager")
+	if err != nil {
+		return ghmirror.Config{Mode: "auto"}
+	}
+	return ghmirror.FromSettings(snapshot.Values)
+}
 
 func (h *HostService) pluginStore() (*catalog.Service, error) {
 	h.storeMu.Lock()
@@ -19,6 +30,7 @@ func (h *HostService) pluginStore() (*catalog.Service, error) {
 		}
 		h.store = catalog.NewService(h.manager, filepath.Join(root, "Sinan", "plugin-store"))
 	}
+	h.store.SetMirrorConfig(h.storeMirrorConfig())
 	return h.store, nil
 }
 func (h *HostService) StoreCatalog(ctx context.Context, refresh bool) (catalog.View, error) {

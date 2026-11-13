@@ -361,7 +361,40 @@
                 "maxLength": 128
               },
               "type": {
-                "const": "directory-list"
+                "enum": [
+                  "directory-list",
+                  "select",
+                  "text"
+                ],
+                "description": "directory-list 保存目录列表；select 需提供 options 并保存单个值；text 保存单行文本。"
+              },
+              "options": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value",
+                    "label"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                }
+              },
+              "placeholder": {
+                "type": "string",
+                "maxLength": 256
               }
             }
           }

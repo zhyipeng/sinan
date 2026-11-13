@@ -4,5 +4,6 @@
 export type {
     Command,
     SearchProvider,
-    Setting
+    Setting,
+    SettingOption
 } from "./models.js";

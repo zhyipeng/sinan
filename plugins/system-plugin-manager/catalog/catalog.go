@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sinan/internal/plugin/ghmirror"
 	"sinan/internal/plugin/icon"
 	"sinan/internal/plugin/manifest"
 	"sort"
@@ -200,13 +201,82 @@ type Client struct {
 	base      string
 	cacheFile string
 	cached    Snapshot
+	cfg       ghmirror.Config
 }
 
 func New(cacheDir string) *Client {
-	return &Client{http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("目录不接受重定向") }}, base: "https://api.github.com", cacheFile: filepath.Join(cacheDir, "catalog.json")}
+	return &Client{
+		http:      &http.Client{Timeout: 15 * time.Second, CheckRedirect: sameHostRedirect},
+		base:      "https://api.github.com",
+		cacheFile: filepath.Join(cacheDir, "catalog.json"),
+		cfg:       ghmirror.Config{Mode: "official"},
+	}
 }
+
+// SetConfig applies the mirror preference. The default (zero) preference keeps
+// the official endpoint only; the host supplies "auto" when the setting is unset.
+func (c *Client) SetConfig(cfg ghmirror.Config) {
+	c.mu.Lock()
+	c.cfg = cfg
+	c.mu.Unlock()
+}
+
+// sameHostRedirect permits HTTPS redirects only when they stay on the host of
+// the first request in the chain (e.g. github.chenc.dev canonicalising to
+// /https:/...). Cross-host redirects remain rejected.
+func sameHostRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) > 5 {
+		return errors.New("目录重定向次数过多")
+	}
+	if req.URL.Scheme != "https" || req.URL.User != nil {
+		return errors.New("目录不接受此重定向")
+	}
+	if len(via) > 0 && !strings.EqualFold(req.URL.Hostname(), via[0].URL.Hostname()) {
+		return errors.New("目录不接受跨主机重定向")
+	}
+	return nil
+}
+
+var (
+	errCatalogRateLimited = errors.New("catalog rate limited")
+	errCatalogUnavailable = errors.New("catalog unavailable")
+)
+
 func (c *Client) read(ctx context.Context, path, etag string) ([]byte, string, bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.base+path, nil)
+	rawURL := c.base + path
+	candidates := c.cfg.Candidates(rawURL)
+	if len(candidates) == 0 {
+		candidates = []string{rawURL}
+	}
+	rateLimited, unavailable, connectFailed := false, false, false
+	for _, target := range candidates {
+		data, newETag, unchanged, err := c.readOnce(ctx, target, etag)
+		if err == nil {
+			return data, newETag, unchanged, nil
+		}
+		switch {
+		case errors.Is(err, errCatalogRateLimited):
+			rateLimited = true
+		case errors.Is(err, errCatalogUnavailable):
+			unavailable = true
+		default:
+			connectFailed = true
+		}
+	}
+	switch {
+	case rateLimited:
+		return nil, "", false, errors.New("GitHub 请求受限，请稍后刷新")
+	case unavailable:
+		return nil, "", false, errors.New("插件目录暂不可用")
+	case connectFailed:
+		return nil, "", false, errors.New("无法连接 GitHub 插件目录")
+	default:
+		return nil, "", false, errors.New("插件目录暂不可用")
+	}
+}
+
+func (c *Client) readOnce(ctx context.Context, target, etag string) ([]byte, string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", target, nil)
 	if err != nil {
 		return nil, "", false, errors.New("目录请求无效")
 	}
@@ -217,17 +287,17 @@ func (c *Client) read(ctx context.Context, path, etag string) ([]byte, string, b
 	}
 	response, err := c.http.Do(req)
 	if err != nil {
-		return nil, "", false, errors.New("无法连接 GitHub 插件目录")
+		return nil, "", false, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode == 304 {
 		return nil, etag, true, nil
 	}
 	if response.StatusCode == 403 || response.StatusCode == 429 {
-		return nil, "", false, errors.New("GitHub 请求受限，请稍后刷新")
+		return nil, "", false, errCatalogRateLimited
 	}
 	if response.StatusCode != 200 {
-		return nil, "", false, errors.New("插件目录暂不可用")
+		return nil, "", false, errCatalogUnavailable
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 2<<20+1))
 	if err != nil || len(data) > 2<<20 {

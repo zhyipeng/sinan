@@ -373,3 +373,8 @@ Manifest 可选 `icon` 指向包内 SVG、PNG、JPEG，宿主限大小读取及�
 ### Windows 与 Linux 同步适配基础（2026-11-13）
 
 按用户指令同步推进 Windows/Linux。首轮将应用检索的目录、条目类型及启动机制从 macOS 假设中拆出，增加开始菜单 `.lnk` / `.exe`、XDG `.desktop` 发现和平台原生启动，业务仍在应用插件。构建与开发准备统一为可供 PowerShell/Make 使用的 Node 入口，Linux 显式采用 GTK3/WebKitGTK 4.1，增加三平台原生构建 CI。Windows 原生入口改为 `.exe` 校验，原生后端仅额外接收显式平台环境白名单以支持目录发现及桌面会话，不整表继承宿主环境。协议、第三方 UI 隔离与权限边界不变；Windows/Linux HTML 客体仍未实现，原生 UI、系统主题、屏幕定位及发行安装流程继续待补。新增 CI 和目标平台运行尚未验证，不将交叉编译等同于平台验收。详见 [ADR 0051](adr/0051-cross-platform-foundation.md) 与[跨平台适配](cross-platform.md)。
+
+
+### 插件商店 GitHub 镜像加速（2026-11-13）
+
+按用户指令为插件商店增加可选 GitHub 镜像加速。设置项类型由 `directory-list` 扩展出 `select` 与 `text`，插件中心 0.8.0 在系统设置页声明「GitHub 加速服务」与「自定义加速模板」。目录读取与发行资产下载共用 `internal/plugin/ghmirror` 的模板候选：默认官方优先、失败逐个回退内置镜像（`github.chenc.dev`、`gh-proxy.com`），可选仅官方、指定镜像或自定义模板；模板仅支持 `{url}` 且限 HTTPS。为兼容镜像规范化跳转，允许同主机 HTTPS 重定向，跨主机仍拒绝。镜像只改变请求出口，不读取本机凭据，不改变目录校验、资产摘要、ZIP 限制、指纹与信任流程。详见 [ADR 0052](adr/0052-github-mirror-acceleration.md) 与[插件商店](plugin-store.md)。

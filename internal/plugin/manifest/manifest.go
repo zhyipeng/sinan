@@ -48,9 +48,17 @@ type Contributions struct {
 }
 
 type Setting struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Type  string `json:"type"`
+	ID          string          `json:"id"`
+	Title       string          `json:"title"`
+	Type        string          `json:"type"`
+	Options     []SettingOption `json:"options,omitempty"`
+	Placeholder string          `json:"placeholder,omitempty"`
+}
+
+// SettingOption is one choice of a "select" setting.
+type SettingOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
 }
 
 type SearchProvider struct {
@@ -187,7 +195,30 @@ func (m Manifest) Validate() error {
 	}
 	settingIDs := map[string]bool{}
 	for _, setting := range m.Contributes.Settings {
-		if !commandPattern.MatchString(setting.ID) || settingIDs[setting.ID] || strings.TrimSpace(setting.Title) == "" || len(setting.Title) > 128 || setting.Type != "directory-list" {
+		if !commandPattern.MatchString(setting.ID) || settingIDs[setting.ID] || strings.TrimSpace(setting.Title) == "" || len(setting.Title) > 128 {
+			return errors.New("设置项声明无效或重复")
+		}
+		switch setting.Type {
+		case "directory-list":
+			if len(setting.Options) > 0 || setting.Placeholder != "" {
+				return errors.New("设置项声明无效或重复")
+			}
+		case "select":
+			if len(setting.Options) < 1 || len(setting.Options) > 16 {
+				return errors.New("设置项声明无效或重复")
+			}
+			optionValues := map[string]bool{}
+			for _, option := range setting.Options {
+				if !commandPattern.MatchString(option.Value) || optionValues[option.Value] || strings.TrimSpace(option.Label) == "" || len(option.Label) > 128 {
+					return errors.New("设置项声明无效或重复")
+				}
+				optionValues[option.Value] = true
+			}
+		case "text":
+			if len(setting.Options) > 0 || len(setting.Placeholder) > 256 {
+				return errors.New("设置项声明无效或重复")
+			}
+		default:
 			return errors.New("设置项声明无效或重复")
 		}
 		settingIDs[setting.ID] = true

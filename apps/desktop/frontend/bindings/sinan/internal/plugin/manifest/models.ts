@@ -27,4 +27,14 @@ export interface Setting {
     "id": string;
     "title": string;
     "type": string;
+    "options"?: SettingOption[] | null;
+    "placeholder"?: string;
+}
+
+/**
+ * SettingOption is one choice of a "select" setting.
+ */
+export interface SettingOption {
+    "value": string;
+    "label": string;
 }

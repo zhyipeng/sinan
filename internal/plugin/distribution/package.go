@@ -16,8 +16,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
+
+	"sinan/internal/plugin/ghmirror"
 )
 
 var repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*$`)
@@ -28,7 +31,11 @@ type Artifact struct {
 	Size       int64
 	SHA256     string
 }
-type Fetcher struct{ Client *http.Client }
+type Fetcher struct {
+	mu     sync.Mutex
+	Client *http.Client
+	cfg    ghmirror.Config
+}
 
 func allowedURL(u *url.URL) bool {
 	if u.Scheme != "https" || u.User != nil || u.Port() != "" {
@@ -40,19 +47,67 @@ func allowedURL(u *url.URL) bool {
 	}
 	return false
 }
-func New() *Fetcher {
-	return &Fetcher{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) > 5 || !allowedURL(req.URL) {
-			return errors.New("下载重定向被拒绝")
-		}
+
+// downloadRedirect allows redirects to approved GitHub asset hosts and to the
+// same host as the first request (so mirror services that canonicalise the path
+// keep working). Other cross-host redirects are rejected.
+func downloadRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) > 5 {
+		return errors.New("下载重定向过多")
+	}
+	if allowedURL(req.URL) {
 		return nil
-	}}}
+	}
+	if len(via) > 0 && req.URL.Scheme == "https" && req.URL.User == nil && req.URL.Port() == "" && strings.EqualFold(req.URL.Hostname(), via[0].URL.Hostname()) {
+		return nil
+	}
+	return errors.New("下载重定向被拒绝")
 }
+
+func New() *Fetcher {
+	return &Fetcher{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: downloadRedirect}, cfg: ghmirror.Config{Mode: "official"}}
+}
+
+// SetConfig applies the mirror preference to asset downloads.
+func (f *Fetcher) SetConfig(cfg ghmirror.Config) {
+	f.mu.Lock()
+	f.cfg = cfg
+	f.mu.Unlock()
+}
+
+func (f *Fetcher) config() ghmirror.Config {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.cfg
+}
+
 func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (directory string, cleanup func(), err error) {
 	if a.ID <= 0 || a.Size <= 0 || a.Size > 64<<20 || len(a.SHA256) != 64 || strings.Trim(a.SHA256, "0123456789abcdef") != "" || !repositoryPattern.MatchString(a.Repository) {
 		return "", nil, errors.New("发行资产参数无效")
 	}
-	if err = os.MkdirAll(cacheDir, 0700); err != nil {
+	rawURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", a.Repository, a.ID)
+	candidates := f.config().Candidates(rawURL)
+	if len(candidates) == 0 {
+		candidates = []string{rawURL}
+	}
+	var lastErr error
+	for _, address := range candidates {
+		staged, stagedCleanup, stageErr := f.stageFrom(ctx, cacheDir, a, address)
+		if stageErr == nil {
+			return staged, stagedCleanup, nil
+		}
+		lastErr = stageErr
+	}
+	if lastErr == nil {
+		lastErr = errors.New("插件包下载失败")
+	}
+	return "", nil, lastErr
+}
+
+// stageFrom downloads and validates one candidate URL. On failure it removes its
+// own temporary directory so the next candidate starts clean.
+func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, address string) (string, func(), error) {
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		return "", nil, errors.New("无法创建下载缓存")
 	}
 	work, err := os.MkdirTemp(cacheDir, "package-")
@@ -60,14 +115,12 @@ func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (direc
 		return "", nil, errors.New("无法创建下载目录")
 	}
 	removeWork := func() { _ = os.RemoveAll(work) }
-	cleanup = removeWork
 	success := false
 	defer func() {
 		if !success {
 			removeWork()
 		}
 	}()
-	address := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", a.Repository, a.ID)
 	req, err := http.NewRequestWithContext(ctx, "GET", address, nil)
 	if err != nil {
 		return "", nil, errors.New("下载请求无效")
@@ -93,7 +146,7 @@ func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (direc
 	if copyErr != nil || closeErr != nil || n != a.Size || hex.EncodeToString(hash.Sum(nil)) != a.SHA256 {
 		return "", nil, errors.New("插件包大小或 SHA-256 校验失败")
 	}
-	directory = filepath.Join(work, "plugin")
+	directory := filepath.Join(work, "plugin")
 	if err = os.Mkdir(directory, 0700); err != nil {
 		return "", nil, err
 	}
@@ -102,7 +155,7 @@ func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (direc
 	}
 	_ = os.Remove(archive)
 	success = true
-	return directory, cleanup, nil
+	return directory, removeWork, nil
 }
 
 // StageLocal snapshots a local ZIP before extracting it with the same limits as store assets.

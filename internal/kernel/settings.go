@@ -35,30 +35,76 @@ func (m *Manager) SavePluginSettings(pluginID string, revision uint64, values ma
 	if err != nil {
 		return storage.SettingsSnapshot{}, err
 	}
-	allowed := map[string]bool{}
+	allowed := map[string]manifest.Setting{}
 	for _, field := range p.manifest.Contributes.Settings {
-		allowed[field.ID] = true
+		allowed[field.ID] = field
 	}
 	normalized := map[string][]string{}
-	for key, paths := range values {
-		if !allowed[key] || len(paths) > 16 {
-			return storage.SettingsSnapshot{}, errors.New("设置项未声明或目录数量超过 16 个")
+	for key, values := range values {
+		field, ok := allowed[key]
+		if !ok {
+			return storage.SettingsSnapshot{}, errors.New("设置项未声明")
 		}
-		seen := map[string]bool{}
-		normalized[key] = []string{}
-		for _, path := range paths {
-			path = strings.TrimSpace(path)
-			if len(path) > 1024 || !filepath.IsAbs(path) || strings.ContainsRune(path, 0) {
-				return storage.SettingsSnapshot{}, errors.New("请输入有效的目录绝对路径")
+		switch field.Type {
+		case "select":
+			if len(values) > 1 {
+				return storage.SettingsSnapshot{}, errors.New("设置项取值无效")
 			}
-			path = filepath.Clean(path)
-			info, statErr := os.Stat(path)
-			if statErr != nil || !info.IsDir() {
-				return storage.SettingsSnapshot{}, errors.New("目录不存在或无法访问，请检查后重试")
+			value := ""
+			if len(values) == 1 {
+				value = strings.TrimSpace(values[0])
 			}
-			if !seen[path] {
-				seen[path] = true
-				normalized[key] = append(normalized[key], path)
+			if value == "" {
+				normalized[key] = []string{}
+				continue
+			}
+			valid := false
+			for _, option := range field.Options {
+				if option.Value == value {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return storage.SettingsSnapshot{}, errors.New("设置项取值无效")
+			}
+			normalized[key] = []string{value}
+		case "text":
+			if len(values) > 1 {
+				return storage.SettingsSnapshot{}, errors.New("设置项取值无效")
+			}
+			value := ""
+			if len(values) == 1 {
+				value = strings.TrimSpace(values[0])
+			}
+			if len(value) > 2048 || strings.ContainsRune(value, 0) {
+				return storage.SettingsSnapshot{}, errors.New("设置内容过长或无效")
+			}
+			if value == "" {
+				normalized[key] = []string{}
+			} else {
+				normalized[key] = []string{value}
+			}
+		default: // directory-list
+			if len(values) > 16 {
+				return storage.SettingsSnapshot{}, errors.New("设置项未声明或目录数量超过 16 个")
+			}
+			seen := map[string]bool{}
+			normalized[key] = []string{}
+			for _, path := range values {
+				path = strings.TrimSpace(path)
+				if len(path) > 1024 || !filepath.IsAbs(path) || strings.ContainsRune(path, 0) {
+					return storage.SettingsSnapshot{}, errors.New("请输入有效的目录绝对路径")
+				}
+				path = filepath.Clean(path)
+				info, statErr := os.Stat(path)
+				if statErr != nil || !info.IsDir() {
+					return storage.SettingsSnapshot{}, errors.New("目录不存在或无法访问，请检查后重试")
+				}
+				if !seen[path] {
+					seen[path] = true
+					normalized[key] = append(normalized[key], path)
+				}
 			}
 		}
 	}
