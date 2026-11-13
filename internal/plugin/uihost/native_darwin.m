@@ -92,12 +92,12 @@ static NSColor *headerToken(NSDictionary *theme, NSString *token, NSAppearance *
 - (void)drawRect:(NSRect)dirtyRect {
     if (self.hovered || [self.cell isHighlighted]) {
         [self.hoverColor setFill];
-        [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:7 yRadius:7] fill];
+        [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:8 yRadius:8] fill];
     }
     [super drawRect:dirtyRect];
     if (self.window.isKeyWindow && self.window.firstResponder == self) {
         [self.focusColor setStroke];
-        NSBezierPath *ring = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,1,1) xRadius:6 yRadius:6];
+        NSBezierPath *ring = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,1,1) xRadius:7 yRadius:7];
         ring.lineWidth = 2;
         [ring stroke];
     }
@@ -181,7 +181,7 @@ static NSColor *headerToken(NSDictionary *theme, NSString *token, NSAppearance *
     self.sourceLabel.frame = NSMakeRect(70+titleWidth+12,21,sourceWidth,16);
 }
 - (void)drawRect:(NSRect)dirtyRect {
-    [[self color:@"background"] setFill]; NSRectFill(self.bounds);
+    [[self color:@"surface"] setFill]; NSRectFill(self.bounds);
     [[self color:@"line"] setFill]; NSRectFill(NSMakeRect(0,0,self.bounds.size.width,1));
 }
 @end

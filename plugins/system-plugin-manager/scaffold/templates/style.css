@@ -1,13 +1,111 @@
-:root { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; font-size: 14px; font-synthesis: none; color: var(--sinan-text, #26334d); background: var(--sinan-background, #f5f7fb); }
-* { box-sizing: border-box; }
+:root {
+  color-scheme: light dark;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  color: var(--sinan-text, #161d2b);
+  background: var(--sinan-background, #f4f6fa);
+  accent-color: var(--sinan-accent, #2558e8);
+}
+
+:where(*, *::before, *::after) { box-sizing: border-box; }
 body { margin: 0; }
-.plugin-body { padding: 20px; }
-label { display: block; margin-bottom: 8px; font-size: 12px; }
-textarea { display: block; width: 100%; min-height: 140px; resize: vertical; padding: 12px; border: 1px solid var(--sinan-line, #dce2ed); border-radius: 8px; font: inherit; line-height: 1.6; color: inherit; background: var(--sinan-surface, #fff); }
-.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
-.form-actions p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--sinan-muted, #64718a); }
-button { flex-shrink: 0; padding: 9px 20px; border: 0; border-radius: 7px; font: inherit; color: var(--sinan-on-accent, #fff); background: var(--sinan-accent, #3761de); cursor: pointer; }
-button:hover { background: var(--sinan-accent-hover, #2e54c0); }
-button:disabled { opacity: .45; cursor: default; }
-textarea:focus-visible, button:focus-visible { outline: 2px solid var(--sinan-accent, #3761de); outline-offset: 2px; }
-output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 20px; padding: 14px; border: 1px solid var(--sinan-line, #dce2ed); border-radius: 8px; background: var(--sinan-surface, #fff); }
+.plugin-body { padding: 18px 20px; }
+
+form {
+  background: var(--sinan-surface, #ffffff);
+  border: 1px solid var(--sinan-line, #dfe5f0);
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sinan-muted, #5c687d);
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 136px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--sinan-line, #dfe5f0);
+  border-radius: 8px;
+  font: inherit;
+  line-height: 1.55;
+  color: inherit;
+  background: var(--sinan-background, #f4f6fa);
+  transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.form-actions p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sinan-muted, #5c687d);
+}
+
+button {
+  flex-shrink: 0;
+  padding: 7px 18px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 560;
+  color: var(--sinan-on-accent, #ffffff);
+  background: var(--sinan-accent, #2558e8);
+  box-shadow: 0 1px 2px rgba(37, 88, 232, 0.18);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-out), transform 100ms var(--ease-out);
+}
+
+button:hover:not(:disabled) {
+  background: var(--sinan-accent-hover, #1d48c8);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--sinan-accent, #2558e8);
+  outline-offset: -2px;
+}
+
+output {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--sinan-line, #dfe5f0);
+  border-left: 3px solid var(--sinan-output-line, #5b82f0);
+  border-radius: 8px;
+  background: var(--sinan-surface, #ffffff);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}

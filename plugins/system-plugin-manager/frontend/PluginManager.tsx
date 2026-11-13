@@ -106,7 +106,7 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
     <div className="center-navigation">
       <div className="center-tabs" role="tablist" aria-label="插件中心">
         <button id="installed-tab" role="tab" aria-selected={tab==='installed'} aria-controls="installed-panel" disabled={busy||createBusy} onClick={()=>setTab('installed')}>已安装 <small>{data.plugins.length}</small></button>
-        <button id="discover-tab" role="tab" aria-selected={tab==='discover'} aria-controls="discover-panel" disabled={busy||createBusy} onClick={()=>setTab('discover')}>发现</button>
+        <button id="discover-tab" role="tab" aria-selected={tab==='discover'} aria-controls="discover-panel" disabled={busy||createBusy} onClick={()=>{setStoreID('');setTab('discover');}}>发现</button>
       </div>
       <div className="center-utilities">
         <button disabled={busy||projectBusy} aria-expanded={showInstall} onClick={()=>setShowInstall(value=>!value)}>本地安装</button>

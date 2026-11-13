@@ -10,12 +10,18 @@ type Entry = {icon?:string;id:string;name:string;summary:string;publisher:{kind:
 export type StoreSnapshot = {entries:Entry[];revision:string;updatedAt:number;stale:boolean;notice:string;os:string;arch:string;hostVersion:string};
 export type StorePreview = {ticket:string;id:string;name:string;version:string;kind:string;installedVersion:string;changed:boolean;repository:string;archiveSha256:string;expiresAt:number};
 export type StoreBridge = {load(refresh:boolean):Promise<StoreSnapshot>;prepare(id:string,version:string,revision:string):Promise<StorePreview>;apply(ticket:string,trust:boolean):Promise<unknown>;cancel(ticket:string):Promise<void>};
+type FilterKind = 'all' | 'official' | 'community' | 'installed' | 'updatable';
+
+const PAGE_SIZE = 24;
+
 function compare(a:string,b:string){const aa=a.split('.').map(Number),bb=b.split('.').map(Number);for(let i=0;i<3;i++){if(aa[i]!==bb[i])return aa[i]>bb[i]?1:-1;}return 0;}
 function compatible(release:Release,data:StoreSnapshot){return release.compatibility.apiVersion==='1'&&['1','2'].includes(release.compatibility.uiBridgeVersion)&&compare(data.hostVersion,release.minHostVersion)>=0&&release.assets.some(asset=>asset.os===data.os&&asset.arch===data.arch);}
 
 export default function PluginStore({bridge,onChanged,initialID='',renderActions,onBusyChange,plugins,disabled}:{bridge:StoreBridge;onChanged():Promise<void>;initialID?:string;renderActions(id:string):ReactNode;onBusyChange(busy:boolean):void;plugins:ManagedPlugin[];disabled:boolean}){
   const [data,setData]=useState<StoreSnapshot>();
   const [query,setQuery]=useState('');
+  const [filter,setFilter]=useState<FilterKind>('all');
+  const [page,setPage]=useState(1);
   const [selectedID,setSelectedID]=useState(initialID);
   const [version,setVersion]=useState('');
   const [localBusy,setBusy]=useState(false);
@@ -36,28 +42,71 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
     alive.current=true;void perform(()=>load(false));
     return()=>{alive.current=false;if(ticket.current)void bridge.cancel(ticket.current).catch(()=>{});};
   },[bridge]);
+  useEffect(()=>{setSelectedID(initialID);setVersion('');},[initialID]);
   useEffect(()=>{clearPreview();},[selectedID,version,data?.revision,plugins]);
   useEffect(()=>{onBusyChange(localBusy);return()=>onBusyChange(false);},[localBusy,onBusyChange]);
-  const entries=(data?.entries??[]).map(entry=>{const local=plugins.find(plugin=>plugin.id===entry.id);return {...entry,installedVersion:local?.version??'',development:!!local?.development,changed:!!local?.changed,protected:!!local?.protected};}).filter(entry=>`${entry.name} ${entry.id} ${entry.summary}`.toLowerCase().includes(query.trim().toLowerCase()));
-  const selected=entries.find(entry=>entry.id===selectedID)??(selectedID===initialID&&initialID?undefined:entries[0]);
+
+  const allEntries=(data?.entries??[]).map(entry=>{
+    const local=plugins.find(plugin=>plugin.id===entry.id);
+    const installedVersion=local?.version??'';
+    const latestCompatible=data?entry.releases.find(item=>compatible(item,data)):undefined;
+    const latestRelease=latestCompatible??entry.releases[0];
+    const latestVersion=latestRelease?.version??'';
+    const updatable=Boolean(installedVersion&&latestCompatible&&compare(latestCompatible.version,installedVersion)>0&&!local?.development&&!local?.changed&&!local?.protected);
+    return {...entry,installedVersion,development:!!local?.development,changed:!!local?.changed,protected:!!local?.protected,latestVersion,updatable};
+  });
+
+  const searchedEntries=allEntries.filter(entry=>`${entry.name} ${entry.id} ${entry.summary}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const counts: Record<FilterKind, number> = {
+    all: searchedEntries.length,
+    official: searchedEntries.filter(e=>e.publisher.kind==='official').length,
+    community: searchedEntries.filter(e=>e.publisher.kind!=='official').length,
+    installed: searchedEntries.filter(e=>!!e.installedVersion).length,
+    updatable: searchedEntries.filter(e=>e.updatable).length,
+  };
+  const entries=searchedEntries.filter(entry=>{
+    if(filter==='official')return entry.publisher.kind==='official';
+    if(filter==='community')return entry.publisher.kind!=='official';
+    if(filter==='installed')return !!entry.installedVersion;
+    if(filter==='updatable')return entry.updatable;
+    return true;
+  });
+
+  const totalPages=Math.max(1,Math.ceil(entries.length/PAGE_SIZE));
+  const currentPage=Math.min(page,totalPages);
+  const pagedEntries=entries.slice((currentPage-1)*PAGE_SIZE,currentPage*PAGE_SIZE);
+
+  const selected=selectedID?allEntries.find(entry=>entry.id===selectedID):undefined;
   const releases=selected?.releases??[];
   const release=releases.find(item=>item.version===version)??releases.find(item=>data&&compatible(item,data))??releases[0];
   const blocked=selected?.development?'开发链接请使用重载':selected?.changed?'请先处理本地文件修改':selected?.protected?'随宿主更新':data?.stale?'请联网刷新后安装':selected?.status==='withdrawn'?'已下架':selected?.status!=='published'?'待发布':!release||!data||!compatible(release,data)?'当前平台或宿主不兼容':'';
   const asset=release?.assets.find(item=>item.os===data?.os&&item.arch===data?.arch);
+
+  const filterOptions: [FilterKind, string][] = [
+    ['all', '全部'],
+    ['official', '官方'],
+    ['community', '社区'],
+    ['installed', '已安装'],
+    ['updatable', '可更新'],
+  ];
+
   return <div className="store-body">
-    <div className="store-toolbar"><input aria-label="搜索插件商店" placeholder="搜索插件…" value={query} onChange={event=>{clearPreview();setQuery(event.target.value);setVersion('');}} disabled={busy}/><button disabled={busy} onClick={()=>{clearPreview();void perform(()=>load(true));}}>刷新目录</button></div>
-    {data?.notice&&<p className="store-note" role="status">{data.notice}</p>}
-    <div className="store-layout">
-      <div className="store-list" aria-label="商店插件">
-        {entries.map(entry=><button key={entry.id} className={`store-item${selected?.id===entry.id?' selected':''}`} aria-pressed={selected?.id===entry.id} disabled={busy} onClick={()=>{setSelectedID(entry.id);setVersion('');}}><PluginIcon name={entry.name} icon={entry.icon}/><span className="store-item-label"><strong>{entry.name}</strong><small>{entry.publisher.kind==='official'?'官方':'社区'}{entry.installedVersion?` · 已安装 ${entry.installedVersion}`:entry.status==='pending-release'?' · 待发布':''}</small></span></button>)}
-        {!entries.length&&<p className="empty">{busy?'正在读取目录…':query?'没有匹配的插件':'暂无插件'}</p>}
+    {selectedID ? <div className="store-detail-view">
+      <div className="store-detail-nav">
+        <button type="button" className="store-back" disabled={busy} onClick={()=>{clearPreview();setSelectedID('');setVersion('');}}>← 返回插件目录</button>
+        <button type="button" disabled={busy} onClick={()=>{clearPreview();void perform(()=>load(true));}}>刷新目录</button>
       </div>
-      {!query&&selectedID===initialID&&initialID&&data&&!data.entries.some(entry=>entry.id===initialID)&&!busy&&<p className="store-note">此插件未收录于商店，本地管理仍可使用。</p>}
-      {selected&&<PluginDetails plugin={selected}><p className="store-summary">{selected.summary}</p>
+      {data?.notice&&<p className="store-note" role="status">{data.notice}</p>}
+      {!selected&&data&&!busy&&<div className="store-detail"><p className="store-note">此插件未收录于商店，本地管理仍可使用。</p></div>}
+      {selected&&<PluginDetails plugin={selected}>
+        <div className="store-meta-badges">
+          <span className={`store-publisher ${selected.publisher.kind==='official'?'official':'community'}`}>{selected.publisher.kind==='official'?'官方':'社区'}</span>
+          {selected.installedVersion&&<span className="store-badge installed">本地版本 {selected.installedVersion}</span>}
+          {asset&&data&&<span className="store-badge version">{data.os} / {data.arch} · {(asset.size/1024/1024).toFixed(1)} MiB</span>}
+        </div>
+        <p className="store-summary">{selected.summary}</p>
         <p className="store-source">{selected.source.repository?.replace('https://github.com/','')??'源码地址待登记'}</p>
         {releases.length>0&&<label className="store-version">版本<select value={release?.version??''} disabled={busy} onChange={event=>setVersion(event.target.value)}>{releases.map(item=><option value={item.version} key={item.version}>{item.version}</option>)}</select></label>}
-        {selected.installedVersion&&<p className="store-note">本地版本 {selected.installedVersion}</p>}
-        {asset&&data&&<p className="store-note">{data.os} / {data.arch} · {(asset.size/1024/1024).toFixed(1)} MiB</p>}
         {blocked?<p className="store-note">{blocked}</p>:!preview&&<button className="primary" disabled={busy} onClick={()=>void perform(async()=>{
           const result=await bridge.prepare(selected.id,release!.version,data!.revision);
           if(!alive.current){await bridge.cancel(result.ticket);return;}
@@ -75,7 +124,46 @@ export default function PluginStore({bridge,onChanged,initialID='',renderActions
         </div>}
         {selected.installedVersion&&renderActions(selected.id)}
       </PluginDetails>}
-    </div>
+    </div> : <>
+      <div className="store-toolbar">
+        <input aria-label="搜索插件商店" placeholder="搜索插件名称、ID 或简介…" value={query} onChange={event=>{clearPreview();setQuery(event.target.value);setPage(1);setVersion('');}} disabled={busy}/>
+        <button disabled={busy} onClick={()=>{clearPreview();void perform(()=>load(true));}}>刷新目录</button>
+      </div>
+      <div className="store-filters" role="group" aria-label="筛选插件目录">
+        <div className="store-filter-pills">
+          {filterOptions.map(([kind,label])=><button key={kind} type="button" className="store-filter-pill" aria-pressed={filter===kind} disabled={busy} onClick={()=>{setFilter(kind);setPage(1);}}>{label} <small>{counts[kind]}</small></button>)}
+        </div>
+        <span className="store-count">{entries.length} 个插件</span>
+      </div>
+      {data?.notice&&<p className="store-note" role="status">{data.notice}</p>}
+      <div className="store-grid" aria-label="商店插件">
+        {pagedEntries.map(entry=><button key={entry.id} type="button" className="store-card store-item" disabled={busy} onClick={()=>{setSelectedID(entry.id);setVersion('');}}>
+          <div className="store-card-header">
+            <PluginIcon name={entry.name} icon={entry.icon}/>
+            <div className="store-item-label">
+              <strong>{entry.name}</strong>
+              <small className="store-card-id">{entry.id}</small>
+            </div>
+            {entry.updatable ? <span className="store-badge updatable">可更新 {entry.latestVersion}</span>
+              : entry.installedVersion ? <span className="store-badge installed">已安装 {entry.installedVersion}</span>
+              : entry.status==='withdrawn' ? <span className="store-badge muted">已下架</span>
+              : entry.status!=='published' ? <span className="store-badge muted">待发布</span>
+              : entry.latestVersion ? <span className="store-badge version">v{entry.latestVersion}</span> : null}
+          </div>
+          <p className="store-card-summary">{entry.summary||'暂无简介'}</p>
+          <div className="store-card-footer">
+            <span className={`store-publisher ${entry.publisher.kind==='official'?'official':'community'}`}>{entry.publisher.kind==='official'?'官方':'社区'}</span>
+            <span className="store-card-repo">{entry.source.repository?.replace('https://github.com/','')??'源码待登记'}</span>
+          </div>
+        </button>)}
+      </div>
+      {!entries.length&&<p className="empty">{busy?'正在读取目录…':query||filter!=='all'?'没有匹配的插件':'暂无插件'}</p>}
+      {totalPages>1&&<div className="store-pagination" role="navigation" aria-label="目录分页">
+        <button type="button" disabled={busy||currentPage<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>上一页</button>
+        <span>第 {currentPage} / {totalPages} 页</span>
+        <button type="button" disabled={busy||currentPage>=totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>下一页</button>
+      </div>}
+    </>}
     {error&&<p className="error" role="alert">{error}</p>}{notice&&<p className="settings-notice" role="status">{notice}</p>}
   </div>;
 }
