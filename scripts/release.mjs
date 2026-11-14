@@ -55,7 +55,9 @@ function archive(version) {
       env: { ...process.env, SINAN_ARCHIVE_SOURCE: directory, SINAN_ARCHIVE_DEST: join(output, name) },
     });
   } else {
-    command('tar', ['-czf', join(output, name), '-C', join(root, 'bin'), source]);
+    command('tar', ['-czf', join(output, name), '-C', join(root, 'bin'), source], {
+      env: process.platform === 'darwin' ? { ...process.env, COPYFILE_DISABLE: '1' } : process.env,
+    });
   }
   writeFileSync(join(output, `${name}.sha256`), `${digest(readFileSync(join(output, name)))}  ${name}\n`);
 }

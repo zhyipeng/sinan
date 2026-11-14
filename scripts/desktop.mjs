@@ -47,9 +47,11 @@ function build() {
   frontend();
   bundlePlugins();
   mkdirSync(join(root, 'bin'), { recursive: true });
-  for (const [name, source] of [['sinan', 'desktop'], ['sinanctl', 'cli'], ['sinan-ui-host', 'ui-host']]) {
-    const gui = platform === 'win32' && name === 'sinan' ? ['-ldflags', '-H=windowsgui'] : [];
-    run('go', ['build', ...tags, ...gui, '-o', binary(name), `./apps/${source}`]);
+  const version = process.env.RELEASE_TAG ? releaseVersion(process.env.RELEASE_TAG) : 'dev';
+  for (const [name, source] of [['sinan', 'desktop'], ['sinanctl', 'cli'], ['sinan-ui-host', 'ui-host'], ['sinan-updater', 'updater']]) {
+    const ldflags = [`-X=sinan/internal/buildinfo.Version=${version}`];
+    if (platform === 'win32' && (name === 'sinan' || name === 'sinan-updater')) ldflags.push('-H=windowsgui');
+    run('go', ['build', ...tags, '-ldflags', ldflags.join(' '), '-o', binary(name), `./apps/${source}`]);
   }
 }
 function bundlePlugins() {
@@ -95,7 +97,7 @@ function packageDesktop() {
     rmSync(dirname(contents), { recursive: true, force: true });
     mkdirSync(join(contents, 'MacOS'), { recursive: true });
     mkdirSync(join(contents, 'Resources'), { recursive: true });
-    for (const name of ['sinan', 'sinanctl', 'sinan-ui-host']) {
+    for (const name of ['sinan', 'sinanctl', 'sinan-ui-host', 'sinan-updater']) {
       const destination = join(contents, 'MacOS', name);
       cpSync(binary(name), destination + '.next');
       renameSync(destination + '.next', destination);
@@ -112,7 +114,7 @@ function packageDesktop() {
     const destination = join(root, 'bin', `Sinan-${platform}-${process.arch}`);
     rmSync(destination, { recursive: true, force: true });
     mkdirSync(destination, { recursive: true });
-    for (const name of ['sinan', 'sinanctl', 'sinan-ui-host']) cpSync(binary(name), join(destination, name + suffix));
+    for (const name of ['sinan', 'sinanctl', 'sinan-ui-host', 'sinan-updater']) cpSync(binary(name), join(destination, name + suffix));
   }
   const metadataDir = platform === 'darwin' ? join(root, 'bin/Sinan.app/Contents/Resources') : join(root, 'bin', `Sinan-${platform}-${process.arch}`);
   writeFileSync(join(metadataDir, 'release.json'), JSON.stringify({

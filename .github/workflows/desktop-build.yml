@@ -60,6 +60,9 @@ jobs:
           node --test packages/plugin-sdk/theme/runtime.test.mjs
           node --test internal/plugin/uihost/gtk_bridge.test.mjs internal/plugin/uihost/webview_bridge.test.mjs
           node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs
+      - name: Windows host update regression
+        if: runner.os == 'Windows'
+        run: go test ./internal/buildinfo ./internal/hostupdate ./plugins/system-settings/update
       - name: Archive portable package
         run: node scripts/release.mjs archive
       - uses: actions/upload-artifact@v4

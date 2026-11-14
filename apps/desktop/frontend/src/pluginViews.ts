@@ -1,6 +1,7 @@
 // Only repository-bundled trusted components can appear in the Shell.
 // A manifest view key never becomes an import URL or installed JavaScript path.
 import { Events } from '@wailsio/runtime';
+import {UpdateStatus,CheckHostUpdate,InstallHostUpdate} from '../bindings/sinan/apps/desktop/hostservice';
 import { createElement, type ComponentType } from 'react';
 import type {StoreBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginStore';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
@@ -36,6 +37,7 @@ function normalize(value: {revision: number; values: Record<string, string[] | n
 }
 let recordingQueue: Promise<void> = Promise.resolve();
 export const settingsBridge: SettingsBridge = {
+ updates:{load:UpdateStatus,check:CheckHostUpdate,install:InstallHostUpdate,subscribe(changed){return Events.On('host-update:changed',event=>changed(event.data as import('../../../../plugins/system-settings/frontend/Updates').UpdateState));}},
  pluginShortcuts:{
   async list(){return await PluginShortcutSettings()??[];},
   subscribe(changed){return Events.On('plugin-shortcuts:changed',changed);},

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"flag"
@@ -9,16 +10,20 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"sinan/internal/buildinfo"
 	"sinan/internal/development/uiacceptance"
+	"sinan/internal/hostupdate"
 	"sinan/internal/kernel"
 	"sinan/internal/platform"
 	"sinan/internal/plugin/uihost"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/theme"
 	pluginmanager "sinan/plugins/system-plugin-manager"
+	settingsupdate "sinan/plugins/system-settings/update"
 )
 
 //go:embed all:frontend/dist
@@ -42,6 +47,7 @@ func run() error {
 	acceptance := flag.Bool("ui-acceptance", false, "运行独立临时窗口验收环境")
 	acceptancePackages := flag.String("acceptance-packages", "plugins", "验收所需系统插件源码目录")
 	root := flag.String("plugins", "", "插件安装目录")
+	updateSession := flag.String("update-session", "", "更新助手启动会话")
 	flag.Parse()
 	useBundledPlugins := *root == "" && !*uiProbe && !*acceptance
 	if *acceptance && (*root != "" || *uiProbe) {
@@ -93,6 +99,8 @@ func run() error {
 		}
 	}
 	host := &HostService{manager: manager, probeEnabled: *uiProbe, migrationNotice: migrationNotice}
+	host.updatesContext, host.updatesCancel = context.WithCancel(context.Background())
+	defer host.updatesCancel()
 	appURL := "/"
 	if *acceptance {
 		appURL = "/?acceptance=1"
@@ -112,6 +120,7 @@ func run() error {
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
 		OnShutdown: func() {
+			host.updatesCancel()
 			if host.pluginRuntimeCancel != nil {
 				host.pluginRuntimeCancel()
 				<-host.pluginRuntimeDone
@@ -125,6 +134,16 @@ func run() error {
 			manager.Close()
 			cleanupAcceptance()
 		},
+	})
+	host.quit = app.Quit
+	updateExecutable, _ := os.Executable()
+	if !useBundledPlugins {
+		updateExecutable = ""
+	}
+	host.updates = settingsupdate.New(updateExecutable, buildinfo.Version, func(state settingsupdate.State) {
+		if host.updatesContext.Err() == nil && host.launcher != nil {
+			host.launcher.dispatch(&application.CustomEvent{Name: "host-update:changed", Data: state, Sender: "system.settings"})
+		}
 	})
 	manager.SetUIHostCall(host.callInputHost)
 	host.launcher = &launcher{detached: map[uint]trustedWindow{}}
@@ -260,6 +279,22 @@ func run() error {
 			host.shortcuts.Start()
 			host.startDetachShortcuts()
 			host.startPluginRuntime(app.GlobalShortcut)
+			if *updateSession != "" && useBundledPlugins {
+				if err := hostupdate.ConfirmStartup(*updateSession, buildinfo.Version, updateExecutable); err != nil {
+					log.Print("更新就绪回执失败")
+				}
+			}
+			if host.updates.State().Supported {
+				go func() {
+					timer := time.NewTimer(3 * time.Second)
+					defer timer.Stop()
+					select {
+					case <-timer.C:
+						_, _ = host.updates.Check(host.updatesContext)
+					case <-host.updatesContext.Done():
+					}
+				}()
+			}
 		})
 		app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
 			go host.showMain()

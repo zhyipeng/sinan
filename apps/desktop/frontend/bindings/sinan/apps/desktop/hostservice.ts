@@ -25,6 +25,9 @@ import * as catalog$0 from "../../plugins/system-plugin-manager/catalog/models.j
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as scaffold$0 from "../../plugins/system-plugin-manager/scaffold/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as update$0 from "../../plugins/system-settings/update/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -43,6 +46,10 @@ export function ApplyThemeAppearance(revision: number, appearance: string): $Can
 
 export function CancelSearch(sequence: number): $CancellablePromise<void> {
     return $Call.ByID(640499065, sequence);
+}
+
+export function CheckHostUpdate(): $CancellablePromise<update$0.State> {
+    return $Call.ByID(2919451886);
 }
 
 /**
@@ -109,6 +116,10 @@ export function HideLauncher(): $CancellablePromise<void> {
 
 export function Install(directory: string, trustNative: boolean): $CancellablePromise<kernel$0.PluginInfo> {
     return $Call.ByID(3733150530, directory, trustNative);
+}
+
+export function InstallHostUpdate(): $CancellablePromise<void> {
+    return $Call.ByID(3235751085);
 }
 
 export function LauncherStatus(): $CancellablePromise<string> {
@@ -288,4 +299,12 @@ export function TrustDevelopmentPlugin(id: string, fingerprint: string): $Cancel
 
 export function Uninstall(pluginID: string): $CancellablePromise<void> {
     return $Call.ByID(147137039, pluginID);
+}
+
+/**
+ * Host update operations are bound to trusted Shell windows only. They are not
+ * registered in the third-party plugin Host API or UI bridge.
+ */
+export function UpdateStatus(): $CancellablePromise<update$0.State> {
+    return $Call.ByID(3157615900);
 }

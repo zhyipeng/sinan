@@ -60,3 +60,9 @@ RELEASE_TAG=v0.1.0-rc.1 node scripts/release.mjs archive
 归档位于 `dist/release/`。以上命令不会启动应用、原生 WebView 或浏览器。真正上传需要发布工作流；不要在未准备完整六目标归档时本地执行 `publish`。
 
 GitHub 的 [runner 文档](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)说明目标标签与架构；草稿、标签核验和自动发行说明使用 [GitHub CLI Release 接口](https://cli.github.com/manual/gh_release_create)。
+
+## 后续接入的宿主自动更新
+
+发行包现额外携带 `sinan-updater`。`RELEASE_TAG` 对应完整版本在构建时写入宿主和助手，包内 `release.json` 记录版本、平台及架构，归档前核对一致；macOS 打包禁止附带 AppleDouble 扩展属性旁路文件，以便受限解压器统一验证根目录。
+
+包含该机制的完整发行版启动后检查稳定新版，在用户点击下载并重启安装后消费本流程发布的对应资产和 `SHA256SUMS.txt`。旧版无助手构建仍需手动安装一次。功能、备份、签名与实机验证边界见[自动更新](auto-update.md)。

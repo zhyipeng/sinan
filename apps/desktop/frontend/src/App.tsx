@@ -4,7 +4,8 @@ import { Events } from '@wailsio/runtime';
 import { disposePaste, escapeAction, filterPasteResults, MAX_PASTE_TEXT_BYTES, pasteBackspaceText, readPastedImage } from './paste';
 import type { PastedInput } from './paste';
 import type { ClipboardEvent } from 'react';
-import { pluginViews } from './pluginViews';
+import { pluginViews, settingsBridge } from './pluginViews';
+import {UpdateNotice} from '../../../../plugins/system-settings/frontend/Updates';
 import { keyCombination, formatShortcut } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Recovery from './Recovery';
 import PluginViewBoundary from './PluginViewBoundary';
@@ -380,6 +381,7 @@ export default function App() {
           if (event.key === 'Enter' && hasQuery) { event.preventDefault(); choose(selected); }
         }} />
         <button className="manage-button" aria-label="管理插件" title="管理插件" onClick={openManager}>···{shortcutError && <span className="warning-dot" />}</button>
+        <UpdateNotice bridge={settingsBridge.updates} onOpen={()=>void OpenSettings().catch(()=>setError('无法打开设置。'))}/>
       </div>
       {hasQuery && <>
         <div id="search-results" className="command-list" role="listbox" aria-label="搜索结果">

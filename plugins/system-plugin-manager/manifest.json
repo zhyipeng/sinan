@@ -1,7 +1,7 @@
 {
   "id": "system.plugin-manager",
   "name": "插件中心",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "apiVersion": "1",
   "icon": "icon.svg",
   "runtime": {

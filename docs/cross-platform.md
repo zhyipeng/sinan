@@ -84,3 +84,9 @@ Windows amd64/arm64 默认构建现创建独立 Environment、临时配置目录
 ### 首轮远端构建结果与 Linux CLI 安装修复
 
 提交 `4949fc9` 的[首轮 Actions](https://github.com/zhyipeng/sinan/actions/runs/43567782447)中，macOS arm64/amd64、Windows amd64/arm64 的原生构建、对应测试和归档上传通过；Linux 两种架构均在 Wails CLI 安装步骤失败，原因是未带 `gtk3` 标签而查找 GTK4/WebKitGTK 6.0。已修正 Linux 安装参数。使用同一已提交源码快照，在本地 Linux arm64 无显示服务器容器中验证修正后的 CLI 安装、桌面打包、全量无界面竞态回归及发行归档均通过；依赖通过本机只读缓存提供，Go 校验保持开启。修复后的 Ubuntu amd64/arm64 远端任务仍待重新运行，以上均不代表实机 UI 验收。
+
+## 宿主自动更新
+
+设置插件新增发行实例启动检查与显式下载安装入口。macOS 替换整个 `.app`，Windows/Linux 替换便携目录；目标 OS/架构必须同时匹配当前二进制身份、发行元数据和资产名。更新助手在用户缓存运行，等待旧进程退出后进行同卷目录替换，保留旧目录，并以新版启动回执决定是否回退；Windows 通过进程句柄等待并处理文件占用重试，Linux 区分运行依赖但不依赖 X11/Wayland 执行文件更新。应用目录不可写时不自动提权。
+
+无界面目录替换与模拟回执不等同于真实应用重启验收。macOS 的 Gatekeeper、Windows 的文件占用和安全软件、Linux 的系统库兼容，以及真实 UI 重启均待实机验证；备份暂不自动清理，强制中止助手或断电可能需要手动恢复。详见[自动更新](auto-update.md)及 [ADR 0060](adr/0060-host-auto-update.md)。

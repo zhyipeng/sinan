@@ -14,12 +14,17 @@ import (
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
 	"sinan/plugins/system-plugin-manager/catalog"
+	settingsupdate "sinan/plugins/system-settings/update"
 	"strconv"
 	"sync"
 )
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	updates              *settingsupdate.Service
+	updatesContext       context.Context
+	updatesCancel        context.CancelFunc
+	quit                 func()
 	pluginShortcuts      map[string]*pluginShortcutEntry
 	inputPermissionGuide accessibilityGuide
 	pluginRuntimeMu      sync.Mutex

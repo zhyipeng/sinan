@@ -38,7 +38,6 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
   const [storeBusy,setStoreBusy]=useState(false);
   const projectBusy=createBusy||storeBusy;
   const [directory,setDirectory]=useState('');
-  const [preview,setPreview]=useState<PackagePreview>();
   const [developmentTrust,setDevelopmentTrust]=useState<Record<string,boolean>>({});
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -66,25 +65,21 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
     } catch(error) {if(alive.current)setError(error instanceof Error?error.message:'操作失败，请重试。');}
     finally {pending.current=false;if(alive.current)setBusy(false);}
   }
-  function installPackage(approved?:PackagePreview) {
+  function installPackage() {
     if(busy||projectBusy||!directory.trim())return;
     const source=directory;
     let message='';
     void perform(async()=>{
-      setPreview(undefined);
-      const candidate=approved??await bridge.inspect(source);
+      const candidate=await bridge.inspect(source);
       if(!alive.current)return;
       if(!candidate.changed){message='插件已是当前内容。';return;}
-      if(candidate.kind==='process'&&!approved){setPreview(candidate);return;}
-      try {
-        await bridge.apply(source,candidate.kind==='process'&&!!approved,candidate.fingerprint,candidate.installedFingerprint);
-        message=candidate.installedVersion?'插件已更新。':'插件已安装。';
-        if(alive.current)setDirectory('');
-      } finally {if(alive.current)setPreview(undefined);}
+      await bridge.apply(source,candidate.kind==='process',candidate.fingerprint,candidate.installedFingerprint);
+      message=candidate.installedVersion?'插件已更新。':'插件已安装。';
+      if(alive.current)setDirectory('');
     },()=>message);
   }
   function changeDirectory(value: string) {
-    setDirectory(value);setPreview(undefined);setError('');setNotice('');
+    setDirectory(value);setError('');setNotice('');
   }
   async function chooseInstallSource(archive = false) {
     if(pending.current||busy||projectBusy)return;
@@ -136,10 +131,9 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
         </PluginDetails>}
       </div>
     </div>:<div id="discover-panel" role="tabpanel" aria-labelledby="discover-tab"><PluginStore bridge={storeBridge} initialID={storeID} plugins={data.plugins} disabled={busy||createBusy} renderActions={renderActions} onBusyChange={setStoreBusy} onChanged={async()=>{const next=await bridge.refresh();await onChanged();if(alive.current)setData(next);}}/></div>}
-    {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage(preview);}}>
+    {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage();}}>
       <label htmlFor="directory">安装 / 更新插件</label>
-      <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()}>{busy?'处理中…':preview?(preview.installedVersion?'信任并更新':'信任并安装'):'安装 / 更新'}</button></div>
-      {preview&&<><div className="package-preview" role="status"><strong>{preview.name}</strong><span>{preview.installedVersion?`${preview.installedVersion} → ${preview.version}`:preview.version}</span><button type="button" disabled={busy||projectBusy} onClick={()=>setPreview(undefined)}>取消</button></div><p className="store-note">此原生插件将以当前用户权限运行。</p></>}
+      <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()}>{busy?'处理中…':'安装 / 更新'}</button></div>
     </form>}
 
     {data.diagnostics.map((diagnostic,index)=><p className="error" key={index}>{diagnostic}</p>)}
