@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -68,16 +69,26 @@ type SearchProvider struct {
 }
 
 type Command struct {
-	Shortcut      string                  `json:"shortcut,omitempty"`
-	View          string                  `json:"view,omitempty"`
-	ID            string                  `json:"id"`
-	Title         string                  `json:"title"`
-	Keywords      []string                `json:"keywords,omitempty"`
-	Message       string                  `json:"message,omitempty"`
-	Execution     string                  `json:"execution,omitempty"`
-	SearchOnly    bool                    `json:"searchOnly,omitempty"`
-	UIView        string                  `json:"uiView,omitempty"`
-	InputMatchers []protocol.InputMatcher `json:"inputMatchers,omitempty"`
+	Shortcut        string                  `json:"shortcut,omitempty"`
+	View            string                  `json:"view,omitempty"`
+	ID              string                  `json:"id"`
+	Title           string                  `json:"title"`
+	Keywords        []string                `json:"keywords,omitempty"`
+	Message         string                  `json:"message,omitempty"`
+	Execution       string                  `json:"execution,omitempty"`
+	SearchOnly      bool                    `json:"searchOnly,omitempty"`
+	UIView          string                  `json:"uiView,omitempty"`
+	InputMatchers   []protocol.InputMatcher `json:"inputMatchers,omitempty"`
+	InputMatchScore *float64                `json:"inputMatchScore,omitempty"`
+}
+
+// ContentMatchScore defaults to the existing content rank. Plugins may lower it
+// for broad matches without changing name matching or activating their backend.
+func (c Command) ContentMatchScore() float64 {
+	if c.InputMatchScore != nil {
+		return *c.InputMatchScore
+	}
+	return .95
 }
 
 func ValidID(id string) bool { return idPattern.MatchString(id) && len(id) <= 128 }
@@ -141,6 +152,9 @@ func (m Manifest) Validate() error {
 	seen := map[string]bool{}
 	matcherCount := 0
 	for _, c := range m.Contributes.Commands {
+		if c.InputMatchScore != nil && (len(c.InputMatchers) == 0 || math.IsNaN(*c.InputMatchScore) || math.IsInf(*c.InputMatchScore, 0) || *c.InputMatchScore < 0 || *c.InputMatchScore > .95) {
+			return errors.New("内容匹配分数须为 0 到 0.95 的有限数值，并声明输入匹配规则")
+		}
 		if c.Shortcut != "" && (c.UIView == "" || len(c.Shortcut) > 128 || strings.TrimSpace(c.Shortcut) != c.Shortcut) {
 			return errors.New("全局快捷键必须关联 HTML 视图命令")
 		}

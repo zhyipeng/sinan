@@ -16,6 +16,7 @@ export interface Command {
     "searchOnly"?: boolean;
     "uiView"?: string;
     "inputMatchers"?: protocol$0.InputMatcher[] | null;
+    "inputMatchScore"?: number | null;
 }
 
 export interface SearchProvider {

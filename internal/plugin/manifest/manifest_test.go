@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	protocol "sinan/packages/plugin-protocol"
@@ -175,16 +176,56 @@ func TestSettingTypes(t *testing.T) {
 	}
 	for name, mutate := range map[string]func(*Manifest){
 		"select-without-options": func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select"}} },
-		"select-bad-value":       func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "Auto", Label: "x"}}}} },
-		"select-dup-option":      func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "a", Label: "a"}, {Value: "a", Label: "b"}}}} },
-		"directory-list-options": func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "directories", Title: "目录", Type: "directory-list", Options: []SettingOption{{Value: "a", Label: "a"}}}} },
-		"text-options":           func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "t", Title: "t", Type: "text", Options: []SettingOption{{Value: "a", Label: "a"}}}} },
-		"unknown-type":           func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "t", Title: "t", Type: "unknown"}} },
+		"select-bad-value": func(m *Manifest) {
+			m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "Auto", Label: "x"}}}}
+		},
+		"select-dup-option": func(m *Manifest) {
+			m.Contributes.Settings = []Setting{{ID: "mirror", Title: "镜像", Type: "select", Options: []SettingOption{{Value: "a", Label: "a"}, {Value: "a", Label: "b"}}}}
+		},
+		"directory-list-options": func(m *Manifest) {
+			m.Contributes.Settings = []Setting{{ID: "directories", Title: "目录", Type: "directory-list", Options: []SettingOption{{Value: "a", Label: "a"}}}}
+		},
+		"text-options": func(m *Manifest) {
+			m.Contributes.Settings = []Setting{{ID: "t", Title: "t", Type: "text", Options: []SettingOption{{Value: "a", Label: "a"}}}}
+		},
+		"unknown-type": func(m *Manifest) { m.Contributes.Settings = []Setting{{ID: "t", Title: "t", Type: "unknown"}} },
 	} {
 		m := base()
 		mutate(&m)
 		if m.Validate() == nil {
 			t.Fatalf("invalid settings accepted: %s", name)
 		}
+	}
+}
+
+func TestInputMatchScore(t *testing.T) {
+	makeManifest := func(score float64) Manifest {
+		return Manifest{ID: "example.rank", Name: "Rank", Version: "0.1.0", APIVersion: "1", Runtime: Runtime{Kind: "declarative"}, Contributes: Contributions{Commands: []Command{{ID: "open", Title: "Open", Message: "ok", InputMatchers: []protocol.InputMatcher{{Kind: "regex", Pattern: `\S`}}, InputMatchScore: &score}}}}
+	}
+	for _, score := range []float64{0, .2, .95} {
+		m := makeManifest(score)
+		if err := m.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if m.Contributes.Commands[0].ContentMatchScore() != score {
+			t.Fatal("score not preserved")
+		}
+	}
+	for _, score := range []float64{-.01, .951, 1, math.NaN(), math.Inf(1), math.Inf(-1)} {
+		if makeManifest(score).Validate() == nil {
+			t.Fatal("invalid score accepted")
+		}
+	}
+	m := makeManifest(.2)
+	m.Contributes.Commands[0].InputMatchers = nil
+	if m.Validate() == nil {
+		t.Fatal("score without matcher accepted")
+	}
+	m.Contributes.Commands[0].InputMatchScore = nil
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if m.Contributes.Commands[0].ContentMatchScore() != .95 {
+		t.Fatal("legacy score changed")
 	}
 }

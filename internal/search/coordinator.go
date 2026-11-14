@@ -90,14 +90,18 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 			}
 			fields := append([]string{plugin.Name, command.Title}, command.Keywords...)
 			contentMatched := matcher.MatchAny(command.InputMatchers)
-			if !contentMatched && (len(query) > 4096 || !commandTextMatches(fields, query)) {
+			nameMatched := len(query) <= 4096 && commandTextMatches(fields, query)
+			if !contentMatched && !nameMatched {
 				continue
 			}
 			score := .85
 			input := ""
 			if contentMatched {
 				input = rawInput
-				score = .95
+				score = command.ContentMatchScore()
+				if nameMatched {
+					score = max(score, .85)
+				}
 			}
 			if strings.EqualFold(command.Title, query) {
 				score = 1
@@ -260,10 +264,13 @@ func (c *Coordinator) QueryPaste(ctx context.Context, queryID, pasteID string, c
 			if !matched {
 				continue
 			}
-			items = append(items, Item{Key: plugin.ID + "/$commands/" + command.ID, PluginID: plugin.ID, ProviderID: "$commands", CommandID: command.ID, PasteID: pasteID, Title: command.Title, Subtitle: plugin.Name, Kind: plugin.Kind, Score: .95})
+			items = append(items, Item{Key: plugin.ID + "/$commands/" + command.ID, PluginID: plugin.ID, ProviderID: "$commands", CommandID: command.ID, PasteID: pasteID, Title: command.Title, Subtitle: plugin.Name, Kind: plugin.Kind, Score: command.ContentMatchScore()})
 		}
 	}
 	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Score != items[j].Score {
+			return items[i].Score > items[j].Score
+		}
 		if items[i].Title != items[j].Title {
 			return items[i].Title < items[j].Title
 		}

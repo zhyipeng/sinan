@@ -109,3 +109,54 @@ func TestPasteSearchOnlyUsesMatchingContent(t *testing.T) {
 		t.Fatal("disabled image plugin remained visible")
 	}
 }
+
+type rankedContentBackend struct{ snapshot kernel.Snapshot }
+
+func (b *rankedContentBackend) Snapshot() kernel.Snapshot { return b.snapshot }
+func (b *rankedContentBackend) QueryProvider(context.Context, string, protocol.SearchParams) (protocol.SearchResult, error) {
+	return protocol.SearchResult{Items: []protocol.SearchItem{{ID: "app", Title: "Application", CommandID: "launch", Score: .7}}}, nil
+}
+func TestLowContentScoreKeepsNamePriorityAndPasteOrder(t *testing.T) {
+	low := .2
+	b := &rankedContentBackend{snapshot: kernel.Snapshot{Plugins: []kernel.PluginInfo{
+		{ID: "example.translate", Name: "Translate", Kind: "process", Commands: []manifest.Command{{ID: "open", Title: "Translate", Keywords: []string{"翻译"}, InputMatchers: []protocol.InputMatcher{{Kind: "regex", Pattern: `\S`}}, InputMatchScore: &low}}},
+		{ID: "example.app", Name: "App", Kind: "process", Commands: []manifest.Command{{ID: "launch", Title: "Launch", SearchOnly: true}}, SearchProviders: []manifest.SearchProvider{{ID: "apps", MinLength: 1}}},
+		{ID: "example.json", Name: "JSON", Kind: "declarative", Commands: []manifest.Command{{ID: "open", Title: "ZZZ JSON", InputMatchers: []protocol.InputMatcher{{Kind: "json", JSONTypes: []string{"object"}}}}}},
+	}}}
+	query := func(input string) []Item {
+		var items []Item
+		(&Coordinator{Backend: b}).Query(context.Background(), "rank", input, func(u Update) { items = u.Items })
+		return items
+	}
+	items := query("  chrome  ")
+	if len(items) != 2 || items[0].PluginID != "example.app" || items[1].Score != low || items[1].Input != "  chrome  " {
+		t.Fatalf("generic text outranked application or lost input: %+v", items)
+	}
+	for _, tc := range []struct {
+		input string
+		score float64
+	}{{"Translate", 1}, {"trans", .85}, {"翻译", .85}} {
+		items = query(tc.input)
+		if items[0].PluginID != "example.translate" || items[0].Score != tc.score {
+			t.Fatalf("name priority changed: %+v", items)
+		}
+	}
+	raw := ` {"value":1} `
+	items = query(raw)
+	if len(items) != 3 || items[0].PluginID != "example.json" || items[0].Score != .95 || items[2].PluginID != "example.translate" {
+		t.Fatalf("specific matching rank changed: %+v", items)
+	}
+	content, err := paste.Parse(protocol.PasteContent{Text: &raw})
+	if err != nil {
+		t.Fatal(err)
+	}
+	(&Coordinator{Backend: b}).QueryPaste(context.Background(), "paste", "clip", content, func(u Update) { items = u.Items })
+	if len(items) != 2 || items[0].PluginID != "example.json" || items[1].Score != low || items[1].PasteID != "clip" {
+		t.Fatalf("paste ranking ignored scores: %+v", items)
+	}
+	low = 0
+	items = query("chrome")
+	if items[1].Score != 0 {
+		t.Fatal("explicit zero should not use default")
+	}
+}

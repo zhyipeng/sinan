@@ -239,6 +239,12 @@
                 "type": "string",
                 "maxLength": 128,
                 "description": "全局快捷键，关联 uiView；CmdOrCtrl 由宿主按平台解析。"
+              },
+              "inputMatchScore": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.95,
+                "description": "仅调整内容匹配的基础分数，省略为 0.95；名称及关键词匹配保持原有评分。须同时声明 inputMatchers。"
               }
             },
             "allOf": [
@@ -312,6 +318,18 @@
                 "then": {
                   "required": [
                     "uiView"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "required": [
+                    "inputMatchScore"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "inputMatchers"
                   ]
                 }
               }
