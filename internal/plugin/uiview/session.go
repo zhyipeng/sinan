@@ -252,7 +252,7 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		if len(fields) > 3 || fields["revision"] != nil || fields["value"] != nil || req.CommandID == "" {
 			return nil, errors.New("命令请求无效")
 		}
-	case "storage.get", "launch.get":
+	case "storage.get", "launch.get", "input.paste":
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}

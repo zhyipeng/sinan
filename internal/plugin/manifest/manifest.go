@@ -68,6 +68,7 @@ type SearchProvider struct {
 }
 
 type Command struct {
+	Shortcut      string                  `json:"shortcut,omitempty"`
 	View          string                  `json:"view,omitempty"`
 	ID            string                  `json:"id"`
 	Title         string                  `json:"title"`
@@ -115,8 +116,8 @@ func (m Manifest) Validate() error {
 	}
 	permissions := map[string]bool{}
 	for _, permission := range m.Permissions {
-		if m.Runtime.Kind != "process" || (permission != "applications.read" && permission != "applications.launch") || permissions[permission] {
-			return errors.New("权限用途无效或重复；当前仅支持可信原生插件的应用读取与启动声明")
+		if m.Runtime.Kind != "process" || (permission != "applications.read" && permission != "applications.launch" && permission != "clipboard.read" && permission != "clipboard.write") || permissions[permission] {
+			return errors.New("权限用途无效或重复；当前仅支持可信原生插件的应用与剪贴板用途声明")
 		}
 		permissions[permission] = true
 	}
@@ -140,6 +141,9 @@ func (m Manifest) Validate() error {
 	seen := map[string]bool{}
 	matcherCount := 0
 	for _, c := range m.Contributes.Commands {
+		if c.Shortcut != "" && (c.UIView == "" || len(c.Shortcut) > 128 || strings.TrimSpace(c.Shortcut) != c.Shortcut) {
+			return errors.New("全局快捷键必须关联 HTML 视图命令")
+		}
 		matcherCount += len(c.InputMatchers)
 		if len(c.InputMatchers) > inputmatch.MaxMatchersPerCommand || matcherCount > inputmatch.MaxMatchersPerPlugin {
 			return errors.New("输入匹配规则数量超过限制")
@@ -183,6 +187,9 @@ func (m Manifest) Validate() error {
 		}
 	}
 	for _, event := range m.ActivationEvents {
+		if event == "onStartup" && m.Runtime.Kind == "process" {
+			continue
+		}
 		if event == "onSearch" && len(m.Contributes.SearchProviders) > 0 {
 			continue
 		}
@@ -274,7 +281,14 @@ func validUICapabilities(view protocol.UIView, mf Manifest) bool {
 	if view.BridgeVersion == protocol.UIBridgeVersion {
 		return len(view.Commands) == 0 && len(view.Permissions) == 0
 	}
-	if len(view.Permissions) > 1 || (len(view.Permissions) == 1 && view.Permissions[0] != "storage") || len(view.Commands) > 16 {
+	permissions := map[string]bool{}
+	for _, permission := range view.Permissions {
+		if permissions[permission] || (permission != "storage" && permission != "input.paste") {
+			return false
+		}
+		permissions[permission] = true
+	}
+	if len(view.Permissions) > 2 || len(view.Commands) > 16 {
 		return false
 	}
 	seen := map[string]bool{}

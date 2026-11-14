@@ -24,6 +24,7 @@ type trustedWindow struct {
 }
 
 type launcher struct {
+	inputTarget   uintptr
 	window        *application.WebviewWindow
 	mu            sync.Mutex
 	shortcutError string
@@ -56,6 +57,11 @@ func (l *launcher) showLocked() {
 	if l.dialogs[l.window] > 0 {
 		return
 	}
+	application.InvokeSync(func() {
+		if target := platform.CaptureInputTarget(); target != 0 {
+			l.inputTarget = target
+		}
+	})
 	l.window.SetSize(launcherWidth, launcherMinHeight)
 	var id string
 	var ok bool

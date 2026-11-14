@@ -237,3 +237,15 @@ func (c *shortcutController) Save(value string, revision uint64) (ShortcutState,
 	c.publish()
 	return c.state, nil
 }
+
+// Stop releases a plugin binding; preferences are retained for reactivation.
+func (c *shortcutController) Stop() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.state.Active != "" {
+		_ = c.registry.Unregister(c.state.Active)
+	}
+	c.state.Active = ""
+	c.state.Ready = false
+	c.recordingUntil = time.Time{}
+}

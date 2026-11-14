@@ -334,3 +334,16 @@ Manifest 可加 `"icon": "icon.svg"`，指向包内相对路径的 SVG、PNG 或
 
 
 Linux GTK3 使用独立 ephemeral WebKitContext 和命名隔离脚本 world。页面的 WebKit 风格 SDK facade 只传递消息，原生端口不注册到页面 world；顶层、精确入口与可信同窗口事件由宿主注入的隔离脚本检查，再进入共用 Go 会话边界。数据包不能自报来源或请求任意插件身份。普通 GTK3 承载要求 WebKitGTK 2.40+，不增加旧独立 helper / ui-probe 的平台支持。协议、预算及验证限制见 [ADR 0054](adr/0054-gtk-isolated-plugin-content.md)。
+
+## 插件全局热键、后台激活与系统输入（ADR 0056）
+
+命令可添加 `shortcut: "CmdOrCtrl+Shift+V"`，必须关联 `uiView`。桌面按有效插件声明注册，禁用/卸载后释放（协调间隔一秒）；注册冲突进入可信界面诊断，不覆盖已有组合。原生 `activationEvents` 可添加 `onStartup`，桌面持续维持后台进程，显式停止后仍会恢复；禁用可持续停止。
+
+原生进程 `initialize.params.dataDir` 为 API 1 可选增量字段，提供 `.sinan-state/native-data/<pluginId>` 持久目录，升级/重载/卸载保留。创建失败阻止进程激活。它不是缓存，不属于 UI JSON 文档管理服务，当前占用统计和清理不涵盖此目录；不要将此目录描述为凭据安全存储。
+
+UI 桥 2 视图可声明 `permissions: ["input.paste"]`，并通过 SDK `pasteToPreviousApp()` 请求 `{ "method": "input.paste" }`，成功返回 `null`。请求不能包含其他字段；宿主从当前嵌入视图会话解析目标，恢复呼出前应用后发送平台粘贴组合。页面须先通过自己的后端写入系统剪贴板；此 API 不读取或返回剪贴板，不接受 PID、窗口或任意按键。会话撤销、目标不可用、焦点不符或平台权限不足时拒绝/取消。返回成功表示粘贴按键已发送，不保证目标应用接受或完成处理；系统发键失败会恢复页面并返回错误。macOS 需要辅助功能权限；缺少时宿主显示带「打开系统设置 / 稍后」的原生引导，第三方页面不能指定 URL。Linux 自动输入仅支持 X11 + xdotool；旧独立 helper 不提供输入动作。
+
+原生清单 `permissions` 另可声明 `clipboard.read` / `clipboard.write` 用途。与原有应用用途一致，它们不构成 OS 沙箱或通用授权弹窗。
+
+
+插件声明的 `shortcut` 是默认值：新版宿主允许用户在设置的「插件快捷键」区域录入、恢复默认并显式保存，用户覆盖优先于清单。配置由宿主按插件 ID / 命令 ID 保存，升级、重载及卸载保留；禁用或卸载释放绑定。保存对呼出、窗口独立与其他插件组合做冲突检查，注册/写入失败回退原组合。录入期间已有全局热键转为捕获事件。该配置服务仅提供给可信设置插件，不进入隔离页面桥。见 ADR 0057。

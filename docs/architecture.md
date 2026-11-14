@@ -392,3 +392,12 @@ Linux GTK3 现实现独立 ephemeral WebKitContext、独立用户脚本与命名
 ### Windows 同窗口隔离内容承载（2026-11-14）
 
 Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和原生 Controller，保留可信页头及现有准备/提交/撤销/拆出路径。资源通过每次视图独立的虚拟 HTTPS 源映射到绑定快照，全部资源事件由宿主处理，不映射磁盘目录或启动 HTTP 服务；消息来源取自引擎顶层事件。仅兼容 SDK 窄桥，不注册 Wails Bridge、Host Object 或通用 CDP 接口。临时配置目录可写且可能残留，不将 InPrivate 描述为内存存储或 OS 沙箱。交叉编译、静态检查与无窗口边界测试已通过，Windows 原生 COM 测试仅编译，实际引擎、焦点和缩放仍待实机验收。见 [ADR 0055](adr/0055-webview2-isolated-plugin-content.md)。
+
+### 官方剪贴板与插件系统输入（2026-11-14）
+
+官方插件仓库新增 `tools.clipboard` 0.1.0，以经信任的原生后台进程提供文本/图片监听、去重、有界本机持久化与隔离选择界面。宿主新增声明式视图热键、原生 `onStartup` 激活、可选 `initialize.dataDir` 和按会话/清单限定的无参数 `input.paste`；页面不能指定输入目标或任意按键。默认 Command/Ctrl + Shift + V 直接打开，选择后恢复原应用并粘贴。剪贴板业务和数据格式留在插件，不自动安装或加入内置保护集合。macOS 自动粘贴需辅助功能权限，缺少时由宿主原生弹窗提供辅助功能设置跳转；Linux 自动输入仅支持 X11 + xdotool，Wayland 可复制。原生目录未纳入现有 UI 文档清理，数据未加密，原生用途声明仍不是 OS 沙箱。无界面测试通过，真实 UI 未验收，见 [ADR 0056](adr/0056-clipboard-plugin-and-system-input.md)。
+
+
+### 集中配置插件快捷键（2026-11-14）
+
+`system.settings` 0.4.0 在已有设置后增加「插件快捷键」，按有效插件的视图命令热键声明自动列出，支持录入、恢复默认与保存即生效。宿主以保留命名空间按插件/命令保存用户覆盖，复用注册事务、失败回退与定向录入；双向检查呼出、窗口独立及其他插件组合冲突。禁用/卸载释放注册、保留覆盖，恢复启用或重新安装后恢复配置。第三方页面桥无新增配置权限，见 [ADR 0057](adr/0057-configurable-plugin-shortcuts.md)。

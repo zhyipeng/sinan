@@ -20,32 +20,41 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
-	migrationNotice     string
-	storeMu             sync.Mutex
-	store               *catalog.Service
-	embedded            *embeddedViews
-	themeMu             sync.Mutex
-	ui                  *uiwindows.Controller
-	uiError             string
-	shortcuts           *shortcutController
-	detachShortcuts     *shortcutController
-	shortcutConfigMu    sync.Mutex
-	probeEnabled        bool
-	manager             *kernel.Manager
-	launcher            *launcher
-	recordMu            sync.Mutex
-	recordingWindow     *application.WebviewWindow
-	searchMu            sync.Mutex
-	searchSequence      uint64
-	searchCancel        context.CancelFunc
-	pasted              *stagedPaste
-	pasteClearedThrough uint64
-	pasteParseMu        sync.Mutex
+	pluginShortcuts      map[string]*pluginShortcutEntry
+	inputPermissionGuide accessibilityGuide
+	pluginRuntimeMu      sync.Mutex
+	pluginRuntimeErrors  []string
+	pluginRuntimeCancel  context.CancelFunc
+	pluginRuntimeDone    chan struct{}
+	migrationNotice      string
+	storeMu              sync.Mutex
+	store                *catalog.Service
+	embedded             *embeddedViews
+	themeMu              sync.Mutex
+	ui                   *uiwindows.Controller
+	uiError              string
+	shortcuts            *shortcutController
+	detachShortcuts      *shortcutController
+	shortcutConfigMu     sync.Mutex
+	probeEnabled         bool
+	manager              *kernel.Manager
+	launcher             *launcher
+	recordMu             sync.Mutex
+	recordingWindow      *application.WebviewWindow
+	searchMu             sync.Mutex
+	searchSequence       uint64
+	searchCancel         context.CancelFunc
+	pasted               *stagedPaste
+	pasteClearedThrough  uint64
+	pasteParseMu         sync.Mutex
 }
 
 func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
 func (h *HostService) Refresh() kernel.Snapshot  { return h.uiDiagnostics(h.manager.Refresh()) }
 func (h *HostService) uiDiagnostics(snapshot kernel.Snapshot) kernel.Snapshot {
+	h.pluginRuntimeMu.Lock()
+	snapshot.Diagnostics = append(snapshot.Diagnostics, h.pluginRuntimeErrors...)
+	h.pluginRuntimeMu.Unlock()
 	if h.migrationNotice != "" {
 		snapshot.Diagnostics = append(snapshot.Diagnostics, h.migrationNotice)
 	}
@@ -226,6 +235,9 @@ func (h *HostService) ShortcutSettings() (ShortcutState, error) {
 func (h *HostService) SaveShortcut(value string, revision uint64) (ShortcutState, error) {
 	h.shortcutConfigMu.Lock()
 	defer h.shortcutConfigMu.Unlock()
+	if err := h.pluginShortcutConflict(value, ""); err != nil {
+		return ShortcutState{}, err
+	}
 	if err := shortcutConflict(value, h.detachShortcuts); err != nil {
 		return ShortcutState{}, err
 	}
@@ -253,11 +265,13 @@ func (h *HostService) RecordShortcut(ctx context.Context, enabled bool) error {
 	if err := h.shortcuts.Record(enabled); err != nil {
 		return err
 	}
+	h.recordPluginShortcuts(enabled)
 	if enabled {
 		h.recordingWindow = window
 		if !window.IsVisible() || !window.IsFocused() {
 			h.recordingWindow = nil
 			_ = h.shortcuts.Record(false)
+			h.recordPluginShortcuts(false)
 			return errors.New("窗口未聚焦，快捷键录入已取消")
 		}
 	} else {
@@ -271,6 +285,7 @@ func (h *HostService) stopRecording(window *application.WebviewWindow) {
 	if h.shortcuts != nil && h.recordingWindow == window {
 		h.recordingWindow = nil
 		_ = h.shortcuts.Record(false)
+		h.recordPluginShortcuts(false)
 	}
 }
 
@@ -422,6 +437,9 @@ func (h *HostService) SaveDetachShortcut(value string, revision uint64) (Shortcu
 	defer h.shortcutConfigMu.Unlock()
 	if h.detachShortcuts == nil {
 		return ShortcutState{}, errors.New("窗口快捷键尚未就绪")
+	}
+	if err := h.pluginShortcutConflict(value, ""); err != nil {
+		return ShortcutState{}, err
 	}
 	if err := shortcutConflict(value, h.shortcuts); err != nil {
 		return ShortcutState{}, err

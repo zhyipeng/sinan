@@ -29,6 +29,7 @@ export interface PluginDataInfo {
 }
 
 export interface PluginInfo {
+    "activationEvents"?: string[] | null;
     "icon"?: string;
     "development"?: boolean;
     "developmentFingerprint"?: string;

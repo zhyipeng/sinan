@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Shortcut, {type ShortcutBridge} from './Shortcut';
+import PluginShortcuts,{type PluginShortcutsBridge} from './PluginShortcuts';
 import Theme,{type ThemeBridge} from './Theme';
 
 export type SettingsSchema = { id: string; title: string; type: string; options?: { value: string; label: string }[] | null; placeholder?: string | null };
@@ -9,6 +10,7 @@ export type SettingsBridge = {
   theme:ThemeBridge;
   shortcut: ShortcutBridge;
   detachShortcut: ShortcutBridge;
+  pluginShortcuts: PluginShortcutsBridge;
   load(pluginID: string): Promise<SettingsSnapshot>;
   save(pluginID: string, revision: number, values: Record<string, string[]>): Promise<SettingsSnapshot>;
   clearHistory(): Promise<void>;
@@ -102,6 +104,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
     <Shortcut bridge={bridge.shortcut} />
     <Shortcut bridge={bridge.detachShortcut} title="窗口独立快捷键" />
     <Theme bridge={bridge.theme} />
+    <PluginShortcuts bridge={bridge.pluginShortcuts} />
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {error && <p className="error" role="alert">{error}</p>}
   </div>;

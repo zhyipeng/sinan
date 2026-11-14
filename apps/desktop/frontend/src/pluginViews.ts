@@ -6,7 +6,7 @@ import type {StoreBridge} from '../../../../plugins/system-plugin-manager/fronte
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StorePreview, StoreApply, StoreCancel } from '../bindings/sinan/apps/desktop/hostservice';
+import { PluginShortcutSettings, SavePluginShortcut, PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StorePreview, StoreApply, StoreCancel } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -36,6 +36,16 @@ function normalize(value: {revision: number; values: Record<string, string[] | n
 }
 let recordingQueue: Promise<void> = Promise.resolve();
 export const settingsBridge: SettingsBridge = {
+ pluginShortcuts:{
+  async list(){return await PluginShortcutSettings()??[];},
+  subscribe(changed){return Events.On('plugin-shortcuts:changed',changed);},
+  forCommand(pluginID,commandID){return {
+   async load(){const rows=await PluginShortcutSettings();const item=rows?.find(row=>row.pluginId===pluginID&&row.commandId===commandID);if(!item)throw new Error('插件快捷键已失效');return item.state;},
+   async save(value,revision){return await SavePluginShortcut(pluginID,commandID,value,revision);},
+   record(enabled){recordingQueue=recordingQueue.catch(()=>{}).then(()=>RecordShortcut(enabled)).then(()=>{});return recordingQueue;},
+   subscribe(changed,captured){const offState=Events.On('plugin-shortcut:changed',event=>{const data=event.data as {pluginId:string;commandId:string;state:ShortcutState};if(data.pluginId===pluginID&&data.commandId===commandID)changed(data.state);});const offCaptured=Events.On('shortcut:recorded',event=>captured(event.data as string));return ()=>{offState();offCaptured();};}
+  };}
+ },
   theme:{load:ThemeSettings,save:SaveTheme,subscribe(changed){return Events.On("theme:changed",event=>changed(event.data as import("../../../../plugins/system-settings/frontend/Theme").ThemeState));}},
   detachShortcut: {
     async load() { return await DetachShortcutSettings(); },

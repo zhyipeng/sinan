@@ -159,6 +159,10 @@ export function PluginSettings(pluginID: string): $CancellablePromise<storage$0.
     return $Call.ByID(2611427045, pluginID);
 }
 
+export function PluginShortcutSettings(): $CancellablePromise<$models.PluginShortcutState[] | null> {
+    return $Call.ByID(2913537695);
+}
+
 export function PluginUIEnabled(): $CancellablePromise<boolean> {
     return $Call.ByID(1572518711);
 }
@@ -214,6 +218,10 @@ export function SaveDetachShortcut(value: string, revision: number): $Cancellabl
 
 export function SavePluginSettings(pluginID: string, revision: number, values: { [_ in string]?: string[] | null } | null): $CancellablePromise<storage$0.SettingsSnapshot> {
     return $Call.ByID(2776673060, pluginID, revision, values);
+}
+
+export function SavePluginShortcut(pluginID: string, commandID: string, value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
+    return $Call.ByID(67871415, pluginID, commandID, value, revision);
 }
 
 export function SaveShortcut(value: string, revision: number): $CancellablePromise<$models.ShortcutState> {

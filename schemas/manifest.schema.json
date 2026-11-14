@@ -234,6 +234,11 @@
                     }
                   ]
                 }
+              },
+              "shortcut": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "全局快捷键，关联 uiView；CmdOrCtrl 由宿主按平台解析。"
               }
             },
             "allOf": [
@@ -431,11 +436,12 @@
               },
               "permissions": {
                 "type": "array",
-                "maxItems": 1,
+                "maxItems": 2,
                 "uniqueItems": true,
                 "items": {
                   "enum": [
-                    "storage"
+                    "storage",
+                    "input.paste"
                   ]
                 },
                 "description": "仅桥 2 可显式声明 storage；按插件隔离，默认不开放。"
@@ -494,7 +500,9 @@
       "items": {
         "enum": [
           "applications.read",
-          "applications.launch"
+          "applications.launch",
+          "clipboard.read",
+          "clipboard.write"
         ]
       },
       "description": "可信原生插件的用途声明；不是操作系统权限隔离或 Host API 授权。"
@@ -503,7 +511,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^(onSearch|onCommand:[a-z][a-z0-9-]*)$"
+        "pattern": "^(onStartup|onSearch|onCommand:[a-z][a-z0-9-]*)$"
       }
     },
     "icon": {

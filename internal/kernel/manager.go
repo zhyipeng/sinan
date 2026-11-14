@@ -3,6 +3,7 @@ package kernel
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
@@ -23,6 +24,7 @@ import (
 )
 
 type PluginInfo struct {
+	ActivationEvents       []string                  `json:"activationEvents,omitempty"`
 	Icon                   string                    `json:"icon,omitempty"`
 	Development            bool                      `json:"development,omitempty"`
 	DevelopmentFingerprint string                    `json:"developmentFingerprint,omitempty"`
@@ -65,6 +67,7 @@ type plugin struct {
 }
 
 type Manager struct {
+	uiHostCall         func(context.Context, *uiview.Session, protocol.UIRequest) (json.RawMessage, error)
 	documents          *storage.Documents
 	views              map[*uiview.Session]struct{} // Accessed under mutationMu.
 	disabled           map[string]bool              // Accessed under mutationMu.
@@ -221,7 +224,7 @@ func (p *plugin) info() PluginInfo {
 	if p.development {
 		developmentFingerprint = p.fingerprint
 	}
-	return PluginInfo{Icon: icon.Load(p.dir, p.manifest.Icon), Development: p.development, DevelopmentFingerprint: developmentFingerprint, NeedsTrust: p.development && p.manifest.Runtime.Kind == "process" && !p.nativeTrusted, Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
+	return PluginInfo{ActivationEvents: p.manifest.ActivationEvents, Icon: icon.Load(p.dir, p.manifest.Icon), Development: p.development, DevelopmentFingerprint: developmentFingerprint, NeedsTrust: p.development && p.manifest.Runtime.Kind == "process" && !p.nativeTrusted, Protected: protectedPlugin(p.manifest.ID), UIViews: p.manifest.Contributes.UIViews, Disabled: p.disabled, Changed: p.changed, Settings: p.manifest.Contributes.Settings, ID: p.manifest.ID, Name: p.manifest.Name, Version: p.manifest.Version, Kind: p.manifest.Runtime.Kind, State: state, Commands: p.manifest.Contributes.Commands, SearchProviders: p.manifest.Contributes.SearchProviders}
 }
 
 // Install imports a local directory. Native code requires an explicit trust decision.
@@ -429,7 +432,13 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 	if os.MkdirAll(cacheDir, 0700) != nil {
 		cacheDir = "" // Cache failure must not prevent plugin activation.
 	}
-	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir}, &init)
+	dataDir := filepath.Join(root, ".sinan-state", "native-data", p.manifest.ID)
+	if os.MkdirAll(dataDir, 0700) != nil {
+		process.Stop()
+		p.state = "failed"
+		return nil, errors.New("无法创建插件持久数据目录")
+	}
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
 	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
 		process.Stop()
 		p.state = "failed"

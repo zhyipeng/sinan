@@ -8,5 +8,6 @@ export {
 
 export type {
     IsolationReport,
+    PluginShortcutState,
     ShortcutState
 } from "./models.js";

@@ -10,6 +10,14 @@ export interface IsolationReport {
     "networkBlocked": boolean;
 }
 
+export interface PluginShortcutState {
+    "pluginId": string;
+    "commandId": string;
+    "pluginName": string;
+    "title": string;
+    "state": ShortcutState;
+}
+
 export interface ShortcutState {
     "shortcut": string;
     "active": string;

@@ -64,6 +64,15 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		}
 		return marshalUIResult(result)
 	}
+	if req.Method == "input.paste" {
+		handler := m.uiHostCall
+		allowed := slices.Contains(view.Permissions, "input.paste")
+		m.mutationMu.Unlock()
+		if !allowed || handler == nil {
+			return nil, errors.New("此视图未声明输入权限或平台不支持")
+		}
+		return handler(ctx, session, req)
+	}
 	m.mutationMu.Unlock()
 	if req.Method != "command.execute" || !slices.Contains(view.Commands, req.CommandID) {
 		return nil, errors.New("此视图未声明该命令")
@@ -92,4 +101,28 @@ func marshalUIResult(value any) (json.RawMessage, error) {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
+}
+
+// SetUIHostCall is configured once before serving sessions; never exposed to pages.
+func (m *Manager) SetUIHostCall(handler func(context.Context, *uiview.Session, protocol.UIRequest) (json.RawMessage, error)) {
+	m.uiHostCall = handler
+}
+
+// ActivateStartup starts only an enabled, explicitly declared background process.
+func (m *Manager) ActivateStartup(ctx context.Context, id string) error {
+	if err := m.beginOperation(); err != nil {
+		return err
+	}
+	defer m.active.Done()
+	m.mutationMu.Lock()
+	defer m.mutationMu.Unlock()
+	p, err := m.lookup(id)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(p.manifest.ActivationEvents, "onStartup") {
+		return errors.New("未声明后台激活")
+	}
+	_, err = p.ensureProcess(ctx, m.root)
+	return err
 }

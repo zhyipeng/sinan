@@ -11,6 +11,7 @@ import (
 
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/uiview"
+	protocol "sinan/packages/plugin-protocol"
 )
 
 func callableUI(t *testing.T, m *Manager) (*uiview.Session, string) {
@@ -167,5 +168,41 @@ func TestUIAdmissionDoesNotWaitForLifecycleLocks(t *testing.T) {
 			<-done
 			t.Fatal("UI request waited for lifecycle lock")
 		}
+	}
+}
+
+func TestPasteRequiresDeclarationAndLiveSession(t *testing.T) {
+	m := manager(t)
+	s, _ := callableUI(t, m)
+	calls := 0
+	m.SetUIHostCall(func(_ context.Context, _ *uiview.Session, _ protocol.UIRequest) (json.RawMessage, error) {
+		calls++
+		return json.RawMessage("null"), nil
+	})
+	if _, err := s.Call(context.Background(), []byte(`{"method":"input.paste"}`)); err == nil || calls != 0 {
+		t.Fatal("undeclared input accepted")
+	}
+	src := uiPackage(t, false, "0.1.0")
+	mf, _ := manifest.Load(src)
+	mf.Contributes.UIViews[0].BridgeVersion = "2"
+	mf.Contributes.UIViews[0].Permissions = []string{"input.paste"}
+	writeManifest(t, src, mf)
+	if _, err := m.Install(src, false); err != nil {
+		t.Fatal(err)
+	}
+	s = openUI(t, m, "example.hello")
+	s.Message([]byte(`{"kind":"ready","version":2}`))
+	callUI(t, s, `{"method":"input.paste"}`)
+	if calls != 1 {
+		t.Fatal("declared input not routed")
+	}
+	for _, request := range []string{`{"method":"input.paste","input":"other"}`, `{"method":"input.paste","value":null}`, `{"method":"input.paste","commandId":"open"}`} {
+		if _, err := s.Call(context.Background(), []byte(request)); err == nil {
+			t.Fatal("paste accepted payload")
+		}
+	}
+	s.Revoke()
+	if _, err := s.Call(context.Background(), []byte(`{"method":"input.paste"}`)); err == nil || calls != 1 {
+		t.Fatal("revoked input accepted")
 	}
 }

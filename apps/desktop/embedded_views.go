@@ -23,9 +23,11 @@ type embeddedSurface interface {
 	Done() <-chan struct{}
 }
 type embeddedEntry struct {
-	view    embeddedSurface
-	session *uiview.Session
-	window  *application.WebviewWindow
+	inputTarget uintptr
+	pasting     bool
+	view        embeddedSurface
+	session     *uiview.Session
+	window      *application.WebviewWindow
 }
 type embeddedViews struct {
 	mu       sync.Mutex
@@ -106,7 +108,10 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	if err != nil {
 		return err
 	}
-	entry = &embeddedEntry{view: nativeView, session: session, window: window}
+	h.launcher.mu.Lock()
+	target := h.launcher.inputTarget
+	h.launcher.mu.Unlock()
+	entry = &embeddedEntry{inputTarget: target, view: nativeView, session: session, window: window}
 	state.mu.Lock()
 	if state.sequence[window] != sequence || !session.Active() || check != nil && !check() {
 		state.mu.Unlock()

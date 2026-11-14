@@ -103,6 +103,10 @@ func run() error {
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
 		OnShutdown: func() {
+			if host.pluginRuntimeCancel != nil {
+				host.pluginRuntimeCancel()
+				<-host.pluginRuntimeDone
+			}
 			host.cancelSearch()
 			host.closePluginStore()
 			go host.closeEmbeddedAll()
@@ -113,6 +117,7 @@ func run() error {
 			cleanupAcceptance()
 		},
 	})
+	manager.SetUIHostCall(host.callInputHost)
 	host.launcher = &launcher{detached: map[uint]trustedWindow{}}
 	var shellSequence uint
 	newShell := func(url string, hidden bool) *application.WebviewWindow {
@@ -242,7 +247,11 @@ func run() error {
 			host.ui.SetDetachShortcut(host.detachShortcuts.State().Shortcut)
 		}
 		// Register after startup so native conflicts are returned synchronously.
-		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) { host.shortcuts.Start(); host.startDetachShortcuts() })
+		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
+			host.shortcuts.Start()
+			host.startDetachShortcuts()
+			host.startPluginRuntime(app.GlobalShortcut)
+		})
 		app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
 			go host.showMain()
 		})
