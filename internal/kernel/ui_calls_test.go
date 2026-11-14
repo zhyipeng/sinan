@@ -206,3 +206,49 @@ func TestPasteRequiresDeclarationAndLiveSession(t *testing.T) {
 		t.Fatal("revoked input accepted")
 	}
 }
+
+func TestUIEncryptedStorageIsExplicitAndSessionBound(t *testing.T) {
+	m := manager(t)
+	s, src := callableUI(t, m)
+	if _, err := s.Call(context.Background(), []byte(`{"method":"storage.encrypted.get"}`)); err == nil {
+		t.Fatal("encrypted storage granted without permission")
+	}
+	mf, err := manifest.Load(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf.Contributes.UIViews[0].Permissions = append(mf.Contributes.UIViews[0].Permissions, "storage.encrypted")
+	mf.Version = "0.1.1"
+	writeManifest(t, src, mf)
+	if _, err = m.Upgrade(src, true); err != nil {
+		t.Fatal(err)
+	}
+	s = openUI(t, m, "example.native")
+	s.Message([]byte(`{"kind":"ready","version":2}`))
+	response := callUI(t, s, `{"method":"storage.encrypted.put","revision":0,"value":{"fixture":"private-fixture-value"}}`)
+	var doc struct {
+		Revision uint64 `json:"revision"`
+	}
+	if json.Unmarshal(response, &doc) != nil || doc.Revision != 1 {
+		t.Fatal("encrypted UI write failed")
+	}
+	callUI(t, s, `{"method":"storage.encrypted.get"}`)
+	for _, input := range []string{`{"method":"storage.encrypted.get","pluginId":"example.other"}`, `{"method":"storage.encrypted.get","revision":1}`, `{"method":"storage.encrypted.put","revision":0,"value":null}`, `{"method":"storage.encrypted.put","value":null}`} {
+		if _, err = s.Call(context.Background(), []byte(input)); err == nil {
+			t.Fatal("invalid or stale encrypted request accepted")
+		}
+	}
+	plain, err := m.documents.Get("example.native")
+	if err != nil || plain.Revision != 0 {
+		t.Fatal("encrypted data entered ordinary document store")
+	}
+	if _, err = m.Reload("example.native"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Call(context.Background(), []byte(`{"method":"storage.encrypted.get"}`)); err == nil {
+		t.Fatal("revoked session could decrypt")
+	}
+	next := openUI(t, m, "example.native")
+	next.Message([]byte(`{"kind":"ready","version":2}`))
+	callUI(t, next, `{"method":"storage.encrypted.get"}`)
+}

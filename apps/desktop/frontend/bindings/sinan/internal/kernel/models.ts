@@ -24,6 +24,7 @@ export interface PluginDataInfo {
     "bytes": number;
     "corrupt": boolean;
     "token": string;
+    "encrypted"?: boolean;
     "name": string;
     "installed": boolean;
 }

@@ -454,12 +454,14 @@
               },
               "permissions": {
                 "type": "array",
-                "maxItems": 2,
+                "maxItems": 4,
                 "uniqueItems": true,
                 "items": {
                   "enum": [
                     "storage",
-                    "input.paste"
+                    "storage.encrypted",
+                    "input.paste",
+                    "llm"
                   ]
                 },
                 "description": "仅桥 2 可显式声明 storage；按插件隔离，默认不开放。"

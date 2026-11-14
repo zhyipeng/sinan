@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 
-export type PluginDataInfo={id:string;name:string;installed:boolean;bytes:number;corrupt:boolean;token:string};
+export type PluginDataInfo={id:string;name:string;installed:boolean;encrypted?:boolean;bytes:number;corrupt:boolean;token:string};
 export type DataBridge={listData():Promise<PluginDataInfo[]>;clearData(id:string,token:string):Promise<void>};
 function size(bytes:number){return bytes<1024?`${bytes} B`:bytes<1024*1024?`${(bytes/1024).toFixed(1)} KiB`:`${(bytes/1024/1024).toFixed(1)} MiB`;}
 
@@ -40,13 +40,13 @@ export default function PluginData({bridge,disabled,snapshot}:{bridge:DataBridge
   <div className="data-toolbar"><h2>插件数据</h2><button disabled={busy} aria-expanded={expanded} aria-controls="plugin-data-list" onClick={()=>{setExpanded(!expanded);setConfirm(undefined);setError('');setNotice('');}}>{expanded?'收起':'查看插件数据'}</button></div>
   {expanded&&<div id="plugin-data-list">
    <div className="data-toolbar"><small>{rows.length} 项 · {size(rows.reduce((total,row)=>total+row.bytes,0))}</small><button disabled={busy} onClick={()=>{setError('');setNotice('');setRefresh(value=>value+1);}}>刷新数据</button></div>
-   {rows.map(row=><div className="data-row" key={row.id}>
-    <div><strong>{row.name}</strong><small>{row.id} · {size(row.bytes)}{!row.installed?' · 未安装':''}{row.corrupt?' · 文件异常':''}</small></div>
-    <button className="danger" disabled={busy||!row.token} aria-label={`清空 ${row.name} 的数据`} onClick={event=>{opener.current=event.currentTarget;setConfirm(row);setError('');setNotice('');}}>清空数据</button>
+   {rows.map(row=><div className="data-row" key={`${row.id}:${row.encrypted?"encrypted":"plain"}`}>
+    <div><strong>{row.name}{row.encrypted?"（加密数据）":""}</strong><small>{row.id} · {size(row.bytes)}{!row.installed?' · 未安装':''}{row.corrupt?' · 文件异常':''}</small></div>
+    <button className="danger" disabled={busy||!row.token} aria-label={`清空 ${row.name} 的${row.encrypted?"加密":""}数据`} onClick={event=>{opener.current=event.currentTarget;setConfirm(row);setError('');setNotice('');}}>清空数据</button>
    </div>)}
    {!loading&&!rows.length&&<p className="empty">暂无插件私有数据</p>}
-   {confirm&&<div ref={confirmPanel} className="data-confirm" role="group" aria-label={`清空 ${confirm.name} 的数据确认`}>
-    <p>清空 {confirm.name} 的私有数据？</p><small>会关闭插件页面。设置和使用历史保留，此操作不可撤销。</small>
+   {confirm&&<div ref={confirmPanel} className="data-confirm" role="group" aria-label={`清空 ${confirm.name} 的${confirm.encrypted?"加密":""}数据确认`}>
+    <p>清空 {confirm.name} 的{confirm.encrypted?"加密":"私有"}数据？</p><small>会关闭插件页面。设置和使用历史保留，此操作不可撤销。</small>
     <div><button ref={cancelButton} disabled={busy} onClick={()=>{setConfirm(undefined);opener.current?.focus();}}>取消</button><button className="danger" disabled={busy} onClick={()=>void clear()}>确认清空</button></div>
    </div>}
    {error&&<p className="error" role="alert">{error}</p>}

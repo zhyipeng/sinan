@@ -1,11 +1,13 @@
 package kernel
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"sinan/internal/plugin/manifest"
@@ -121,5 +123,47 @@ func TestProtectedPluginPrivateDataCleanupKeepsPolicy(t *testing.T) {
 	}
 	if _, err := manifest.Load(filepath.Join(m.root, "system.settings")); err != nil {
 		t.Fatal("package removed", err)
+	}
+}
+
+func TestEncryptedMetadataAndCleanupKeepOrdinaryData(t *testing.T) {
+	m := manager(t)
+	session, _ := callableUI(t, m)
+	if _, err := m.documents.Put("example.native", 0, json.RawMessage(`{"ordinary":true}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.encryptedDocuments.Put("example.native", 0, json.RawMessage(`{"fixture":"private-fixture-value"}`)); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := m.PluginData()
+	if err != nil || len(rows) != 2 {
+		t.Fatal("missing encrypted metadata", err)
+	}
+	var encrypted PluginDataInfo
+	for _, row := range rows {
+		if row.Encrypted {
+			encrypted = row
+		}
+	}
+	encoded, _ := json.Marshal(rows)
+	if bytes.Contains(encoded, []byte("private-fixture-value")) {
+		t.Fatal("metadata exposed decrypted values")
+	}
+	if !strings.HasPrefix(encrypted.Token, "encrypted:") {
+		t.Fatal("encrypted review token missing kind")
+	}
+	if err = m.ClearPluginData(encrypted.ID, encrypted.Token); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active() {
+		t.Fatal("cleared encrypted namespace did not revoke views")
+	}
+	plain, err := m.documents.Get("example.native")
+	if err != nil || plain.Revision != 1 {
+		t.Fatal("clearing encrypted data removed ordinary document")
+	}
+	sealed, err := m.encryptedDocuments.Get("example.native")
+	if err != nil || sealed.Revision != 0 {
+		t.Fatal("encrypted namespace not cleared")
 	}
 }

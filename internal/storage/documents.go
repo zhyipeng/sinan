@@ -23,13 +23,14 @@ type Document struct {
 
 // Documents stores one bounded JSON document per plugin, outside installed packages.
 type Documents struct {
-	mu   sync.Mutex
-	root string
+	mu             sync.Mutex
+	root           string
+	hostNamespaces bool
 }
 
 func OpenDocuments(root string) *Documents { return &Documents{root: root} }
 func (d *Documents) path(id string) (string, error) {
-	if len(id) > 128 || !documentID.MatchString(id) {
+	if len(id) > 128 || (!documentID.MatchString(id) && !(d.hostNamespaces && hostDocumentID.MatchString(id))) {
 		return "", errors.New("数据命名空间无效")
 	}
 	if err := os.MkdirAll(d.root, 0700); err != nil {

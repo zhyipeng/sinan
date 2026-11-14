@@ -297,12 +297,12 @@ func validUICapabilities(view protocol.UIView, mf Manifest) bool {
 	}
 	permissions := map[string]bool{}
 	for _, permission := range view.Permissions {
-		if permissions[permission] || (permission != "storage" && permission != "input.paste") {
+		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm") {
 			return false
 		}
 		permissions[permission] = true
 	}
-	if len(view.Permissions) > 2 || len(view.Commands) > 16 {
+	if len(view.Permissions) > 4 || len(view.Commands) > 16 {
 		return false
 	}
 	seen := map[string]bool{}

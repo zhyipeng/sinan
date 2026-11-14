@@ -4,10 +4,12 @@ import (
 	"errors"
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/storage"
+	"strings"
 )
 
 type PluginDataInfo struct {
 	storage.DocumentInfo
+	Encrypted bool   `json:"encrypted,omitempty"`
 	Name      string `json:"name"`
 	Installed bool   `json:"installed"`
 }
@@ -26,11 +28,24 @@ func (m *Manager) PluginData() ([]PluginDataInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]PluginDataInfo, 0, len(documents))
+	encrypted, err := m.encryptedDocuments.List()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]PluginDataInfo, 0, len(documents)+len(encrypted))
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, doc := range documents {
 		info := PluginDataInfo{DocumentInfo: doc, Name: doc.ID}
+		if p := m.plugins[doc.ID]; p != nil {
+			info.Name = p.manifest.Name
+			info.Installed = true
+		}
+		result = append(result, info)
+	}
+	for _, doc := range encrypted {
+		doc.Token = "encrypted:" + doc.Token
+		info := PluginDataInfo{DocumentInfo: doc, Name: doc.ID, Encrypted: true}
 		if p := m.plugins[doc.ID]; p != nil {
 			info.Name = p.manifest.Name
 			info.Installed = true
@@ -55,7 +70,13 @@ func (m *Manager) ClearPluginData(id, token string) error {
 	if closed {
 		return errors.New("运行时已关闭")
 	}
-	if err := m.documents.Clear(id, token); err != nil {
+	var err error
+	if strings.HasPrefix(token, "encrypted:") {
+		err = m.encryptedDocuments.Clear(id, strings.TrimPrefix(token, "encrypted:"))
+	} else {
+		err = m.documents.Clear(id, token)
+	}
+	if err != nil {
 		return err
 	}
 	if p != nil {

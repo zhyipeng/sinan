@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 
 	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
@@ -63,6 +64,29 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 			return nil, err
 		}
 		return marshalUIResult(result)
+	}
+	if req.Method == "storage.encrypted.get" || req.Method == "storage.encrypted.put" {
+		defer m.mutationMu.Unlock()
+		if !slices.Contains(view.Permissions, "storage.encrypted") {
+			return nil, errors.New("此视图未声明加密数据权限")
+		}
+		var result any
+		if req.Method == "storage.encrypted.get" {
+			result, err = m.encryptedDocuments.Get(p.manifest.ID)
+		} else {
+			result, err = m.encryptedDocuments.Put(p.manifest.ID, req.Revision, req.Value)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return marshalUIResult(result)
+	}
+	if strings.HasPrefix(req.Method, "llm.") {
+		defer m.mutationMu.Unlock()
+		if !slices.Contains(view.Permissions, "llm") {
+			return nil, errors.New("此视图未声明 LLM 能力")
+		}
+		return m.callLLM(session, p.manifest.ID, req)
 	}
 	if req.Method == "input.paste" {
 		handler := m.uiHostCall

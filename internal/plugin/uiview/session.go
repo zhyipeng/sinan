@@ -252,11 +252,19 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		if len(fields) > 3 || fields["revision"] != nil || fields["value"] != nil || req.CommandID == "" {
 			return nil, errors.New("命令请求无效")
 		}
-	case "storage.get", "launch.get", "input.paste":
+	case "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste":
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}
-	case "storage.put":
+	case "llm.start":
+		if len(fields) != 2 || fields["value"] == nil {
+			return nil, errors.New("LLM 请求无效")
+		}
+	case "llm.poll", "llm.cancel":
+		if len(fields) != 2 || fields["input"] == nil || len(req.Input) != 32 {
+			return nil, errors.New("LLM 任务请求无效")
+		}
+	case "storage.put", "storage.encrypted.put":
 		if len(fields) != 3 || fields["revision"] == nil || fields["value"] == nil {
 			return nil, errors.New("数据保存请求无效")
 		}

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import Shortcut, {type ShortcutBridge} from './Shortcut';
 import PluginShortcuts,{type PluginShortcutsBridge} from './PluginShortcuts';
 import Theme,{type ThemeBridge} from './Theme';
+import LLM,{type LLMBridge} from './LLM';
 import Updates,{type UpdateBridge} from './Updates';
 
 export type SettingsSchema = { id: string; title: string; type: string; options?: { value: string; label: string }[] | null; placeholder?: string | null };
-export type ConfigurablePlugin = { id: string; name: string; settings?: SettingsSchema[] | null };
+export type ConfigurablePlugin = { id: string; name: string; uiViews?: {permissions?:string[]|null}[]|null;settings?: SettingsSchema[] | null };
 export type SettingsSnapshot = { revision: number; values: Record<string, string[]> };
 export type SettingsBridge = {
+  llm:LLMBridge;
   updates:UpdateBridge;
   theme:ThemeBridge;
   shortcut: ShortcutBridge;
@@ -108,6 +110,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
     <Theme bridge={bridge.theme} />
     <PluginShortcuts bridge={bridge.pluginShortcuts} />
     <Updates bridge={bridge.updates} />
+    <LLM bridge={bridge.llm} plugins={plugins.filter(p=>p.uiViews?.some(v=>v.permissions?.includes("llm")))} />
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {error && <p className="error" role="alert">{error}</p>}
   </div>;

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"sinan/internal/llm"
 	"sinan/internal/plugin/icon"
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/transport"
@@ -68,6 +69,9 @@ type plugin struct {
 
 type Manager struct {
 	uiHostCall         func(context.Context, *uiview.Session, protocol.UIRequest) (json.RawMessage, error)
+	llm                *llm.Service
+	llmTasks           llmTasks
+	encryptedDocuments *storage.EncryptedDocuments
 	documents          *storage.Documents
 	views              map[*uiview.Session]struct{} // Accessed under mutationMu.
 	disabled           map[string]bool              // Accessed under mutationMu.
@@ -105,6 +109,9 @@ func New(root string) (*Manager, error) {
 	}
 	m := &Manager{blockedUpgrades: map[string]bool{}, lease: lease, root: abs, plugins: make(map[string]*plugin), usage: storage.OpenUsage(filepath.Join(abs, ".sinan-state", "usage.json")), settings: storage.OpenSettings(filepath.Join(abs, ".sinan-state", "settings.json"))}
 	m.documents = storage.OpenDocuments(filepath.Join(abs, ".sinan-state", "data"))
+	m.encryptedDocuments = storage.OpenEncryptedDocuments(filepath.Join(abs, ".sinan-state", "encrypted-data"), filepath.Join(abs, ".sinan-state", "keys", "plugin-data.key"))
+	m.llm = llm.New(m.encryptedDocuments)
+	m.llmTasks.items = map[string]*llmTask{}
 	m.loadEnablement()
 	m.startupDiagnostics = m.recoverUpgrades()
 	m.Refresh()
@@ -671,6 +678,7 @@ func (m *Manager) Close() {
 	defer m.mutationMu.Unlock()
 	m.mu.Lock()
 	m.closed = true
+	m.llmTasks.cancelAll()
 	entries := m.plugins
 	m.plugins = map[string]*plugin{}
 	m.mu.Unlock()

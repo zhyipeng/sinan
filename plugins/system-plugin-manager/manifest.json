@@ -1,7 +1,7 @@
 {
   "id": "system.plugin-manager",
   "name": "插件中心",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "apiVersion": "1",
   "icon": "icon.svg",
   "runtime": {
@@ -33,11 +33,26 @@
         "title": "GitHub 加速服务",
         "type": "select",
         "options": [
-          { "value": "auto", "label": "自动（官方优先，失败回退镜像）" },
-          { "value": "official", "label": "仅官方，不加速" },
-          { "value": "chenc", "label": "github.chenc.dev" },
-          { "value": "ghproxy", "label": "gh-proxy.com" },
-          { "value": "custom", "label": "自定义模板" }
+          {
+            "value": "auto",
+            "label": "自动（官方优先，失败回退镜像）"
+          },
+          {
+            "value": "official",
+            "label": "仅官方，不加速"
+          },
+          {
+            "value": "chenc",
+            "label": "github.chenc.dev"
+          },
+          {
+            "value": "ghproxy",
+            "label": "gh-proxy.com"
+          },
+          {
+            "value": "custom",
+            "label": "自定义模板"
+          }
         ]
       },
       {

@@ -15,6 +15,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as kernel$0 from "../../internal/kernel/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as llm$0 from "../../internal/llm/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as storage$0 from "../../internal/storage/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -94,6 +97,10 @@ export function CreatePluginProject(options: scaffold$0.Options): $CancellablePr
     return $Call.ByID(2099979901, options);
 }
 
+export function DeleteLLMProfile(id: string, revision: number): $CancellablePromise<llm$0.Snapshot> {
+    return $Call.ByID(3154152464, id, revision);
+}
+
 export function DetachShortcutSettings(): $CancellablePromise<$models.ShortcutState> {
     return $Call.ByID(4262640395);
 }
@@ -120,6 +127,10 @@ export function Install(directory: string, trustNative: boolean): $CancellablePr
 
 export function InstallHostUpdate(): $CancellablePromise<void> {
     return $Call.ByID(3235751085);
+}
+
+export function LLMSettings(): $CancellablePromise<llm$0.Snapshot> {
+    return $Call.ByID(1104903135);
 }
 
 export function LauncherStatus(): $CancellablePromise<string> {
@@ -225,6 +236,14 @@ export function ResizeLauncher(height: number): $CancellablePromise<void> {
 
 export function SaveDetachShortcut(value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
     return $Call.ByID(1332948311, value, revision);
+}
+
+export function SaveLLMPreferences(p: llm$0.Preferences): $CancellablePromise<llm$0.Snapshot> {
+    return $Call.ByID(2135413129, p);
+}
+
+export function SaveLLMProfile(edit: llm$0.Edit): $CancellablePromise<llm$0.Snapshot> {
+    return $Call.ByID(614461370, edit);
 }
 
 export function SavePluginSettings(pluginID: string, revision: number, values: { [_ in string]?: string[] | null } | null): $CancellablePromise<storage$0.SettingsSnapshot> {

@@ -15,8 +15,8 @@ export interface SearchParams { providerId: string; query: string; limit: number
 export interface SearchItem { icon?: string; id: string; title: string; subtitle?: string; commandId: string; input?: string; score: number }
 export interface SearchResult { items: SearchItem[] }
 
-export interface UIView { id:string; entry:string; title?:string; bridgeVersion:'1'|'2'; commands?:string[]; permissions?:('storage'|'input.paste')[] }
-export type UIRequest = {method:'command.execute';commandId:string;input:string} | {method:'input.paste'} | {method:'launch.get'} | {method:'storage.get'} | {method:'storage.put';revision:number;value:unknown};
+export interface UIView { id:string; entry:string; title?:string; bridgeVersion:'1'|'2'; commands?:string[]; permissions?:('storage'|'input.paste'|'storage.encrypted'|'llm')[] }
+export type UIRequest = {method:'llm.config'} | {method:'llm.start';value:{profileId?:string;systemPrompt:string;input:string}} | {method:'llm.poll'|'llm.cancel';input:string} | {method:'command.execute';commandId:string;input:string} | {method:'input.paste'} | {method:'launch.get'} | {method:'storage.get'} | {method:'storage.encrypted.get'} | {method:'storage.encrypted.put';revision:number;value:unknown} | {method:'storage.put';revision:number;value:unknown};
 export interface PluginDocument<T=unknown> {revision:number;value:T|null}
 
 /** Data-only contract reserved for future theme providers; no CSS or scripts. */

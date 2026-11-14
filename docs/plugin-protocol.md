@@ -353,3 +353,15 @@ UI 桥 2 视图可声明 `permissions: ["input.paste"]`，并通过 SDK `pasteTo
 API 1 清单的可选 `commands[].inputMatchScore` 为 0～0.95 的有限数值，仅可与非空 `inputMatchers` 一起声明。例如宽泛文本入口可配置 `"inputMatchScore": 0.2`；省略为 0.95，显式 0 会保留。仅内容命中时使用该分数；名称/关键词/拼音同时命中仍至少 0.85，精确标题为 1，后续使用历史加分规则不变。粘贴内容结果同样先按此分数降序排序，同分按标题、结果键排序。
 
 旧宿主会拒绝这个新字段，需要支持 [ADR 0061](adr/0061-content-match-ranking.md) 的新版宿主。后端 RPC、SDK、UI Bridge 2、匹配及打开参数预算均无变化。
+
+## 加密私有文档
+
+UI Bridge 2 视图可声明 `permissions: ["storage.encrypted"]`，通过 SDK `readEncryptedData()` / `writeEncryptedData(revision,value)` 请求 `storage.encrypted.get` / `storage.encrypted.put`。请求字段与普通文档相同，结果为 `{revision,value}`，独立于普通 `storage`，明文 JSON 上限 20 KiB。身份由会话绑定，禁止提交插件 ID、路径、主密钥或其他额外字段；沿用就绪、撤销、指纹、在途、频率及 500 ms 预算。
+
+core 自动生成本地主密钥，以 AES-256-GCM 加密落盘；授权页面可以读取自己命名空间的明文，密钥与密文同时可读仍可解密。旧宿主拒绝新权限，SDK 与宿主须配套更新。数据管理返回可选 `encrypted: true`，清理指纹含 `encrypted:` 类别前缀；仅提供元数据，不返回值。详细边界见 [ADR 0063](adr/0063-encrypted-plugin-storage-and-llm-translation.md)。
+
+## 共享 LLM
+
+UI Bridge 2 视图可声明 `llm` 权限，调用 SDK `listLLMConfigurations()` 获取仅含 ID/名称的列表与默认 ID。`startLLM({profileId?,systemPrompt,input})` 对应 `{"method":"llm.start","value":{...}}`，返回 `{id}`；`pollLLM(id)` 和 `cancelLLM(id)` 分别对应 `llm.poll` / `llm.cancel`，字段为 `input`。`llm.config` 无参数。禁止多余字段或自行指定地址、模型、Key、插件身份。
+
+显式配置 ID 优先于插件覆盖和全局默认，允许同一插件的不同服务选择不同配置。Key 由 core 持有，不返回插件。任务仅由创建会话使用，每会话最多 2 个、全局最多 16 个；关闭/撤销或配置变更取消。提示词上限 8 KiB、输入 20 KiB、任务 45 秒，桥本身仍为 500 ms。仅实现 UI 窄桥，不包含原生后台反向 RPC。旧宿主拒绝该权限，须配套更新。详见 [ADR 0064](adr/0064-shared-llm-capability.md)。

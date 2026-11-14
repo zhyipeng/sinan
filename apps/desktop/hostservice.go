@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"os"
 	"sinan/internal/kernel"
+	"sinan/internal/llm"
 	"sinan/internal/plugin/distribution"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/search"
@@ -522,4 +523,15 @@ func localPackageSource(source string) (string, func(), error) {
 		return source, func() {}, nil
 	}
 	return distribution.StageLocal(source)
+}
+
+func (h *HostService) LLMSettings() (llm.Snapshot, error) { return h.manager.LLMSettings() }
+func (h *HostService) SaveLLMProfile(edit llm.Edit) (llm.Snapshot, error) {
+	return h.manager.SaveLLMProfile(edit)
+}
+func (h *HostService) DeleteLLMProfile(id string, revision uint64) (llm.Snapshot, error) {
+	return h.manager.DeleteLLMProfile(id, revision)
+}
+func (h *HostService) SaveLLMPreferences(p llm.Preferences) (llm.Snapshot, error) {
+	return h.manager.SaveLLMPreferences(p)
 }
