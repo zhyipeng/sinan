@@ -25,6 +25,8 @@ Linux 安装 Wails CLI 本身也必须带 `-tags gtk3`，因为 CLI 依赖的系
 
 `node scripts/desktop.mjs dev` 构建后，准备 `.sinan-dev` 中的三个内置插件并运行开发实例；应用检索的 Windows 清单入口为 `backend/plugin.exe`，其他平台为 `backend/plugin`。`prepare` 仅准备开发包，`test` 仅执行无界面回归。已有 `make` 入口继续可用。
 
+三平台共用的后台协调退出逻辑采用可取消的原生快捷键投递，避免退出主线程等待后台循环、后台循环又等待主线程的死锁。无界面回归模拟注册/注销排队与空闲退出，并验证目录租约可重取；真实 Ctrl+C 和各平台桌面退出未据此验收。目录锁由 OS 随持有进程退出释放，不应通过删除锁文件绕过，见 [ADR 0062](adr/0062-plugin-runtime-shutdown.md)。
+
 `package` 在 macOS 继续生成 `.app`；Windows/Linux 仅生成 `bin/Sinan-<platform>-<arch>` 可执行文件目录，尚无安装器、签名、桌面注册、运行依赖打包及内置插件发行安装流程，不能视为完整发行包。
 
 ## 应用检索

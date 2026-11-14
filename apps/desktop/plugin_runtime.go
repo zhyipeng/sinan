@@ -15,17 +15,24 @@ import (
 
 // The host registers declarations; plugin business never enters the Shell.
 func (h *HostService) startPluginRuntime(registry shortcutRegistry) {
+	h.startPluginRuntimeWithDispatch(registry, application.InvokeAsync)
+}
+
+func (h *HostService) startPluginRuntimeWithDispatch(registry shortcutRegistry, dispatch func(func())) {
 	ctx, cancel := context.WithCancel(context.Background())
+	registry = runtimeShortcutRegistry{ctx: ctx, registry: registry, dispatch: dispatch}
 	h.pluginRuntimeCancel = cancel
 	h.pluginRuntimeDone = make(chan struct{})
 	go func() {
 		defer close(h.pluginRuntimeDone)
 
 		retry := map[string]time.Time{}
-		defer h.stopPluginShortcuts()
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
+			if ctx.Err() != nil {
+				return
+			}
 			diagnostics := []string{}
 			snapshot := h.manager.Snapshot()
 			for _, p := range snapshot.Plugins {
@@ -53,6 +60,44 @@ func (h *HostService) startPluginRuntime(registry shortcutRegistry) {
 			}
 		}
 	}()
+}
+
+// OnShutdown waits for this worker on the UI thread. Only native registry calls
+// run there; coordination and its mutexes stay on the worker. Cancellation must
+// release the worker even when the UI queue cannot run. Wails releases remaining
+// bindings after OnShutdown, so the worker must not unregister them on exit.
+type runtimeShortcutRegistry struct {
+	ctx      context.Context
+	registry shortcutRegistry
+	dispatch func(func())
+}
+
+func (r runtimeShortcutRegistry) invoke(call func() error) error {
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
+	result := make(chan error, 1)
+	r.dispatch(func() {
+		if err := r.ctx.Err(); err != nil {
+			result <- err
+			return
+		}
+		result <- call()
+	})
+	select {
+	case <-r.ctx.Done():
+		return r.ctx.Err()
+	case err := <-result:
+		return err
+	}
+}
+
+func (r runtimeShortcutRegistry) Register(key string, callback func()) error {
+	return r.invoke(func() error { return r.registry.Register(key, callback) })
+}
+
+func (r runtimeShortcutRegistry) Unregister(key string) error {
+	return r.invoke(func() error { return r.registry.Unregister(key) })
 }
 
 func (h *HostService) openShortcutCommand(owner string) {

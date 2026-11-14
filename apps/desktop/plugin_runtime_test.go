@@ -1,9 +1,12 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"sinan/internal/kernel"
 	"sinan/internal/plugin/manifest"
 	"testing"
+	"time"
 )
 
 func shortcutHost(t *testing.T) (*HostService, *fakeShortcutRegistry) {
@@ -15,6 +18,90 @@ func shortcutHost(t *testing.T) (*HostService, *fakeShortcutRegistry) {
 	t.Cleanup(manager.Close)
 	return &HostService{manager: manager}, &fakeShortcutRegistry{keys: map[string]func(){}}
 }
+
+func TestPluginRuntimeShutdownDoesNotWaitForUI(t *testing.T) {
+	for _, phase := range []string{"register", "unregister", "idle"} {
+		t.Run(phase, func(t *testing.T) {
+			root := t.TempDir()
+			manager, err := kernel.New(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(manager.Close)
+			source := t.TempDir()
+			mf := `{"id":"example.shortcuts","name":"Shortcuts","version":"0.1.0","apiVersion":"1","runtime":{"kind":"declarative"},"contributes":{"commands":[{"id":"open","title":"Open","uiView":"main","shortcut":"Ctrl+Shift+V"}],"uiViews":[{"id":"main","entry":"index.html","bridgeVersion":"1"}]},"permissions":[],"activationEvents":["onCommand:open"]}`
+			if err := os.WriteFile(filepath.Join(source, "manifest.json"), []byte(mf), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(filepath.Join(source, "ui"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(source, "ui", "index.html"), []byte("fixture"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manager.Install(source, false); err != nil {
+				t.Fatal(err)
+			}
+			h := &HostService{manager: manager}
+			registry := &fakeShortcutRegistry{keys: map[string]func(){}}
+			queued := make(chan func(), 1)
+			h.startPluginRuntimeWithDispatch(registry, func(fn func()) { queued <- fn })
+			t.Cleanup(h.pluginRuntimeCancel)
+			nextCall := func() func() {
+				t.Helper()
+				select {
+				case fn := <-queued:
+					return fn
+				case <-time.After(3 * time.Second):
+					t.Fatal("native shortcut call was not queued")
+					return nil
+				}
+			}
+			pending := nextCall()
+			if len(registry.keys) != 0 {
+				t.Fatal("registration ran outside the dispatcher")
+			}
+			if phase != "register" {
+				pending()
+				pending = nil
+				if state := h.PluginShortcutSettings()[0].State; state.Active != "Ctrl+Shift+V" {
+					t.Fatal("dispatched registration failed")
+				}
+				if phase == "unregister" {
+					if _, err := manager.SetPluginEnabled("example.shortcuts", false); err != nil {
+						t.Fatal(err)
+					}
+					pending = nextCall()
+				}
+			}
+			// OnShutdown occupies the UI thread. Queued native work cannot run
+			// until the runtime stops and the manager releases its directory lock.
+			h.pluginRuntimeCancel()
+			select {
+			case <-h.pluginRuntimeDone:
+			case <-time.After(3 * time.Second):
+				t.Fatal("shutdown waited for the UI thread")
+			}
+			manager.Close()
+			next, err := kernel.New(root)
+			if err != nil {
+				t.Fatal("shutdown retained the directory lock", err)
+			}
+			defer next.Close()
+			before := len(registry.keys)
+			if pending != nil {
+				pending()
+			}
+			if len(registry.keys) != before {
+				t.Fatal("canceled native call ran after shutdown")
+			}
+			if phase != "register" && registry.keys["Ctrl+Shift+V"] == nil {
+				t.Fatal("worker attempted final release instead of leaving it to Wails")
+			}
+		})
+	}
+}
+
 func clipboardShortcut() kernel.PluginInfo {
 	return kernel.PluginInfo{ID: "tools.clipboard", Name: "剪贴板", Commands: []manifest.Command{{ID: "open", Title: "剪贴板历史", UIView: "history", Shortcut: "Ctrl+Shift+V"}}}
 }
