@@ -43,6 +43,7 @@ func run() error {
 	acceptancePackages := flag.String("acceptance-packages", "plugins", "验收所需系统插件源码目录")
 	root := flag.String("plugins", "", "插件安装目录")
 	flag.Parse()
+	useBundledPlugins := *root == "" && !*uiProbe && !*acceptance
 	if *acceptance && (*root != "" || *uiProbe) {
 		return errors.New("临时验收不能同时使用 -plugins 或 -ui-probe")
 	}
@@ -78,9 +79,17 @@ func run() error {
 	}
 	defer manager.Close()
 	migrationNotice := ""
+	if useBundledPlugins {
+		if err := installMissingBundledPlugins(manager); err != nil {
+			migrationNotice = err.Error()
+		}
+	}
 	if !*uiProbe && !*acceptance {
 		if err := pluginmanager.Migrate(manager); err != nil {
-			migrationNotice = err.Error()
+			if migrationNotice != "" {
+				migrationNotice += "\n"
+			}
+			migrationNotice += err.Error()
 		}
 	}
 	host := &HostService{manager: manager, probeEnabled: *uiProbe, migrationNotice: migrationNotice}

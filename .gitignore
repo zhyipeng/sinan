@@ -11,3 +11,5 @@ node_modules/
 *.log
 sinan-official-plugins
 sinan-plugin-registry
+/apps/desktop/bundled/*
+!/apps/desktop/bundled/README.txt

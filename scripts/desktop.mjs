@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Native, shell-free entry point shared by Make, PowerShell and CI.
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { releaseVersion } from './release.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const platform = process.platform;
@@ -44,10 +45,28 @@ function frontend() {
 }
 function build() {
   frontend();
+  bundlePlugins();
   mkdirSync(join(root, 'bin'), { recursive: true });
   for (const [name, source] of [['sinan', 'desktop'], ['sinanctl', 'cli'], ['sinan-ui-host', 'ui-host']]) {
     const gui = platform === 'win32' && name === 'sinan' ? ['-ldflags', '-H=windowsgui'] : [];
     run('go', ['build', ...tags, ...gui, '-o', binary(name), `./apps/${source}`]);
+  }
+}
+function bundlePlugins() {
+  const destination = join(root, 'apps/desktop/bundled');
+  for (const name of ['system-app-search', 'system-settings', 'system-plugin-manager']) {
+    const source = join(root, 'plugins', name);
+    const manifest = JSON.parse(readFileSync(join(source, 'manifest.json'), 'utf8'));
+    const target = join(destination, manifest.id);
+    rmSync(target, { recursive: true, force: true });
+    mkdirSync(target, { recursive: true });
+    if (name === 'system-app-search') {
+      manifest.runtime.entry = `backend/plugin${suffix}`;
+      mkdirSync(join(target, 'backend'), { recursive: true });
+      run('go', ['build', '-o', join(target, manifest.runtime.entry), './plugins/system-app-search/cmd']);
+    }
+    writeFileSync(join(target, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+    cpSync(join(source, 'icon.svg'), join(target, 'icon.svg'));
   }
 }
 function prepare() {
@@ -68,24 +87,39 @@ function prepare() {
   }
 }
 function packageDesktop() {
+  // Validate before spending time building or touching an existing package.
+  const version = process.env.RELEASE_TAG ? releaseVersion(process.env.RELEASE_TAG) : undefined;
   build();
   if (platform === 'darwin') {
     const contents = join(root, 'bin/Sinan.app/Contents');
+    rmSync(dirname(contents), { recursive: true, force: true });
     mkdirSync(join(contents, 'MacOS'), { recursive: true });
     mkdirSync(join(contents, 'Resources'), { recursive: true });
-    for (const name of ['sinan', 'sinan-ui-host']) {
+    for (const name of ['sinan', 'sinanctl', 'sinan-ui-host']) {
       const destination = join(contents, 'MacOS', name);
       cpSync(binary(name), destination + '.next');
       renameSync(destination + '.next', destination);
     }
-    cpSync(join(root, 'apps/desktop/Info.plist'), join(contents, 'Info.plist'));
+    let plist = readFileSync(join(root, 'apps/desktop/Info.plist'), 'utf8');
+    if (version) {
+      plist = plist.replace(/(<key>CFBundleShortVersionString<\/key><string>)[^<]+/, (_, prefix) => prefix + version.split('-')[0])
+        .replace(/(<key>CFBundleVersion<\/key><string>)[^<]+/, (_, prefix) => prefix + version.split('-')[0]);
+    }
+    writeFileSync(join(contents, 'Info.plist'), plist);
     cpSync(join(root, 'apps/desktop/assets/AppIcon.icns'), join(contents, 'Resources/AppIcon.icns'));
   } else {
     // Portable build directory only; OS installers and dependency bundling are pending.
     const destination = join(root, 'bin', `Sinan-${platform}-${process.arch}`);
+    rmSync(destination, { recursive: true, force: true });
     mkdirSync(destination, { recursive: true });
     for (const name of ['sinan', 'sinanctl', 'sinan-ui-host']) cpSync(binary(name), join(destination, name + suffix));
   }
+  const metadataDir = platform === 'darwin' ? join(root, 'bin/Sinan.app/Contents/Resources') : join(root, 'bin', `Sinan-${platform}-${process.arch}`);
+  writeFileSync(join(metadataDir, 'release.json'), JSON.stringify({
+    version: version ?? JSON.parse(readFileSync(join(root, 'apps/desktop/frontend/package.json'), 'utf8')).version,
+    platform,
+    arch: process.arch,
+  }, null, 2) + '\n');
 }
 
 const tasks = {

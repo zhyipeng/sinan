@@ -69,3 +69,11 @@ Windows amd64/arm64 默认构建现创建独立 Environment、临时配置目录
 每次视图使用独立虚拟 HTTPS 源，资源直接来自会话快照；不启动 HTTP 服务或映射磁盘目录。SDK 窄桥由引擎顶层消息的精确来源校验，资源、调用和撤销继续经过共有 Go 边界。保留可信页头、主题、原生快捷键和拆出流程；原生视图按 Windows DPI 布局。临时配置目录关闭后尽力清理，不能把 InPrivate 等同于内存存储或操作系统沙箱。详见 [ADR 0055](adr/0055-webview2-isolated-plugin-content.md)。
 
 本轮验证为 macOS 全量无界面回归、Windows amd64/arm64 全仓交叉编译及测试可执行文件编译、Windows 静态检查，以及 Linux ARM64 容器中的 GTK3 UI 边界包竞态回归。原生 COM 回调测试已纳入 Windows CI，尚未本机执行；真实窗口、引擎策略效果、层叠、焦点、输入法、拆出及多屏缩放均待明确安排的实机验收。没有运行桌面 UI 或浏览器交互回归。
+
+## 自动构建与便携发行
+
+已接入 `.github/workflows/desktop-build.yml`，由普通 CI 与标签发布共用，在 macOS、Windows、Ubuntu 各自的 amd64/arm64 runner 上原生构建。`v*` 标签经版本校验、六目标打包及对应无界面检查后发布 GitHub Release；Windows 仍执行已迁移的测试子集。平台与架构在归档前核对，缺失资产或 SHA-256 不符阻止发布。具体触发、依赖、重跑与保护规则见[自动发布](releases.md)。远端实际运行结果仍待验证。
+
+`package` 现将最小内置插件快照编入宿主，默认用户目录正常启动时仅安装缺失插件；已有安装保持原样。macOS `.app` 包含 CLI 和 helper，归档前只做 ad-hoc 签名。Windows/Linux 继续使用便携目录，首次安装内置插件已补齐，但安装器、发行签名、系统依赖打包与真实桌面验收未完成。该段更新前文关于「尚无内置插件发行安装流程」的历史状态，不改变其余平台限制。
+
+本轮本地验证：macOS arm64 打包、ad-hoc 签名验证、归档与 SHA-256、全量无界面回归、新增内置插件初始化竞态测试、桌面静态检查及 actionlint 均通过；Windows arm64 桌面测试可执行文件交叉编译通过，未在 Windows 运行。其他五个目标的原生 Actions 构建和真实发行尚未执行，未进行 UI 验收。
