@@ -18,8 +18,6 @@ func readMetadata(path string) (metadata, error) {
 	return metadata{Name: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))}, nil
 }
 
-func readIcon(string) string { return "" }
-
 func launchApplication(ctx context.Context, path string) error {
 	if err := ctx.Err(); err != nil {
 		return err

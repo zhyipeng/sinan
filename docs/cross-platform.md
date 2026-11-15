@@ -36,12 +36,16 @@ Linux 安装 Wails CLI 本身也必须带 `-tags gtk3`，因为 CLI 依赖的系
 | 平台 | 默认索引范围 | 启动机制 | 当前限制 |
 | --- | --- | --- | --- |
 | macOS | 系统与用户 Applications | `/usr/bin/open -a` | 保持原有 Bundle 元数据和图标 |
-| Windows | APPDATA、PROGRAMDATA 下开始菜单 Programs；附加目录 | ShellExecute 打开 `.lnk` / `.exe` | 使用文件名；图标、打包应用专用枚举及快捷方式元数据待补 |
+| Windows | APPDATA、PROGRAMDATA 下开始菜单 Programs；附加目录 | ShellExecute 打开 `.lnk` / `.exe` | 使用文件名；已接入 Shell 图标提取；打包应用专用枚举及其他快捷方式元数据待补 |
 | Linux | XDG_DATA_HOME、XDG_DATA_DIRS 的 applications；附加目录 | `gio launch <绝对路径>` | 需要 GIO 和桌面会话；图标待补 |
 
 Linux 解析 `[Desktop Entry]`，支持本地化名称、Hidden、NoDisplay、OnlyShowIn、NotShowIn、TryExec，按根目录优先级用 desktop-file ID 屏蔽低优先级项。`Exec` 参数与字段代码交给 GIO，不交给 shell，也不自行拆分。读取预算为 256 KiB。Linux 显示过滤、本地化和 TryExec 变化沿用现有缓存刷新周期，并非实时系统订阅。
 
 Windows 通过初始化 COM 的固定线程调用 ShellExecute，不拼接 cmd.exe 命令。宿主按 GUI 子系统构建；原生插件按 `.exe` 而非 POSIX 执行位检查，启动时隐藏控制台。后端环境使用显式白名单提供平台系统/应用目录、语言及必要桌面会话变量，不整表继承宿主环境。两端均只接受当前索引中的应用 ID，执行前再次检查条目存在、类型与元数据；不接受外部输入的任意路径。该机制不构成操作系统沙箱。
+
+应用检索 0.5.1 在 Windows 适配内通过 `SHGetFileInfoW` 按实际条目读取 `.exe` 与 `.lnk` 图标，由 Shell 解析快捷方式自定义图标或目标图标；在初始化 COM 的固定后台线程内完成提取，不打开目标应用。离屏 GDI 绘制转为 64×64 PNG data URL，通过黑白背景重建透明度以兼容 alpha 与传统掩码图标，释放 HICON、位图和 DC。复用现有按结果读取和内存缓存，失败返回空图标并沿用默认展示。未增加 SDK、协议、权限或宿主业务，不涉及两个独立插件仓库的格式联动；macOS 图标实现与 Linux 图标待补状态保持。
+
+本次本地验证包括 macOS 应用插件竞态回归、透明度像素转换测试和静态检查，Windows amd64/arm64 插件与测试程序交叉编译、静态检查，以及 Linux amd64/arm64 插件交叉构建。Windows 无窗口原生用例覆盖可执行文件图标、中文路径、透明 PNG 和自定义图标快捷方式，沿用现有 CI 的 `TestPlatform` 筛选；本地未运行这些 Windows 原生用例，远端 CI 结果与实际搜索界面显示仍待验证。未启动桌面 UI 或浏览器。
 
 ## 验证与后续顺序
 
