@@ -118,3 +118,9 @@ SDK 与权限枚举同步，旧宿主拒绝新权限；插件中心 0.9.1 显示
 ## 全局共享 LLM（更新）
 
 LLM 配置管理已移到设置插件 0.6.0，通用请求与凭据留在 core；翻译 0.3.0 仅生成提示词、选择全局配置并提交输入。全局加密记录使用保留宿主命名空间和已有主密钥，插件只能获取配置 ID/名称，不能从桥读取 Key。三端复用同一 Go 请求和会话取消机制，没有新的平台原生依赖。旧 0.2.0 私有配置不读取、不迁移；见 [ADR 0064](adr/0064-shared-llm-capability.md)。交叉编译、无界面测试与实机验收仍分别记录。
+
+## 官方日历插件
+
+独立官方仓库新增 `tools.calendar` 0.1.2，使用 React DayPicker 10.0.2、React 19.3.1 和 chinese-days 1.5.10 本地打包，只读展示月历、农历、节日、节气和中国大陆放假/补班数据。沿用声明式运行时、隔离 HTML UI、桥 2 ready 和包内图标，不新增宿主协议、权限、系统依赖或持久化，All-in-Plugin 边界不变；首发使用 0.1.2，避免覆盖官方仓库已有的 v0.1.0 / v0.1.1 标签。
+
+公历范围 1901–2099，假期数据覆盖 2004–2027，未收录年份显式降级。目标语法沿用 Safari 16.4 / Chromium 119 / Firefox 115；CSS 静态输出并跟随宿主主题，无 CDN、动态 style 注入、平台路径或 X11/Wayland 调用。六平台/架构复用纯前端包，三系统 CI 追加无界面测试与构建。[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43791121005) 无界面测试与构建通过；[0.1.2 Release](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/v0.1.2) 的六目标包及摘要已正式上传。各目标 OS 的插件实机运行、WKWebView/WebView2/WebKitGTK、输入法、焦点、主题和 DPI 的真实 UI 验证仍未执行，发行状态不代表实机交互验收通过。
