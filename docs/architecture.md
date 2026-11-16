@@ -432,3 +432,7 @@ Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和
 ### 插件独立版本与发布标签
 
 目录接受 `<plugin-id>-v<version>`，并兼容既有 `v<version>`；版本唯一性按插件 ID 判断，同仓库不同插件可使用相同版本号。字段、资源和权限边界不变；旧宿主需升级才能读取新标签记录，发行前按此顺序部署，不改写历史资产。见 [ADR 0065](adr/0065-independent-plugin-release-tags.md)。
+
+### 独立官方计算插件
+
+`sinan-official-plugins/plugins/calculator` 新增 `tools.calculator` 0.1.0，以现有进程 Search Provider、direct 命令、隔离 UI Bridge 2 和私有 storage 实现主搜索计算与多行计算稿纸。表达式解析、数值运算、稿纸历史与复制业务均留在插件层，宿主协议、SDK、权限和隔离边界不变；未引入新的内核计算能力。三平台依赖与已验证范围见[跨平台适配](cross-platform.md)及[计算插件说明](../../sinan-official-plugins/plugins/calculator/README.md)；当前为本地构建与无界面验证，尚未正式发布或实机 UI 验收。
