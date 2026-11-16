@@ -186,3 +186,11 @@ JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.
 本次本地验证：macOS arm64 宿主全量无界面竞态回归（含前端类型检查与生产构建）、全仓 Go 静态检查通过；新增 UI 请求形状、预算及撤销测试、真实 stdio 模拟大图片双向传输、权限拒绝、进程结束取消与错误后继续调用通过。两个官方插件六目标构建、官方仓库前端 100 项/Python 2 项/三个原生插件竞态回归通过。Windows/Linux 的 amd64/arm64 剪贴板、内核与 transport 静态检查及测试程序交叉编译通过，未在目标系统执行；Windows CI 已补无窗口剪贴板和权限检查，但远端结果尚未验证。测试不读取或修改真实剪贴板，没有运行桌面、原生 WebView 或浏览器。三个平台真实系统剪贴板、UI、焦点与自动输入未验收；未发布新版插件，登记仓库无资产变更。
 
 发布预检补充：插件商店的宿主版本不再写死为 0.1.0，改用各平台构建注入版本做 SemVer 最低版本判定；开发构建使用 0.2.1 能力基线，插件中心 0.9.2 同步展示。修复不增加平台调用、协议或权限。初始 v0.2.0 发布已取消且没有公开资产，本体改发 v0.2.1；插件 0.2.0 最低宿主相应为 0.2.1。远端最终结果在发布后记录。
+
+### 共享剪贴板正式发行结果
+
+[Sinan v0.2.1](https://github.com/zhyipeng/sinan/releases/tag/v0.2.1) 已公开，[六目标原生流水线](https://github.com/zhyipeng/sinan/actions/runs/43806863705) 的 macOS、Windows、Linux arm64/amd64 构建与各自约定的无界面检查全部通过，六个归档的远端 SHA-256 与 SHA256SUMS 一致。初始 v0.2.0 未公开，标签保留。
+
+[剪贴板 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.clipboard-v0.2.0) 与[计算 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.calculator-v0.2.0) 均已公开，各有六目标 ZIP 和摘要；[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43806605442) 通过。包内清单、图标（允许 Windows CRLF）、原生架构、大小与远端 SHA-256 已核验，商店使用真实 Release/Asset ID 登记，最低宿主为 0.2.1。
+
+以上发行状态不代替三平台真实系统剪贴板、WebView、焦点、自动输入和安装升级验收；本次未运行这些实机验证。
