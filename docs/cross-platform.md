@@ -223,3 +223,6 @@ JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.
 本轮仅执行本地无界面检查与 macOS arm64 原生识别验证，不启动桌面、不读真实系统剪贴板。完整 OCR 包仍只验证 macOS arm64；Windows/Linux 完整原生包及三端 WKWebView/WebView2/WebKitGTK 的 paste event、快捷键、焦点和权限尚未实机验收。此接口未发布，官方插件须配套本轮宿主，不能仅凭 v0.2.1 判断兼容。决策见 [ADR 0068](adr/0068-session-image-commands.md)，本轮结果与旧轮次区分记录。
 
 本轮验证结果：宿主 `node scripts/desktop.mjs test`（前端构建、无界面 JS、全量 Go 竞态检查，原生 UI 禁用）及本机桌面构建通过；官方仓库 108 项 JS、3 项打包与四个后台竞态检查通过。OCR 六目标后台 build/vet 通过，仅代表编译/静态检查。macOS arm64 真实 worker 在系统级禁网、模拟宿主下通过 11 图及独立图片快照、不重读剪贴板、取消和后台退出回收验证；更新包约 27.80 MiB，宿主 inspect 通过，SDK 来源补丁可重放。具体摘要与边界见[本轮结果](research/ocr-image-input-validation-results.json)，此前 OCR 报告属于历史轮次，不作为新包摘要。
+
+
+发行前传输复核：补齐 helper 对大于 512 KiB 会话原图的交付（独立上限 4 MiB，普通 bundle 仍为 512 KiB），并补齐 WebView2 新剪贴板图片/图片命令的 URL 双向转换及重复字段拒绝。新增 4 MiB 真实私有管道和无原生窗口的 WebView2 传输单元测试。v0.3.0 发布已取消且无公开 Release，配套发行改为 v0.3.1，OCR 最低宿主同为 0.3.1。

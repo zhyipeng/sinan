@@ -144,3 +144,52 @@ func TestWebviewLaunchImageTranslationDoesNotRewriteUserData(t *testing.T) {
 		}
 	}
 }
+
+func TestWebviewClipboardImageAndCommandTranslation(t *testing.T) {
+	b, _ := bridgeFixture(t)
+	transport := newWebviewTransport(b)
+	internal := "sinan-plugin://example.bridge/__sinan_input/snapshot.png"
+	public := transport.origin + "/__sinan_input/snapshot.png"
+	original, _ := json.Marshal(map[string]any{"url": internal, "width": 128, "future": 42})
+	result, err := transport.callResult([]byte(`{"method":"clipboard.readImage"}`), original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var image map[string]any
+	_ = json.Unmarshal(result, &image)
+	if image["url"] != public || image["width"] != float64(128) || image["future"] != float64(42) {
+		t.Fatal("clipboard metadata changed")
+	}
+	result, err = transport.callResult([]byte(`{"method":"clipboard.readImage"}`), []byte(`null`))
+	if err != nil || string(result) != "null" {
+		t.Fatal("text clipboard changed")
+	}
+	request, _ := json.Marshal(map[string]string{"method": "command.executeImage", "commandId": "start", "input": public})
+	envelope, _ := json.Marshal(webviewEnvelope{Channel: webviewChannel, Kind: "call", ID: 1, Request: request})
+	received, ok := transport.receive(transport.entry, envelope)
+	if !ok {
+		t.Fatal("image command rejected")
+	}
+	var command map[string]string
+	_ = json.Unmarshal(received.Request, &command)
+	if command["input"] != internal || command["commandId"] != "start" {
+		t.Fatal("image command not translated")
+	}
+	ordinary, _ := json.Marshal(map[string]string{"method": "command.execute", "commandId": "start", "input": public})
+	same, err := transport.callRequest(ordinary)
+	if err != nil || !bytes.Equal(same, ordinary) {
+		t.Fatal("ordinary input rewritten")
+	}
+	for _, raw := range []string{
+		`{"method":"command.executeImage","commandId":"start","input":"` + public + `","input":"` + public + `"}`,
+		`{"method":"command.executeImage","method":"command.executeImage","commandId":"start","input":"` + public + `"}`,
+		`{"method":"command.executeImage","commandId":"start","input":"` + public + `","value":{}}`,
+		`{"method":"command.executeImage","commandId":"start","input":"https://foreign.invalid/image.png"}`,
+		`{"method":"command.executeImage","commandId":"start","input":"` + public + `?query=1"}`,
+		`{"method":"command.executeImage","commandId":"start","input":null}`,
+	} {
+		if _, err := transport.callRequest([]byte(raw)); err == nil {
+			t.Fatal("invalid image request admitted")
+		}
+	}
+}

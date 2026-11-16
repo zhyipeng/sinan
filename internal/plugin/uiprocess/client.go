@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	neturl "net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -222,7 +224,12 @@ func (c *Client) Resource(url string) (uiview.Resource, bool) {
 		return uiview.Resource{}, false
 	}
 	frame, err := c.call(request{Kind: "resource", URL: url}, false)
-	if err != nil || frame.Resource == nil || len(frame.Resource.Data) > uiview.MaxFileBytes {
+	limit := uiview.MaxFileBytes
+	entry, parseErr := neturl.Parse(c.init.Entry)
+	if parseErr == nil && frame.Resource != nil && frame.Resource.MIME == "image/png" && strings.HasPrefix(url, "sinan-plugin://"+entry.Host+"/__sinan_input/") {
+		limit = 4 << 20
+	}
+	if err != nil || frame.Resource == nil || len(frame.Resource.Data) > limit {
 		return uiview.Resource{}, false
 	}
 	return *frame.Resource, true

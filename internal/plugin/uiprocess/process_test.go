@@ -2,6 +2,7 @@ package uiprocess
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -386,5 +387,24 @@ func TestResetReturnsFromAttachedAndDetachedGuests(t *testing.T) {
 		if s.Active() {
 			t.Fatal("reset retained the old guest session")
 		}
+	}
+}
+
+func TestPrivatePipeLargeSessionImage(t *testing.T) {
+	s := session(t)
+	image := s.AttachLaunchImage(make([]byte, 4<<20), 1024, 1024)
+	opts := options("large-image")
+	opts.Args = append(opts.Args, image.URL)
+	p, err := Start(context.Background(), s, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := p.Wait()
+	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	var report struct{ Bytes int }
+	if json.Unmarshal(result.Report, &report) != nil || report.Bytes != 4<<20 {
+		t.Fatal("large session image not delivered")
 	}
 }

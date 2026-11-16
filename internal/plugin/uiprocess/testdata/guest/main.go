@@ -69,6 +69,15 @@ func main() {
 	if _, err = c.Message([]byte(`{"kind":"ready","version":1}`)); err != nil {
 		os.Exit(9)
 	}
+	if mode == "large-image" {
+		resource, ok := c.Resource(os.Args[2])
+		if !ok {
+			os.Exit(20)
+		}
+		report, _ := json.Marshal(map[string]int{"bytes": len(resource.Data)})
+		_ = c.Finish(report)
+		return
+	}
 	if mode == "settings" {
 		time.Sleep(100 * time.Millisecond)
 		if c.WindowAction("settings") != nil {

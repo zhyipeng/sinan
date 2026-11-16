@@ -103,21 +103,35 @@ func (t *webviewTransport) receive(source string, data []byte) (webviewEnvelope,
 		t.bridge.consume(0)
 		return webviewEnvelope{}, false
 	}
+	if envelope.Kind == "call" {
+		translated, err := t.callRequest(envelope.Request)
+		if err != nil {
+			t.bridge.consume(0)
+			return webviewEnvelope{}, false
+		}
+		envelope.Request = translated
+	}
 	return envelope, true
 }
 
-// Only launch.get's image URL is a transport detail. Never rewrite user input,
+// Image resource URLs are transport details. Never rewrite user input,
 // storage values, or arbitrary strings that happen to contain the private URL.
 func (t *webviewTransport) callResult(request, value json.RawMessage) (json.RawMessage, error) {
 	var call struct {
 		Method string `json:"method"`
 	}
-	if json.Unmarshal(request, &call) != nil || call.Method != "launch.get" {
+	if json.Unmarshal(request, &call) != nil || (call.Method != "launch.get" && call.Method != "clipboard.readImage") {
 		return value, nil
 	}
 	var result map[string]json.RawMessage
 	if err := json.Unmarshal(value, &result); err != nil {
 		return nil, err
+	}
+	if call.Method == "clipboard.readImage" {
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return value, nil
+		}
+		return t.imageResult(result)
 	}
 	if len(result["image"]) == 0 || bytes.Equal(result["image"], []byte("null")) {
 		return value, nil
@@ -126,6 +140,14 @@ func (t *webviewTransport) callResult(request, value json.RawMessage) (json.RawM
 	if err := json.Unmarshal(result["image"], &image); err != nil {
 		return nil, err
 	}
+	translated, err := t.imageResult(image)
+	if err != nil {
+		return nil, err
+	}
+	result["image"] = translated
+	return json.Marshal(result)
+}
+func (t *webviewTransport) imageResult(image map[string]json.RawMessage) (json.RawMessage, error) {
 	var target string
 	if json.Unmarshal(image["url"], &target) != nil {
 		return nil, errors.New("插件图片地址无效")
@@ -135,6 +157,52 @@ func (t *webviewTransport) callResult(request, value json.RawMessage) (json.RawM
 		return nil, errors.New("插件图片地址无效")
 	}
 	image["url"], _ = json.Marshal(public)
-	result["image"], _ = json.Marshal(image)
-	return json.Marshal(result)
+	return json.Marshal(image)
+}
+
+// Translate only the dedicated image command input. Strictly reject duplicate
+// and extra fields before re-encoding, so normalization cannot hide bad input.
+func (t *webviewTransport) callRequest(request json.RawMessage) (json.RawMessage, error) {
+	var call struct {
+		Method string `json:"method"`
+	}
+	if json.Unmarshal(request, &call) != nil || call.Method != "command.executeImage" {
+		return request, nil
+	}
+	d := json.NewDecoder(bytes.NewReader(request))
+	token, err := d.Token()
+	if err != nil || token != json.Delim('{') {
+		return nil, errors.New("插件图片请求无效")
+	}
+	fields := map[string]string{}
+	for d.More() {
+		token, err = d.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := token.(string)
+		if !ok || (key != "method" && key != "commandId" && key != "input") {
+			return nil, errors.New("插件图片请求字段无效")
+		}
+		if _, seen := fields[key]; seen {
+			return nil, errors.New("插件图片请求字段重复")
+		}
+		var value string
+		if err = d.Decode(&value); err != nil {
+			return nil, err
+		}
+		fields[key] = value
+	}
+	if _, err = d.Token(); err != nil {
+		return nil, err
+	}
+	if d.Decode(new(any)) != io.EOF || len(fields) != 3 || fields["commandId"] == "" {
+		return nil, errors.New("插件图片请求无效")
+	}
+	internal, ok := t.internal(fields["input"])
+	if !ok {
+		return nil, errors.New("插件图片地址无效")
+	}
+	fields["input"] = internal
+	return json.Marshal(fields)
 }
