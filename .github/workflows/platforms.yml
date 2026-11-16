@@ -1,8 +1,7 @@
 name: Desktop platform builds
+# commit/PR 自动构建已关闭以节省 Actions 用量；全平台 Release 构建仅由 tag 触发
+# 的 Desktop release（release.yml）负责。如需临时验证，可在 Actions 页手动触发。
 on:
-  push:
-    branches: ['**']
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
