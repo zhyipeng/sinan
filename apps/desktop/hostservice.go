@@ -18,6 +18,7 @@ import (
 	settingsupdate "sinan/plugins/system-settings/update"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
@@ -47,12 +48,15 @@ type HostService struct {
 	launcher             *launcher
 	recordMu             sync.Mutex
 	recordingWindow      *application.WebviewWindow
-	searchMu             sync.Mutex
-	searchSequence       uint64
-	searchCancel         context.CancelFunc
-	pasted               *stagedPaste
-	pasteClearedThrough  uint64
-	pasteParseMu         sync.Mutex
+	// Read from the native window proc (UI thread), so keep them lock-free.
+	shortcutRecording   atomic.Bool
+	altSpaceHotkey      atomic.Bool
+	searchMu            sync.Mutex
+	searchSequence      uint64
+	searchCancel        context.CancelFunc
+	pasted              *stagedPaste
+	pasteClearedThrough uint64
+	pasteParseMu        sync.Mutex
 }
 
 func (h *HostService) Snapshot() kernel.Snapshot { return h.uiDiagnostics(h.manager.Snapshot()) }
@@ -262,6 +266,8 @@ func (h *HostService) RecordShortcut(ctx context.Context, enabled bool) error {
 	}
 	h.recordMu.Lock()
 	defer h.recordMu.Unlock()
+	// Mirror the recorder state for the lock-free native window proc.
+	defer func() { h.shortcutRecording.Store(h.recordingWindow != nil) }()
 	if !enabled && h.recordingWindow != window {
 		return nil
 	}
@@ -290,6 +296,7 @@ func (h *HostService) stopRecording(window *application.WebviewWindow) {
 	defer h.recordMu.Unlock()
 	if h.shortcuts != nil && h.recordingWindow == window {
 		h.recordingWindow = nil
+		h.shortcutRecording.Store(false)
 		_ = h.shortcuts.Record(false)
 		h.recordPluginShortcuts(false)
 	}

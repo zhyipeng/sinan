@@ -132,7 +132,14 @@ const tasks = {
   prepare,
   package: packageDesktop,
   run() { build(); run(binary('sinan')); },
-  dev() { build(); prepare(); run(binary('sinan'), ['-plugins', '.sinan-dev/plugins']); },
+  dev() {
+    build();
+    prepare();
+    // Isolate the dev WebView2 profile from an installed Sinan and stale locks.
+    const webviewData = join(root, '.sinan-dev/webview2');
+    mkdirSync(webviewData, { recursive: true });
+    run(binary('sinan'), ['-plugins', '.sinan-dev/plugins', '-webview-data-dir', webviewData]);
+  },
   test() {
     frontend();
     run(process.execPath, ['--test', 'packages/plugin-sdk/theme/runtime.test.mjs']);

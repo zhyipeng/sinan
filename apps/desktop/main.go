@@ -48,6 +48,7 @@ func run() error {
 	acceptancePackages := flag.String("acceptance-packages", "plugins", "验收所需系统插件源码目录")
 	root := flag.String("plugins", "", "插件安装目录")
 	updateSession := flag.String("update-session", "", "更新助手启动会话")
+	webviewDataDir := flag.String("webview-data-dir", "", "WebView2 用户数据目录（Windows 开发隔离用；留空使用默认目录）")
 	flag.Parse()
 	useBundledPlugins := *root == "" && !*uiProbe && !*acceptance
 	if *acceptance && (*root != "" || *uiProbe) {
@@ -112,6 +113,14 @@ func run() error {
 	if *acceptance {
 		name = "Sinan Acceptance"
 	}
+	windowsOptions := application.WindowsOptions{WndProcInterceptor: newWindowsWndProcInterceptor(host)}
+	if *webviewDataDir != "" {
+		absolute, err := filepath.Abs(*webviewDataDir)
+		if err != nil {
+			return fmt.Errorf("无法解析 WebView2 用户数据目录：%w", err)
+		}
+		windowsOptions.WebviewUserDataPath = absolute
+	}
 	app := application.New(application.Options{
 		Name:        name,
 		Description: "插件驱动的桌面效率工具",
@@ -119,6 +128,7 @@ func run() error {
 		Services:    []application.Service{application.NewService(host)},
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
+		Windows:     windowsOptions,
 		OnShutdown: func() {
 			host.updatesCancel()
 			if host.pluginRuntimeCancel != nil {
@@ -257,6 +267,7 @@ func run() error {
 			host.captureShortcut(value)
 		}, func(state ShortcutState) {
 			host.launcher.setShortcutError(state.Error)
+			host.updateAltSpaceHotkey()
 			if *acceptance {
 				tray.SetTooltip("司南 · 临时验收 · " + state.Shortcut)
 			} else {
@@ -265,6 +276,7 @@ func run() error {
 			host.launcher.dispatch(&application.CustomEvent{Name: "shortcut:changed", Data: state, Sender: "kernel.shortcuts"})
 		})
 		host.detachShortcuts = newShortcutControllerWithDefault(windowPreferences{manager}, localShortcutRegistry{}, nil, nil, func(state ShortcutState) {
+			host.updateAltSpaceHotkey()
 			host.setEmbeddedShortcut(state.Active, state.Revision)
 			if host.ui != nil {
 				host.ui.SetDetachShortcut(state.Active)

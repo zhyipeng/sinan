@@ -77,6 +77,7 @@ func (h *HostService) syncPluginShortcuts(plugins []kernel.PluginInfo, registry 
 		entry := h.pluginShortcuts[owner]
 		if entry == nil {
 			controller := newShortcutControllerWithDefault(pluginShortcutPreferences{h.manager, info.PluginID, info.CommandID}, registry, func() { h.openShortcutCommand(owner) }, h.captureShortcut, func(state ShortcutState) {
+				h.updateAltSpaceHotkey()
 				h.dispatchPluginShortcut(&application.CustomEvent{Name: "plugin-shortcut:changed", Data: map[string]any{"pluginId": info.PluginID, "commandId": info.CommandID, "state": state}, Sender: "kernel.shortcuts"})
 			}, info.State.Default)
 			entry = &pluginShortcutEntry{info: info, controller: controller}

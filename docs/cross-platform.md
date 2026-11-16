@@ -23,7 +23,7 @@ Linux 的构建、绑定生成和回归均使用 `gtk3` 标签及 CGO。关闭 C
 
 Linux 安装 Wails CLI 本身也必须带 `-tags gtk3`，因为 CLI 依赖的系统检测包同样通过构建标签选择 GTK 版本。不带标签会查找 `gtk4` / `webkitgtk-6.0`，与本项目的 GTK3/WebKitGTK 4.1 依赖不匹配；CI 的 Linux 安装步骤使用相同参数。
 
-`node scripts/desktop.mjs dev` 构建后，准备 `.sinan-dev` 中的三个内置插件并运行开发实例；应用检索的 Windows 清单入口为 `backend/plugin.exe`，其他平台为 `backend/plugin`。`prepare` 仅准备开发包，`test` 仅执行无界面回归。已有 `make` 入口继续可用。
+`node scripts/desktop.mjs dev` 构建后，准备 `.sinan-dev` 中的三个内置插件并运行开发实例；应用检索的 Windows 清单入口为 `backend/plugin.exe`，其他平台为 `backend/plugin`。`prepare` 仅准备开发包，`test` 仅执行无界面回归。已有 `make` 入口继续可用。Windows 无 make 时使用 `scripts/dev.cmd`（PowerShell 7 包装 `desktop.mjs dev`）：检查 Node.js/Go/wails3、依赖缺失时执行 `setup`、构建前结束仓库内旧 `bin\sinan.exe` 并等待其 WebView2 子进程释放数据目录，并支持 `-Setup`、`-Clean`、`-NoStop`、`-ResetWebView`、`-DryRun`；`-DryRun` 只检查环境不启动桌面。开发实例通过新增的 `-webview-data-dir` 使用 `.sinan-dev\webview2`，与已安装司南的默认 `%APPDATA%\sinan.exe` 隔离，避免 WebView2 `0x800700aa`（用户数据目录被其他 WebView2 进程占用）。
 
 三平台共用的后台协调退出逻辑采用可取消的原生快捷键投递，避免退出主线程等待后台循环、后台循环又等待主线程的死锁。无界面回归模拟注册/注销排队与空闲退出，并验证目录租约可重取；真实 Ctrl+C 和各平台桌面退出未据此验收。目录锁由 OS 随持有进程退出释放，不应通过删除锁文件绕过，见 [ADR 0062](adr/0062-plugin-runtime-shutdown.md)。
 
@@ -226,3 +226,7 @@ JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.
 
 
 发行前传输复核：补齐 helper 对大于 512 KiB 会话原图的交付（独立上限 4 MiB，普通 bundle 仍为 512 KiB），并补齐 WebView2 新剪贴板图片/图片命令的 URL 双向转换及重复字段拒绝。新增 4 MiB 真实私有管道和无原生窗口的 WebView2 传输单元测试。v0.3.0 发布已取消且无公开 Release，配套发行改为 v0.3.1，OCR 最低宿主同为 0.3.1。
+
+### Windows 呼出快捷键 Alt+Space
+
+Windows 把 `Alt+Space` 当作窗口系统菜单组合，`RegisterHotKey` 注册后前台窗口仍会收到 `WM_SYSCOMMAND`/`SC_KEYMENU` 并弹出标题栏右键菜单，导致设置无法录入该热键。宿主现通过 Wails `WndProcInterceptor` 在自有窗口内吞掉该系统菜单消息：录入时原生捕获 `Alt+Space` 并投递 `shortcut:recorded`，已配置时交给全局热键的 `WM_HOTKEY` 切换；未配置且未录入时保持系统默认菜单。为避免 UI 消息线程等待控制器锁，录入与配置状态分别用原子布尔值暴露，并在快捷键变更回调中刷新。该实现仅 Windows 构建安装拦截器，不修改全局热键注册、插件协议、SDK 或设置存储格式。新增消息判定与规范化单元测试，Windows amd64 本机 `go vet` 及相关用例通过；Windows 真实桌面、WebView2 键盘与系统菜单、macOS/Linux 真实输入法与焦点仍未实机验收。详见 [ADR 0070](adr/0070-windows-alt-space-shortcut.md)。

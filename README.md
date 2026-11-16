@@ -14,6 +14,16 @@ make setup
 make dev
 ```
 
+Windows 没有 make 时使用 PowerShell 7 启动脚本（内部仍调用 `node scripts/desktop.mjs dev`）：
+```powershell
+.\scripts\dev.cmd          # 检查依赖、必要时 setup，然后构建并启动开发实例
+.\scripts\dev.cmd -Setup   # 显式安装依赖，缺少时一并安装 wails3 CLI
+.\scripts\dev.cmd -Clean   # 删除 bin\ 与 .sinan-dev\ 后重新构建
+.\scripts\dev.cmd -ResetWebView # 重置 .sinan-dev\webview2（WebView2 报 0x800700aa 时）
+.\scripts\dev.cmd -DryRun  # 只检查环境并打印步骤，不构建、不启动
+```
+开发实例使用独立的 `.sinan-dev\webview2` 作为 WebView2 用户数据目录，避免与已安装的司南或残留 WebView2 进程争用默认 `%APPDATA%\sinan.exe`。
+
 ## 开发文档
 - [架构指导方案](docs/architecture.md)
 - [插件开发协议](docs/plugin-protocol.md)
