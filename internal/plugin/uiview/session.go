@@ -252,9 +252,13 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		if len(fields) > 3 || fields["revision"] != nil || fields["value"] != nil || req.CommandID == "" {
 			return nil, errors.New("命令请求无效")
 		}
-	case "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste":
+	case "clipboard.readText", "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste":
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
+		}
+	case "clipboard.writeText":
+		if len(fields) != 2 || fields["input"] == nil || len(req.Input) > 32<<10 {
+			return nil, errors.New("剪贴板文本请求无效或超过 32 KiB")
 		}
 	case "llm.start":
 		if len(fields) != 2 || fields["value"] == nil {

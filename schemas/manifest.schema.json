@@ -461,7 +461,9 @@
                     "storage",
                     "storage.encrypted",
                     "input.paste",
-                    "llm"
+                    "llm",
+                    "clipboard.read",
+                    "clipboard.write"
                   ]
                 },
                 "description": "仅桥 2 可显式声明 storage；按插件隔离，默认不开放。"

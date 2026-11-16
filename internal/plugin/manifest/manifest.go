@@ -297,7 +297,7 @@ func validUICapabilities(view protocol.UIView, mf Manifest) bool {
 	}
 	permissions := map[string]bool{}
 	for _, permission := range view.Permissions {
-		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm") {
+		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm" && permission != "clipboard.read" && permission != "clipboard.write") {
 			return false
 		}
 		permissions[permission] = true

@@ -51,6 +51,21 @@ func main() {
 					time.Sleep(200 * time.Millisecond)
 				}
 				return protocol.CommandResult{Text: p.Input}, nil
+			case "host-clipboard":
+				host := sdk.HostFromContext(ctx)
+				if p.Input == "write" {
+					err := host.ClipboardWrite(ctx, protocol.ClipboardContent{Kind: "image", Data: make([]byte, 2<<20)})
+					return protocol.CommandResult{Text: "written"}, err
+				}
+				sequence := uint64(0)
+				if p.Input == "wait" {
+					sequence = 100
+				}
+				if p.Input == "denied" {
+					sequence = 99
+				}
+				value, err := host.ClipboardRead(ctx, sequence)
+				return protocol.CommandResult{Text: strconv.Itoa(len(value.Content.Data))}, err
 			case "hang":
 				time.Sleep(time.Minute)
 			case "crash":

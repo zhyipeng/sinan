@@ -365,3 +365,27 @@ core 自动生成本地主密钥，以 AES-256-GCM 加密落盘；授权页面�
 UI Bridge 2 视图可声明 `llm` 权限，调用 SDK `listLLMConfigurations()` 获取仅含 ID/名称的列表与默认 ID。`startLLM({profileId?,systemPrompt,input})` 对应 `{"method":"llm.start","value":{...}}`，返回 `{id}`；`pollLLM(id)` 和 `cancelLLM(id)` 分别对应 `llm.poll` / `llm.cancel`，字段为 `input`。`llm.config` 无参数。禁止多余字段或自行指定地址、模型、Key、插件身份。
 
 显式配置 ID 优先于插件覆盖和全局默认，允许同一插件的不同服务选择不同配置。Key 由 core 持有，不返回插件。任务仅由创建会话使用，每会话最多 2 个、全局最多 16 个；关闭/撤销或配置变更取消。提示词上限 8 KiB、输入 20 KiB、任务 45 秒，桥本身仍为 500 ms。仅实现 UI 窄桥，不包含原生后台反向 RPC。旧宿主拒绝该权限，须配套更新。详见 [ADR 0064](adr/0064-shared-llm-capability.md)。
+
+## 宿主系统剪贴板（ADR 0066）
+
+此节更新前文「尚无系统 Host API」「剪贴板仅用途声明」的历史限制。初始化可选字段 `hostCapabilities` 包含 `clipboard.v1` 时，原生插件可在相同 stdio 流上请求宿主。反向请求使用标准 JSON-RPC 2.0，ID 在两个方向独立；响应没有 method，扫描循环必须同时处理请求和响应。缺少能力时应明确报告宿主不兼容，不尝试调用旧宿主。协议 API 仍为 1，不代表所有 API 1 宿主都具备此增量能力。
+
+- `clipboard.read` 参数 `{sequence?: number}`，返回 `{content:{kind,data},sequence}`；data 为 base64，kind 为 text / image，空内容为 kind 空字符串、data null。首次可用 sequence 0，后续传上次值；Linux 无系统序列号时调用方仍需去重。未变化、空或受保护类型可返回空内容。
+- `clipboard.write` 参数 `{content:{kind:"text"|"image",data:<base64>}}`，成功返回空内容的 ClipboardResult。非空 UTF-8 文本最多 256 KiB，禁止 NUL；图片仅 PNG，最多 8 MiB / 1600 万像素。不提供清空、富文本、文件列表或宿主监控订阅。
+- 宿主根据进程清单中的同名权限拒绝未声明操作，参数不能指定其他插件或路径。清单声明不产生操作系统沙箱或新授权弹窗。
+- 每进程最多 4 个在途反向请求，重复在途 ID 和超量请求终止进程；两秒预算，进程退出取消等待。已开始的同步原生操作不能保证强制撤销。
+- 普通 RPC 的 1 MiB 消息限制不变；反向 clipboard.write 请求和 clipboard.read 响应可使用 12 MiB，扫描器上限相应调整。Go SDK 为新增能力提供有界并发与独立 ID 路由。
+
+Go SDK 用法（命令上下文中）：
+
+```go
+host := sdk.HostFromContext(ctx)
+err := host.ClipboardWrite(ctx, protocol.ClipboardContent{Kind: "text", Data: []byte("result")})
+snapshot, err := host.ClipboardRead(ctx, 0)
+```
+
+后台任务可通过 `Handlers.HostReady` 捕获 `*sdk.HostClient`；此回调仅保存客户端，不同步发请求。`Initialize` 应检查 `HostCapabilities` 后再启动后台任务，初始化回调中不能同步等待宿主调用（读循环尚在处理初始化）。既有 SDK 接口与旧插件不需要改动。
+
+页面使用 UI Bridge 2，在对应视图 permissions 声明 `clipboard.read` / `clipboard.write` 后调用 `readClipboardText()` / `writeClipboardText(text)`；请求分别为 `{method:"clipboard.readText"}` / `{method:"clipboard.writeText",input:text}`，成功分别返回 string / null。权限不继承顶层原生清单，声明式视图也可单独申请。最多 32 KiB 文本，维持 64 KiB 请求、192 KiB 响应与 500 毫秒预算，JSON 转义超预算仍拒绝；非文本剪贴板返回错误，图片请经后端 API 访问。页面关闭、包变化或禁用仍按现有会话撤销流程处理。
+
+平台依赖及未验收边界见 [ADR 0066](adr/0066-host-clipboard-api.md) 与[跨平台适配](cross-platform.md)。

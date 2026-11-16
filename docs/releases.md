@@ -66,3 +66,7 @@ GitHub 的 [runner 文档](https://docs.github.com/en/actions/reference/runners/
 发行包现额外携带 `sinan-updater`。`RELEASE_TAG` 对应完整版本在构建时写入宿主和助手，包内 `release.json` 记录版本、平台及架构，归档前核对一致；macOS 打包禁止附带 AppleDouble 扩展属性旁路文件，以便受限解压器统一验证根目录。
 
 包含该机制的完整发行版启动后检查稳定新版，在用户点击下载并重启安装后消费本流程发布的对应资产和 `SHA256SUMS.txt`。旧版无助手构建仍需手动安装一次。功能、备份、签名与实机验证边界见[自动更新](auto-update.md)。
+
+## v0.2.0 发布准备
+
+本版增加宿主共享系统剪贴板 API（ADR 0066），配套计算、剪贴板插件 0.2.0；新插件要求司南 0.2.0 与初始化 `clipboard.v1` 能力。宿主六目标原生构建和无界面检查由标签工作流执行，成功后才公开 Release；此处不预先声明远端或实机验收通过。macOS 仍为 ad-hoc 签名，Windows/Linux 仍为便携目录，系统依赖和真实桌面验收限制不变。

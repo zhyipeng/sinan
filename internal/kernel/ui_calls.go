@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"sinan/internal/clipboard"
 	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
 )
@@ -87,6 +88,34 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 			return nil, errors.New("此视图未声明 LLM 能力")
 		}
 		return m.callLLM(session, p.manifest.ID, req)
+	}
+	if req.Method == "clipboard.readText" || req.Method == "clipboard.writeText" {
+		defer m.mutationMu.Unlock()
+		permission := "clipboard.read"
+		method := "clipboard.read"
+		params := protocol.ClipboardParams{}
+		if req.Method == "clipboard.writeText" {
+			permission = "clipboard.write"
+			method = "clipboard.write"
+			params.Content = protocol.ClipboardContent{Kind: "text", Data: []byte(req.Input)}
+		}
+		if !slices.Contains(view.Permissions, permission) {
+			return nil, errors.New("此视图未声明剪贴板权限")
+		}
+		value, err := clipboard.Call(ctx, method, params)
+		if err != nil {
+			return nil, err
+		}
+		if method == "clipboard.write" {
+			return marshalUIResult(nil)
+		}
+		if value.Content.Kind != "" && value.Content.Kind != "text" {
+			return nil, errors.New("当前剪贴板不是文本")
+		}
+		if len(value.Content.Data) > 32<<10 {
+			return nil, errors.New("剪贴板文本超过 UI 32 KiB 限制")
+		}
+		return marshalUIResult(string(value.Content.Data))
 	}
 	if req.Method == "input.paste" {
 		handler := m.uiHostCall

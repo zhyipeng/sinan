@@ -60,9 +60,12 @@ jobs:
           node --test packages/plugin-sdk/theme/runtime.test.mjs
           node --test internal/plugin/uihost/gtk_bridge.test.mjs internal/plugin/uihost/webview_bridge.test.mjs
           node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs apps/desktop/frontend/tests/searchKeyboard.test.mjs
-      - name: Windows search preferences regression
+      - name: Windows search preferences and clipboard authority regression
         if: runner.os == 'Windows'
-        run: go test ./internal/kernel -run '^TestSearchPreferences'
+        run: go test ./internal/kernel -run '^TestSearchPreferences|^TestClipboardAuthority'
+      - name: Clipboard validation without desktop access
+        if: runner.os == 'Windows'
+        run: go test ./internal/clipboard
       - name: Windows host update regression
         if: runner.os == 'Windows'
         run: go test ./internal/buildinfo ./internal/hostupdate ./plugins/system-settings/update

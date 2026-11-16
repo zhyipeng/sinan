@@ -436,3 +436,7 @@ Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和
 ### 独立官方计算插件
 
 `sinan-official-plugins/plugins/calculator` 新增 `tools.calculator` 0.1.0，以现有进程 Search Provider、direct 命令、隔离 UI Bridge 2 和私有 storage 实现主搜索计算与多行计算稿纸。表达式解析、数值运算、稿纸历史与复制业务均留在插件层，宿主协议、SDK、权限和隔离边界不变；未引入新的内核计算能力。三平台依赖与已验证范围见[跨平台适配](cross-platform.md)及[计算插件说明](../../sinan-official-plugins/plugins/calculator/README.md)；当前为本地构建与无界面验证，尚未正式发布或实机 UI 验收。
+
+## 宿主共享系统剪贴板
+
+系统剪贴板文本/PNG 读写现由宿主提供，原生插件通过带清单权限校验的双向 stdio Host API 访问；初始化能力标识为 `clipboard.v1`。计算、剪贴板历史及轮询仍留在独立官方插件，两个插件的 0.2.0 源码已移除重复的平台读写实现。UI Bridge 2 另提供受视图权限与既有预算约束的文本 API；不继承后端权限、不开放完整 Wails Bridge，不构成 OS 沙箱。版本、传输与平台边界见 [ADR 0066](adr/0066-host-clipboard-api.md)。尚未发布新版插件，实际系统剪贴板与 UI 尚未验收。

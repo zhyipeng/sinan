@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"sinan/internal/clipboard"
 	"sinan/internal/llm"
 	"sinan/internal/plugin/icon"
 	"sinan/internal/plugin/manifest"
@@ -428,7 +429,7 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 		return nil, err
 	}
 	p.state = "activating"
-	process, err := transport.Start(path, p.dir)
+	process, err := transport.StartWithHost(path, p.dir, clipboardHandler(p.manifest.Permissions, clipboard.Call))
 	if err != nil {
 		p.state = "failed"
 		return nil, err
@@ -445,7 +446,7 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 		p.state = "failed"
 		return nil, errors.New("无法创建插件持久数据目录")
 	}
-	err = process.Call(ctx, "initialize", protocol.InitializeParams{APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{HostCapabilities: []string{protocol.ClipboardCapability}, APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
 	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
 		process.Stop()
 		p.state = "failed"
