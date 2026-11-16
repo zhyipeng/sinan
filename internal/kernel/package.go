@@ -103,6 +103,60 @@ func loadPackage(dir string) (manifest.Manifest, string, error) {
 	}
 	return mf, digest, nil
 }
+
+// PackageContents describes an installed package's current bytes: its content
+// fingerprint, the regular files it holds, and whether it is flat, meaning every
+// entry is a regular file. It never reads or executes package code. Callers that
+// replace or remove a system component use this to recognise a shipped snapshot
+// and to keep any package that carries extra local bytes.
+type PackageContents struct {
+	Fingerprint string   `json:"fingerprint"`
+	Files       []string `json:"files"`
+	Flat        bool     `json:"flat"`
+}
+
+// PackageContents reports the installed package's bytes on disk. It walks the
+// package directory without following links; directories and other non-regular
+// entries clear Flat. A package that is not installed yields zero contents.
+func (m *Manager) PackageContents(id string) (PackageContents, error) {
+	m.mu.Lock()
+	current := m.plugins[id]
+	var dir string
+	if current != nil {
+		dir = current.dir
+	}
+	m.mu.Unlock()
+	if current == nil {
+		return PackageContents{}, nil
+	}
+	fingerprint, err := packageFingerprint(dir)
+	if err != nil {
+		return PackageContents{}, err
+	}
+	contents := PackageContents{Fingerprint: fingerprint, Flat: true}
+	err = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return errors.New("无法读取插件包")
+		}
+		if path == dir {
+			return nil
+		}
+		rel, relErr := filepath.Rel(dir, path)
+		if relErr != nil {
+			return errors.New("插件路径无效")
+		}
+		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
+			contents.Flat = false
+			return nil
+		}
+		contents.Files = append(contents.Files, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return PackageContents{}, err
+	}
+	return contents, nil
+}
 func (m *Manager) packageSource(source string) (string, error) {
 	abs, err := filepath.Abs(source)
 	if err != nil {

@@ -117,6 +117,63 @@ func TestMigrationFromStoreOnlyAndEmptyInstallation(t *testing.T) {
 	}
 }
 
+// A release installs only the flat manifest/icon snapshot, so a host upgrade has
+// to adopt the bundled declaration instead of reporting an unknown built-in
+// package. The fixture is the snapshot released as plugin center 0.9.2.
+func TestMigrationAdoptsBundledCenterFromReleasedSnapshot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "plugins")
+	manager, err := kernel.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manager.Close)
+	if _, err = manager.Install(filepath.Join("testdata", "released-0.9.2"), false); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err = Migrate(manager); err != nil {
+			t.Fatal(err)
+		}
+		plugins := manager.Snapshot().Plugins
+		if len(plugins) != 1 || plugins[0].ID != "system.plugin-manager" || plugins[0].Version != "0.9.3" {
+			t.Fatalf("released snapshot not adopted: %+v", plugins)
+		}
+	}
+	contents, err := manager.PackageContents("system.plugin-manager")
+	if err != nil || !contents.Flat || len(contents.Files) != 2 {
+		t.Fatalf("unexpected installed package %+v %v", contents, err)
+	}
+}
+
+// Only the center's own declaration may be replaced. Another declarative package
+// that happens to use the same two-file layout stays untouched.
+func TestMigrationKeepsFlatPackageWithForeignDeclaration(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "package")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	declaration := `{"id":"system.plugin-manager","name":"插件中心","version":"0.9.2","apiVersion":"1","runtime":{"kind":"declarative"},"contributes":{"commands":[{"id":"open","title":"插件中心","view":"store"}]},"permissions":[],"activationEvents":["onCommand:open"]}`
+	if err := os.WriteFile(filepath.Join(source, "manifest.json"), []byte(declaration), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "plugins")
+	manager, err := kernel.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manager.Close)
+	if _, err = manager.Install(source, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = Migrate(manager); err == nil {
+		t.Fatal("foreign declaration accepted")
+	}
+	plugins := manager.Snapshot().Plugins
+	if len(plugins) != 1 || plugins[0].Version != "0.9.2" {
+		t.Fatal("foreign package replaced")
+	}
+}
+
 func TestCheckedUninstallRejectsPackageChangedAfterPreview(t *testing.T) {
 	manager, root := fixtureManager(t, "system-plugin-store")
 	preview, err := manager.PreviewPackage(filepath.Join("testdata", "system-plugin-store"))
