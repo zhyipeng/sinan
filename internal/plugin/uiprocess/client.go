@@ -159,6 +159,18 @@ func (c *Client) revokeLocal() {
 func (c *Client) Close() {
 	c.closeOnce.Do(func() { c.revokeLocal(); close(c.closed); _ = c.reader.Close(); _ = c.writer.Close() })
 }
+
+// callBudget bounds one client/server exchange. A flat one-second deadline is
+// too tight for multi-megabyte session-image frames on slow machines, so the
+// budget grows with the largest frame a request may return.
+func callBudget(req request) time.Duration {
+	bytes := len(req.Message) + len(req.Report)
+	if req.Kind == "resource" {
+		bytes = maxFrameBytes
+	}
+	return time.Second + time.Duration(bytes/(512<<10))*100*time.Millisecond
+}
+
 func (c *Client) call(req request, allowRevoked bool) (response, error) {
 	c.callMu.Lock()
 	defer c.callMu.Unlock()
@@ -174,7 +186,7 @@ func (c *Client) call(req request, allowRevoked bool) (response, error) {
 	c.expected = req.ID
 	c.mu.Unlock()
 	defer func() { c.mu.Lock(); c.pending = nil; c.mu.Unlock() }()
-	timer := time.NewTimer(time.Second)
+	timer := time.NewTimer(callBudget(req))
 	defer timer.Stop()
 	written := make(chan error, 1)
 	go func() { written <- writeFrame(c.writer, req) }()

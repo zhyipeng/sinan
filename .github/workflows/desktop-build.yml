@@ -77,9 +77,23 @@ jobs:
         run: go test ./internal/buildinfo ./internal/hostupdate ./plugins/system-settings/update
       - name: Archive portable package
         run: node scripts/release.mjs archive
-      - uses: actions/upload-artifact@v4
+      - name: Upload package artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           path: dist/release/*
           if-no-files-found: error
           retention-days: 7
+      # upload-artifact already retries its own requests five times; this outer
+      # attempt rescues longer ArtifactService outages (CreateArtifact timeouts).
+      - name: Retry package artifact upload
+        if: steps.upload.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true

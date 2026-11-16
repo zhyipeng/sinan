@@ -23,3 +23,5 @@ OCR 首次读取 launch 后自动识别；页面 Cmd/Ctrl+V 或 paste event 含 
 
 
 发行前补充：UI helper 的会话图片响应上限须为 4 MiB，普通包资源仍为 512 KiB；二者均受原有 6 MiB 私有帧和 8 MiB 累计资源交付限制。WebView2 将 `launch.image.url` / 剪贴板图片 `url` 转为该视图的私有 HTTPS origin，并仅将 `command.executeImage.input` 转回内部 URL；重编码前严格拒绝重复和额外字段，用户文本/存储值不改写。v0.3.0 发行已取消，最低完整宿主选为 v0.3.1，保留旧标签且不发布旧资产。
+
+传输超时复核：私有管道客户端、反向宿主调用与 SDK 剪贴板调用的固定 1s/2s 截止时间对 4 MiB/2 MiB 载荷在慢速构建机（`-race`、Intel runner）上偏紧，v0.3.1 首发流水线在 macOS x64 出现偶发超时。现改为按载荷大小自适应放宽（基础预算加每 512 KiB 递增 100ms，上限由既有 6 MiB 私有帧 / 12 MiB 剪贴板预算界定），协议字段与预算上限不变；CI 产物上传另加重试一次以覆盖 GitHub Artifact 服务短时不可用。裁决与实现见对应提交。

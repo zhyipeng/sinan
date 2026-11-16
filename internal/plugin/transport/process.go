@@ -125,6 +125,19 @@ func (p *Process) read(out io.Reader) {
 
 func (p *Process) finish() { p.once.Do(func() { p.hostCancel(); close(p.done); _ = p.stdin.Close() }) }
 
+// hostCallBudget scales the reverse host-RPC deadline with the largest payload
+// the clipboard contract allows. A flat two-second budget proved too tight for
+// image snapshots on slow machines.
+func hostCallBudget(req protocol.Request) time.Duration {
+	bytes := len(req.Params)
+	if req.Method == "clipboard.read" || req.Method == "clipboard.write" {
+		if bytes < protocol.MaxClipboardMessageBytes {
+			bytes = protocol.MaxClipboardMessageBytes
+		}
+	}
+	return 2*time.Second + time.Duration(bytes/(512<<10))*100*time.Millisecond
+}
+
 func (p *Process) serveHost(req protocol.Request) {
 	defer func() { p.mu.Lock(); delete(p.hostIDs, req.ID); p.mu.Unlock() }()
 	defer func() {
@@ -133,7 +146,7 @@ func (p *Process) serveHost(req protocol.Request) {
 			_ = p.cmd.Process.Kill()
 		}
 	}()
-	ctx, cancel := context.WithTimeout(p.hostContext, 2*time.Second)
+	ctx, cancel := context.WithTimeout(p.hostContext, hostCallBudget(req))
 	defer cancel()
 	response := protocol.Response{JSONRPC: "2.0", ID: req.ID}
 	var value any
