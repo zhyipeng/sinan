@@ -33,7 +33,12 @@ func main() {
 		},
 		Command: func(ctx context.Context, p protocol.CommandParams) (protocol.CommandResult, error) {
 			switch p.CommandID {
+			case "image-size":
+				return protocol.CommandResult{Text: strconv.Itoa(len(p.Image))}, nil
 			case "echo":
+				if len(p.Image) > 0 {
+					return protocol.CommandResult{Text: strconv.Itoa(len(p.Image))}, nil
+				}
 				if p.Input == "cacheDir" {
 					return protocol.CommandResult{Text: cacheDir}, nil
 				}

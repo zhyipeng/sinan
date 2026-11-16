@@ -29,7 +29,7 @@ const Repository = "zhyipeng/sinan-plugin-registry"
 // Development builds expose the capabilities of the current source baseline.
 func HostVersion() string {
 	if buildinfo.Version == "dev" {
-		return "0.2.1"
+		return "0.3.0"
 	}
 	if !buildinfo.ValidVersion(buildinfo.Version) {
 		return "0.0.0"

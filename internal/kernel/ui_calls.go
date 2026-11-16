@@ -3,12 +3,14 @@ package kernel
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
 
 	"sinan/internal/clipboard"
+	"sinan/internal/paste"
 	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
 )
@@ -89,6 +91,20 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		}
 		return m.callLLM(session, p.manifest.ID, req)
 	}
+	if req.Method == "clipboard.readImage" {
+		defer m.mutationMu.Unlock()
+		if !slices.Contains(view.Permissions, "clipboard.read") {
+			return nil, errors.New("此视图未声明剪贴板读取权限")
+		}
+		value, err := clipboard.Call(ctx, "clipboard.read", protocol.ClipboardParams{})
+		if err != nil {
+			return nil, err
+		}
+		if value.Content.Kind != "image" {
+			return marshalUIResult(nil)
+		}
+		return attachClipboardImage(session, value.Content)
+	}
 	if req.Method == "clipboard.readText" || req.Method == "clipboard.writeText" {
 		defer m.mutationMu.Unlock()
 		permission := "clipboard.read"
@@ -127,8 +143,17 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		return handler(ctx, session, req)
 	}
 	m.mutationMu.Unlock()
-	if req.Method != "command.execute" || !slices.Contains(view.Commands, req.CommandID) {
+	if (req.Method != "command.execute" && req.Method != "command.executeImage") || !slices.Contains(view.Commands, req.CommandID) {
 		return nil, errors.New("此视图未声明该命令")
+	}
+	params := protocol.CommandParams{CommandID: req.CommandID, Input: req.Input}
+	if req.Method == "command.executeImage" {
+		var ok bool
+		params.Image, ok = session.Image(req.Input)
+		if !ok {
+			return nil, errors.New("图片不属于当前会话或已失效")
+		}
+		params.Input = ""
 	}
 	// Calls route to the captured plugin instance; never resolve a replacement by ID.
 	process, err := p.ensureUIProcess(ctx, m.root)
@@ -139,7 +164,7 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		return nil, errors.New("UI 会话已撤销")
 	}
 	var result protocol.CommandResult
-	if err = process.Call(ctx, "command.execute", protocol.CommandParams{CommandID: req.CommandID, Input: req.Input}, &result); err != nil {
+	if err = process.Call(ctx, req.Method, params, &result); err != nil {
 		return nil, errors.New("插件命令失败或超时")
 	}
 	// UI calls do not dismiss search or add search usage history.
@@ -178,4 +203,21 @@ func (m *Manager) ActivateStartup(ctx context.Context, id string) error {
 	}
 	_, err = p.ensureProcess(ctx, m.root)
 	return err
+}
+
+// Separate validation allows tests without accessing the system clipboard.
+func attachClipboardImage(session *uiview.Session, content protocol.ClipboardContent) (json.RawMessage, error) {
+	if content.Kind != "image" {
+		return nil, errors.New("请先截图或复制一张图片")
+	}
+	parsed, err := paste.Parse(protocol.PasteContent{Image: &protocol.PasteImage{DataBase64: base64.StdEncoding.EncodeToString(content.Data)}})
+	if err != nil {
+		return nil, err
+	}
+	data, width, height := parsed.Image()
+	image := session.AttachLaunchImage(data, width, height)
+	if image.URL == "" {
+		return nil, errors.New("图片会话已失效")
+	}
+	return marshalUIResult(image)
 }

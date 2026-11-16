@@ -40,7 +40,7 @@ func TestClipboardAuthorityAndShape(t *testing.T) {
 func TestClipboardUIRequiresViewPermission(t *testing.T) {
 	m := manager(t)
 	session, _ := callableUI(t, m)
-	for _, raw := range []string{`{"method":"clipboard.readText"}`, `{"method":"clipboard.writeText","input":"fixture"}`} {
+	for _, raw := range []string{`{"method":"clipboard.readImage"}`, `{"method":"clipboard.readText"}`, `{"method":"clipboard.writeText","input":"fixture"}`} {
 		if _, err := session.Call(context.Background(), []byte(raw)); err == nil {
 			t.Fatal("unprivileged UI reached clipboard")
 		}

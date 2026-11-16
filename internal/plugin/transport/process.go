@@ -207,7 +207,11 @@ func (p *Process) call(ctx context.Context, method string, params, result any, c
 		return errors.New("请求参数无法编码")
 	}
 	message, err := json.Marshal(protocol.Request{JSONRPC: "2.0", ID: id, Method: method, Params: b})
-	if err != nil || len(message)+1 >= protocol.MaxMessageBytes {
+	limit := protocol.MaxMessageBytes
+	if method == "command.executeImage" {
+		limit = protocol.MaxImageCommandBytes
+	}
+	if err != nil || len(message)+1 >= limit {
 		return errors.New("请求超过消息大小限制")
 	}
 	ch := make(chan protocol.Response, 1)

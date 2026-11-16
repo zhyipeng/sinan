@@ -83,6 +83,20 @@ func TestPlatformNativeProcessHandshake(t *testing.T) {
 	if err := process.Call(rpc, "command.execute", protocol.CommandParams{CommandID: "echo", Input: "跨平台"}, &result); err != nil || result.Text != "跨平台" {
 		t.Fatal("stdio roundtrip failed", err)
 	}
+
+	// Image requests have an independent budget; ordinary commands keep 1 MiB.
+	if err := process.Call(rpc, "command.executeImage", protocol.CommandParams{CommandID: "image-size", Image: make([]byte, 4<<20)}, &result); err != nil || result.Text != "4194304" {
+		t.Fatal("image frame lost", err)
+	}
+	if err := process.Call(rpc, "command.execute", protocol.CommandParams{CommandID: "image-size", Image: make([]byte, 2<<20)}, &result); err == nil {
+		t.Fatal("ordinary command admitted large image")
+	}
+	if err := process.Call(rpc, "command.executeImage", protocol.CommandParams{CommandID: "image-size"}, &result); err == nil {
+		t.Fatal("empty image admitted")
+	}
+	if err := process.Call(rpc, "command.executeImage", protocol.CommandParams{CommandID: "image-size", Image: make([]byte, (4<<20)+1)}, &result); err == nil {
+		t.Fatal("oversized image admitted")
+	}
 	for _, input := range []string{"read", "write", "denied"} {
 		err := process.Call(rpc, "command.execute", protocol.CommandParams{CommandID: "host-clipboard", Input: input}, &result)
 		if (err != nil) != (input == "denied") {

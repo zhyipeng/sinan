@@ -11,6 +11,7 @@ import (
 	"sinan/internal/plugin/manifest"
 	"sinan/internal/plugin/uiview"
 	protocol "sinan/packages/plugin-protocol"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -172,5 +173,75 @@ func TestPastedImageIsIsolatedAndRevoked(t *testing.T) {
 	textContent, _ := paste.Parse(protocol.PasteContent{Text: &text})
 	if _, err := m.OpenUICommandWithPaste(context.Background(), mf.ID, "open", textContent); err == nil {
 		t.Fatal("image-only command accepted text")
+	}
+}
+
+func TestClipboardSnapshotValidationAndOwnership(t *testing.T) {
+	m := manager(t)
+	launchFixture(t, m, "example.snapshot")
+	first, err := m.OpenUICommand(context.Background(), "example.snapshot", "open")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := m.OpenUICommand(context.Background(), "example.snapshot", "open")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	_ = png.Encode(&b, image.NewRGBA(image.Rect(0, 0, 2, 3)))
+	raw, err := attachClipboardImage(first, protocol.ClipboardContent{Kind: "image", Data: b.Bytes()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshot protocol.UILaunchImage
+	if json.Unmarshal(raw, &snapshot) != nil {
+		t.Fatal("invalid metadata")
+	}
+	data, ok := first.Image(snapshot.URL)
+	if !ok || !bytes.Equal(data, b.Bytes()) {
+		t.Fatal("snapshot changed")
+	}
+	if _, ok = second.Image(snapshot.URL); ok {
+		t.Fatal("snapshot leaked")
+	}
+	for _, content := range []protocol.ClipboardContent{{Kind: "text", Data: []byte("text")}, {Kind: "image", Data: []byte("invalid")}, {Kind: "image", Data: make([]byte, (4<<20)+1)}} {
+		if _, err := attachClipboardImage(first, content); err == nil {
+			t.Fatal("invalid clipboard image accepted")
+		}
+	}
+	readLaunchForTest(t, second)
+	request, _ := json.Marshal(protocol.UIRequest{Method: "command.executeImage", CommandID: "missing", Input: snapshot.URL})
+	if _, err := second.Call(context.Background(), request); err == nil {
+		t.Fatal("undeclared command accepted")
+	}
+}
+
+func TestUIImageCommandDeliversOnlyOwnedSnapshot(t *testing.T) {
+	m := manager(t)
+	session, _ := callableUI(t, m)
+	// Warm up the existing backend; image requests keep the usual 500 ms UI budget.
+	callUI(t, session, `{"method":"command.execute","commandId":"echo","input":"warm"}`)
+	var b bytes.Buffer
+	_ = png.Encode(&b, image.NewRGBA(image.Rect(0, 0, 2, 3)))
+	snapshot := session.AttachLaunchImage(b.Bytes(), 2, 3)
+	request := func(url string) string {
+		v, _ := json.Marshal(protocol.UIRequest{Method: "command.executeImage", CommandID: "echo", Input: url})
+		return string(v)
+	}
+	for _, url := range []string{"/tmp/arbitrary.png", session.EntryURL(), "sinan-plugin://other/image.png"} {
+		if _, err := session.Call(context.Background(), []byte(request(url))); err == nil {
+			t.Fatal("foreign image accepted")
+		}
+	}
+	var result protocol.CommandResult
+	if err := json.Unmarshal(callUI(t, session, request(snapshot.URL)), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Text != strconv.Itoa(b.Len()) {
+		t.Fatal("snapshot not delivered to backend")
+	}
+	session.AttachLaunchImage(b.Bytes(), 2, 3)
+	if _, err := session.Call(context.Background(), []byte(request(snapshot.URL))); err == nil {
+		t.Fatal("replaced snapshot accepted")
 	}
 }

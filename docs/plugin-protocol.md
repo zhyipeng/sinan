@@ -324,7 +324,7 @@ if (launch.image) {
 
 图片为经过验证的静态 PNG，最多 4 MiB、16,777,216 像素；原尺寸保留，不保证动画/原文件元数据。图片地址随机生成，只在当前会话可读，撤销后不可访问，不会在普通打开或其他会话中复用。没有图片时省略 image；图片打开不附带 input。沿用 CSP 和总计 8 MiB 会话资源交付预算，固定包资源预算不变。不要把图片正文塞进普通 `execute` 或草稿请求。
 
-可信 Shell 通过临时 pasteId 选择图片，不向页面开放主输入框、系统剪贴板、任意路径或安装导航接口。页面 `launch.get` 的请求形状、调用频率和 192 KiB 返回预算不变。helper 私有管道帧上限增至 6 MiB，公开后端消息上限不变；使用图片时须同步更新宿主与 helper。Esc 的统一返回由可信宿主原生路径处理，插件无需声明额外能力。详见 [ADR 0044](adr/0044-paste-mode-and-escape.md)。
+可信 Shell 通过临时 pasteId 选择图片，不向页面开放主输入框、系统剪贴板、任意路径或安装导航接口。页面 `launch.get` 的请求形状、调用频率和 192 KiB 返回预算不变。helper 私有管道帧上限增至 6 MiB，普通后端消息上限不变（新增图片命令的独立预算见下文）；使用图片时须同步更新宿主与 helper。Esc 的统一返回由可信宿主原生路径处理，插件无需声明额外能力。详见 [ADR 0044](adr/0044-paste-mode-and-escape.md)。
 
 ## 可选插件图标
 
@@ -386,6 +386,18 @@ snapshot, err := host.ClipboardRead(ctx, 0)
 
 后台任务可通过 `Handlers.HostReady` 捕获 `*sdk.HostClient`；此回调仅保存客户端，不同步发请求。`Initialize` 应检查 `HostCapabilities` 后再启动后台任务，初始化回调中不能同步等待宿主调用（读循环尚在处理初始化）。既有 SDK 接口与旧插件不需要改动。
 
-页面使用 UI Bridge 2，在对应视图 permissions 声明 `clipboard.read` / `clipboard.write` 后调用 `readClipboardText()` / `writeClipboardText(text)`；请求分别为 `{method:"clipboard.readText"}` / `{method:"clipboard.writeText",input:text}`，成功分别返回 string / null。权限不继承顶层原生清单，声明式视图也可单独申请。最多 32 KiB 文本，维持 64 KiB 请求、192 KiB 响应与 500 毫秒预算，JSON 转义超预算仍拒绝；非文本剪贴板返回错误，图片请经后端 API 访问。页面关闭、包变化或禁用仍按现有会话撤销流程处理。
+页面使用 UI Bridge 2，在对应视图 permissions 声明 `clipboard.read` / `clipboard.write` 后调用 `readClipboardText()` / `writeClipboardText(text)`；请求分别为 `{method:"clipboard.readText"}` / `{method:"clipboard.writeText",input:text}`，成功分别返回 string / null。权限不继承顶层原生清单，声明式视图也可单独申请。最多 32 KiB 文本，维持 64 KiB 请求、192 KiB 响应与 500 毫秒预算，JSON 转义超预算仍拒绝；非文本剪贴板返回错误，图片快照使用下述会话图片接口。页面关闭、包变化或禁用仍按现有会话撤销流程处理。
 
 平台依赖及未验收边界见 [ADR 0066](adr/0066-host-clipboard-api.md) 与[跨平台适配](cross-platform.md)。
+
+
+## 会话图片命令（工作树新增，未发布）
+
+初始化能力 `ui.image-command.v1` 表示宿主支持以下 UI Bridge 2 扩展。不能将已发布 v0.2.1 或相同 API 1 视为具备此能力；原生插件应检查 `hostCapabilities`，不支持时明确报错。
+
+- `readClipboardImage()` → `{method:"clipboard.readImage"}`，须在当前视图声明 `clipboard.read`。宿主显式读取一次系统剪贴板，验证静态 PNG（最多 4 MiB、16,777,216 像素并完整解码），返回与 `launch.image` 相同的 `{url,mimeType,width,height,bytes}`，不把图片正文返回页面。非图片返回 null（快捷键可保留普通文本粘贴）；平台不可用/无效图片/超限报错。此调用不是剪贴板监听，也不承诺与浏览器 paste event 的 Blob 相同；调用者应在用户粘贴或点击识别时使用，并让预览与后台共同使用返回的快照。
+- `executeImage(commandId,url)` → `{method:"command.executeImage",commandId,input:url}`。命令须在当前视图 `commands` 白名单中，URL 必须精确指向当前会话持有的图片；不接受文件路径、其他会话、普通 bundle 资源或页面图片正文。读取主输入框显式带入的 `launch.image` 无须额外剪贴板权限。
+- 每会话只保留一份当前图片。新的剪贴板快照成功后替换旧图及随机 URL；失败不替换，旧 URL 在成功替换后不可继续读取或执行，`readLaunch()` 仍仅描述初次打开参数。撤销清空图片。原图预览继续走既有隔离资源策略，256 次请求/8 MiB 累计交付预算不变，耗尽需重新打开视图。
+- 宿主把快照经后端 RPC `command.executeImage` 交给同一插件实例，参数为 `{commandId,input:"",image:<PNG base64>}`（Go `CommandParams.Image []byte`）；页面桥请求不含正文，保持 64 KiB/192 KiB、500 ms、单在途及每分钟 120 次限制。仅该后端方法允许小于 6 MiB 的请求帧；SDK 拒绝空图和超过 4 MiB 的图片，普通 `command.execute` 禁止携带图片，普通 RPC 的 1 MiB 限制不变。识别等耗时业务仍应在插件后台异步执行。
+
+UI 与后端权限不互相继承。不增加网络、文件访问或完整 Wails Bridge，不声称独立进程具备安全沙箱。此扩展与 OCR worker 的私有 stdin 管道独立，见 [ADR 0068](adr/0068-session-image-commands.md)。

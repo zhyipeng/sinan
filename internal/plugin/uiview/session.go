@@ -248,11 +248,11 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		return nil, errors.New("UI 请求无效")
 	}
 	switch req.Method {
-	case "command.execute":
+	case "command.execute", "command.executeImage":
 		if len(fields) > 3 || fields["revision"] != nil || fields["value"] != nil || req.CommandID == "" {
 			return nil, errors.New("命令请求无效")
 		}
-	case "clipboard.readText", "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste":
+	case "clipboard.readImage", "clipboard.readText", "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste":
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}
@@ -298,15 +298,25 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 	return result, nil
 }
 
-// AttachLaunchImage is called only during kernel session construction. Resource
+// AttachLaunchImage stores one immutable snapshot, replacing any previous image. Resource
 // URLs are scoped to the session and remain subject to normal revoke/budgets.
 func (s *Session) AttachLaunchImage(data []byte, width, height int) protocol.UILaunchImage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.revoked || s.ready || s.launchImageURL != "" {
+	if s.revoked || len(data) == 0 || len(data) > 4<<20 {
 		return protocol.UILaunchImage{}
 	}
 	s.launchImageURL = "sinan-plugin://" + s.binding.PluginID + "/__sinan_input/" + strings.ToLower(rand.Text()) + ".png"
 	s.launchImage = Resource{MIME: "image/png", Data: bytes.Clone(data)}
 	return protocol.UILaunchImage{URL: s.launchImageURL, MIMEType: "image/png", Width: width, Height: height, Bytes: len(data)}
+}
+
+// Image returns only the current image, never arbitrary bundle resources or paths.
+func (s *Session) Image(url string) ([]byte, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.revoked || url == "" || url != s.launchImageURL {
+		return nil, false
+	}
+	return bytes.Clone(s.launchImage.Data), true
 }

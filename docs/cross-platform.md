@@ -185,6 +185,12 @@ JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.
 
 本次本地验证：macOS arm64 宿主全量无界面竞态回归（含前端类型检查与生产构建）、全仓 Go 静态检查通过；新增 UI 请求形状、预算及撤销测试、真实 stdio 模拟大图片双向传输、权限拒绝、进程结束取消与错误后继续调用通过。两个官方插件六目标构建、官方仓库前端 100 项/Python 2 项/三个原生插件竞态回归通过。Windows/Linux 的 amd64/arm64 剪贴板、内核与 transport 静态检查及测试程序交叉编译通过，未在目标系统执行；Windows CI 已补无窗口剪贴板和权限检查，但远端结果尚未验证。测试不读取或修改真实剪贴板，没有运行桌面、原生 WebView 或浏览器。三个平台真实系统剪贴板、UI、焦点与自动输入未验收；未发布新版插件，登记仓库无资产变更。
 
+## OCR 引擎预研验证
+
+2026-11-16：在 macOS arm64 上，以独立 Python 环境和 11 张合成图片，对 PP-OCRv5 mobile、PP-OCRv6 small/tiny 进行 CPU 离线识别、耗时、内存与依赖体积验证；正式基准在系统级禁网环境执行，不读取真实剪贴板或屏幕，不启动桌面 UI。v6 small 在本批样本中质量较好，但双栏顺序、内存和原生包体积仍待处理。脚本、模型摘要及数据见 [OCR 验证报告](research/ocr-validation.md)。
+
+这只是本机引擎实验：没有新增插件、宿主能力、协议或发布资产，没有构建原生 OCR 插件，也未执行 Windows/Linux、其他架构、截图选区、Wayland Portal、原生 WebView 或系统授权验证。不能由模型跨平台或 Python 推理成功推断六目标插件已可用。
+
 发布预检补充：插件商店的宿主版本不再写死为 0.1.0，改用各平台构建注入版本做 SemVer 最低版本判定；开发构建使用 0.2.1 能力基线，插件中心 0.9.2 同步展示。修复不增加平台调用、协议或权限。初始 v0.2.0 发布已取消且没有公开资产，本体改发 v0.2.1；插件 0.2.0 最低宿主相应为 0.2.1。远端最终结果在发布后记录。
 
 ### 共享剪贴板正式发行结果
@@ -194,3 +200,26 @@ JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.
 [剪贴板 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.clipboard-v0.2.0) 与[计算 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.calculator-v0.2.0) 均已公开，各有六目标 ZIP 和摘要；[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43806605442) 通过。包内清单、图标（允许 Windows CRLF）、原生架构、大小与远端 SHA-256 已核验，商店使用真实 Release/Asset ID 登记，最低宿主为 0.2.1。
 
 以上发行状态不代替三平台真实系统剪贴板、WebView、焦点、自动输入和安装升级验收；本次未运行这些实机验证。
+
+### OCR 原生程序第二轮实验
+
+2026-11-16：macOS arm64 上从固定 RapidOCRLite v5.0.0a6 源码构建 CPU 库，经独立 Go/CGO 程序完成 PNG 解码及完整 OCR 链路；复用第一轮 small 权重与 11 张合成图。严格浮点构建通过每图 5 次及密集图 100 次文字稳定性检查，原生运行目录 33.28 MiB、ZIP 26.84 MiB，迁移后在禁网环境运行；峰值约 347–349 MiB，销毁引擎未明显回落，进程退出及强制取消已由实验脚本回收。
+
+上游默认 fast-math 在本机出现漏行和输出变化，严格浮点追加选项后本轮不再复现，不能据此断言底层根因或其他编译器已修复。其余五个 OS/架构目标未构建或运行；Windows 仍需模型路径编码、链接和 RSS 适配，Linux 需运行库与 ISA 核验。实验不是安装包，不含插件协议/UI，也未解决宿主对任意后代进程的回收边界；没有新增宿主能力、正式依赖决定或发行资产。详见[原生验证报告](research/ocr-native-validation.md)。
+
+### OCR 插件任务与 worker 接入
+
+官方仓库新增未发布 `tools.ocr` 0.1.0，本地打通剪贴板 PNG、异步命令、隔离页面及文本复制。共享 Go 后台与私有父子管道面向三端，Windows 隐藏子进程控制台；5 秒轮询租约、30 秒任务预算与 worker 的 35 秒硬退出控制生命周期。真实后台被强杀后，macOS arm64 worker 能因 stdin EOF 自行退出；不扩展宿主任意后代进程回收能力，见 [ADR 0067](adr/0067-ocr-private-worker-lifecycle.md)。
+
+本机通过官方仓库 104 项前端/3 项打包测试及四个插件后台竞态回归；OCR 六目标后台交叉编译和静态检查通过，但未在 Windows/Linux 运行。三平台 CI 已纳入相关无界面测试与后台编译，远端未执行。完整原生包仅构建 macOS arm64，约 35.59 MiB / ZIP 27.80 MiB；真实 worker 的 11 图、取消、后台强杀退出在模拟 Host API、系统级禁网下通过，含空格/中文路径亦通过；临时宿主目录检查、安装和搜索通过。macOS 后台、worker 及动态库均显式对齐宿主 12.0 构建目标，已核对 Mach-O，旧系统执行未验证。没有读取真实系统剪贴板或运行桌面 UI。
+
+完整打包入口当前仅允许 macOS 本机目标；macOS amd64 未构建/运行，Windows 因 Unicode 模型路径和 DLL 分发、Linux 因运行库与原生依赖验证未完成而明确不可用。没有发布或上架，不把后台源码/交叉编译描述为六目标 OCR 支持。截图捕获、主搜索会话图片输入和三端 WebView、主题、焦点、拆出及系统剪贴板实机验收仍未完成。
+
+
+### OCR 会话图片与快捷键扩展
+
+本轮共享宿主/SDK 增加 `ui.image-command.v1` 与页面剪贴板图片快照，OCR 追加 image matcher，主搜索带图打开后自动识别并展示原图；页面通过 Cmd/Ctrl+V 或 image paste event 读取宿主快照，Cmd/Ctrl+C 在无选区时复制当前结果。普通文本粘贴与有选区复制保留原行为。PNG 快照限制统一为 4 MiB，既有会话资源预算不变，三端继续使用既有系统剪贴板适配；Linux X11 和 Wayland 的外部工具/会话依赖仍需分别满足。
+
+本轮仅执行本地无界面检查与 macOS arm64 原生识别验证，不启动桌面、不读真实系统剪贴板。完整 OCR 包仍只验证 macOS arm64；Windows/Linux 完整原生包及三端 WKWebView/WebView2/WebKitGTK 的 paste event、快捷键、焦点和权限尚未实机验收。此接口未发布，官方插件须配套本轮宿主，不能仅凭 v0.2.1 判断兼容。决策见 [ADR 0068](adr/0068-session-image-commands.md)，本轮结果与旧轮次区分记录。
+
+本轮验证结果：宿主 `node scripts/desktop.mjs test`（前端构建、无界面 JS、全量 Go 竞态检查，原生 UI 禁用）及本机桌面构建通过；官方仓库 108 项 JS、3 项打包与四个后台竞态检查通过。OCR 六目标后台 build/vet 通过，仅代表编译/静态检查。macOS arm64 真实 worker 在系统级禁网、模拟宿主下通过 11 图及独立图片快照、不重读剪贴板、取消和后台退出回收验证；更新包约 27.80 MiB，宿主 inspect 通过，SDK 来源补丁可重放。具体摘要与边界见[本轮结果](research/ocr-image-input-validation-results.json)，此前 OCR 报告属于历史轮次，不作为新包摘要。

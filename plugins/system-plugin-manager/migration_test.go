@@ -52,7 +52,7 @@ func TestMigrationMergesIdentityAndPreservesPrivateState(t *testing.T) {
 			t.Fatalf("expected one plugin, got %d", len(snapshot.Plugins))
 		}
 		plugin := snapshot.Plugins[0]
-		if plugin.ID != "system.plugin-manager" || plugin.Name != "插件中心" || plugin.Version != "0.9.2" || !plugin.Protected {
+		if plugin.ID != "system.plugin-manager" || plugin.Name != "插件中心" || plugin.Version != "0.9.3" || !plugin.Protected {
 			t.Fatal("invalid merged identity")
 		}
 	}

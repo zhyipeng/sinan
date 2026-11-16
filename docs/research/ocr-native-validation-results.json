@@ -1,0 +1,4175 @@
+{
+  "date": "2026-11-16",
+  "scope": "Standalone native experiment, not a plugin or released asset",
+  "hardware": {
+    "cpu": "Apple M4 Max",
+    "ram_gib": 36,
+    "os_arch": "macOS arm64"
+  },
+  "upstream": {
+    "repo": "https://github.com/RapidAI/RapidOCRLite",
+    "tag": "v5.0.0a6",
+    "commit": "63bef543c782a0d81db2af056e1dfba550c6dd87",
+    "source_tree_pristine": true
+  },
+  "tools": {
+    "cpp": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "cmake": "cmake version 4.4.5",
+    "ninja": "1.13.2.git.kitware.jobserver-pipe-1",
+    "go": "go version go1.26.0 darwin/arm64"
+  },
+  "build": {
+    "cpu_only": true,
+    "vulkan": false,
+    "metal": false,
+    "strict_fp_override": "scripts/ocr-native/strict-fp.cmake",
+    "last_math_flag": "-fno-fast-math"
+  },
+  "source_sha256": {
+    "scripts/ocr-native/README.md": "01552a2240e9b3ce1bf6f48523bf19d4236da6be9d3f4c1ee04970ce4f76b8bc",
+    "scripts/ocr-native/go.mod": "de25be179f5ac18de3b7f53895763713571d34301c8405e717183ea9eb38c0bf",
+    "scripts/ocr-native/main.go": "33e4313379dcd9e2a667bf32e905a4114910b40954555ad90a2f2844be58fdc3",
+    "scripts/ocr-native/strict-fp.cmake": "c6b6b76995f9a6b5ce6bd0b691d8242cbc2c69ac73115bb5f67911ba4a65cb5b",
+    "scripts/ocr-native/validate.py": "67d47a8566a4210c4c9f608fb8e9a99c5185394f6db2c8e34ddd520fc5c78d42",
+    "scripts/ocr-native/validate.py.lock": "916a151cf3b189f4c369e066773d1f770685c4d5be9181851e0e5fe5aa4dc3f9"
+  },
+  "package": {
+    "files": [
+      {
+        "path": "NOTICE.txt",
+        "bytes": 490,
+        "sha256": "ac84dfff018ee7ce1cc4e44cf4a6521a4172d0bdb5d414561ce7a3d296caa709"
+      },
+      {
+        "path": "backend/ocr",
+        "bytes": 2257746,
+        "sha256": "bebc8d7aedead1944f0a3399fca8f9b1cc8da2da630d24d08bdfa3ec4d06fb6f"
+      },
+      {
+        "path": "lib/libppocr.5.dylib",
+        "bytes": 1358224,
+        "sha256": "a4387c23215e35ee13276b8b0eef2de97277628e8e3e77f5714dc945d6b51fda"
+      },
+      {
+        "path": "licenses/Apache-2.0.txt",
+        "bytes": 11358,
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      {
+        "path": "licenses/RapidOCRLite-README.md",
+        "bytes": 28004,
+        "sha256": "2584e3fef0b05b24bb9f7e2a3056fde1f1c42beab5e0987976f5d9f27a8ac19c"
+      },
+      {
+        "path": "models/PP-OCRv6_det_small.onnx",
+        "bytes": 9929594,
+        "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+      },
+      {
+        "path": "models/PP-OCRv6_rec_small.onnx",
+        "bytes": 21234383,
+        "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+      },
+      {
+        "path": "models/dictionary.txt",
+        "bytes": 74946,
+        "sha256": "f7aa897ca828a4c7c9e2739c30f9161a33306d532f020bcdb91dcfb664a5507e"
+      }
+    ],
+    "unpacked_bytes": 34894745,
+    "zip_bytes": 28139534,
+    "zip_sha256": "bf067b64b18cd841241c6c8fb10c9e3708408b169bd9b03ea1e273d54add3367",
+    "relocated_run": true,
+    "direct_dynamic_dependencies": {
+      "backend/ocr": [
+        "\t@rpath/libppocr.5.dylib (compatibility version 5.0.0, current version 5.0.0)",
+        "\t/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 5026.5.4)",
+        "\t/usr/lib/libresolv.9.dylib (compatibility version 1.0.0, current version 1.0.0)",
+        "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)"
+      ],
+      "lib/libppocr.5.dylib": [
+        "\t@rpath/libppocr.5.dylib (compatibility version 5.0.0, current version 5.0.0)",
+        "\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2100.43.0)",
+        "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)"
+      ]
+    },
+    "limit_bytes": 67108864,
+    "note": "No plugin manifest, stdio RPC, SDK, UI, production signing, or full redistribution audit"
+  },
+  "strict_fp": {
+    "arch": "arm64",
+    "backend": "CPU",
+    "cases": [
+      {
+        "name": "light",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          114.714,
+          116.632,
+          115.294,
+          114.954,
+          112.722
+        ],
+        "median_ms": 114.954,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.98679096,
+            "box": [
+              [
+                27,
+                24
+              ],
+              [
+                316,
+                24
+              ],
+              [
+                316,
+                55
+              ],
+              [
+                27,
+                55
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.9898716,
+            "box": [
+              [
+                27,
+                73
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                450,
+                105
+              ],
+              [
+                27,
+                105
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额 1234.56 元。",
+            "confidence": 0.9667025,
+            "box": [
+              [
+                27,
+                119
+              ],
+              [
+                567,
+                121
+              ],
+              [
+                567,
+                153
+              ],
+              [
+                27,
+                151
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.9998354,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "dark",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          124.201,
+          120.695,
+          118.608,
+          122.419,
+          119.884
+        ],
+        "median_ms": 120.695,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.9912125,
+            "box": [
+              [
+                27,
+                24
+              ],
+              [
+                316,
+                24
+              ],
+              [
+                316,
+                53
+              ],
+              [
+                27,
+                53
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.99654454,
+            "box": [
+              [
+                26,
+                71
+              ],
+              [
+                451,
+                71
+              ],
+              [
+                451,
+                103
+              ],
+              [
+                26,
+                103
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额1234.56 元。",
+            "confidence": 0.9835293,
+            "box": [
+              [
+                26,
+                120
+              ],
+              [
+                566,
+                121
+              ],
+              [
+                566,
+                151
+              ],
+              [
+                26,
+                150
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.99973327,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "small_12px",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          98.838,
+          96.765,
+          101.8,
+          97.743,
+          101.874
+        ],
+        "median_ms": 98.838,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.9857953,
+            "box": [
+              [
+                26,
+                24
+              ],
+              [
+                162,
+                24
+              ],
+              [
+                162,
+                42
+              ],
+              [
+                26,
+                42
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.9809045,
+            "box": [
+              [
+                26,
+                58
+              ],
+              [
+                223,
+                58
+              ],
+              [
+                223,
+                76
+              ],
+              [
+                26,
+                76
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额 1234.56元。",
+            "confidence": 0.9667873,
+            "box": [
+              [
+                27,
+                93
+              ],
+              [
+                279,
+                93
+              ],
+              [
+                279,
+                109
+              ],
+              [
+                27,
+                109
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.99679744,
+            "box": [
+              [
+                26,
+                126
+              ],
+              [
+                178,
+                126
+              ],
+              [
+                178,
+                144
+              ],
+              [
+                26,
+                144
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "low_contrast",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号SN-20261116，金额1234.56元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          124.148,
+          121.02,
+          123.101,
+          110.221,
+          120.446
+        ],
+        "median_ms": 121.02,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.9366736,
+            "box": [
+              [
+                28,
+                24
+              ],
+              [
+                315,
+                24
+              ],
+              [
+                315,
+                53
+              ],
+              [
+                28,
+                53
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.95710146,
+            "box": [
+              [
+                28,
+                73
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                450,
+                103
+              ],
+              [
+                28,
+                103
+              ]
+            ]
+          },
+          {
+            "text": "订单编号SN-20261116，金额1234.56元。",
+            "confidence": 0.99276197,
+            "box": [
+              [
+                28,
+                121
+              ],
+              [
+                566,
+                121
+              ],
+              [
+                566,
+                151
+              ],
+              [
+                28,
+                151
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.99971926,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号SN-20261116，金额1234.56元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "rotated_3deg",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          99.538,
+          99.784,
+          99.187,
+          98.634,
+          115.585
+        ],
+        "median_ms": 99.538,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.9975328,
+            "box": [
+              [
+                28,
+                79
+              ],
+              [
+                317,
+                64
+              ],
+              [
+                319,
+                97
+              ],
+              [
+                29,
+                113
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.99211246,
+            "box": [
+              [
+                29,
+                127
+              ],
+              [
+                454,
+                104
+              ],
+              [
+                456,
+                139
+              ],
+              [
+                31,
+                163
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额1234.56 元。",
+            "confidence": 0.98529774,
+            "box": [
+              [
+                32,
+                175
+              ],
+              [
+                572,
+                147
+              ],
+              [
+                574,
+                182
+              ],
+              [
+                34,
+                209
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.9999138,
+            "box": [
+              [
+                34,
+                223
+              ],
+              [
+                363,
+                206
+              ],
+              [
+                364,
+                240
+              ],
+              [
+                36,
+                257
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "transparent",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          121.864,
+          113.861,
+          116.772,
+          108.735,
+          114.636
+        ],
+        "median_ms": 114.636,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.98679096,
+            "box": [
+              [
+                27,
+                24
+              ],
+              [
+                316,
+                24
+              ],
+              [
+                316,
+                55
+              ],
+              [
+                27,
+                55
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.9898716,
+            "box": [
+              [
+                27,
+                73
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                450,
+                105
+              ],
+              [
+                27,
+                105
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额 1234.56 元。",
+            "confidence": 0.9667025,
+            "box": [
+              [
+                27,
+                119
+              ],
+              [
+                567,
+                121
+              ],
+              [
+                567,
+                153
+              ],
+              [
+                27,
+                151
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.9998354,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "terminal",
+        "expected": "构建完成 Build completed\ngo test ./...\nconst total = price * 1.08;\nif (count <= 10) { return \"OK\"; }\npath: /tmp/sinan-ocr/report.json",
+        "actual": "构建完成 Build completed\ngo test /...\nconst total = price * 1.08;\nif (count <= 10) { return \"OK\"; }\npath: /tmp/sinan-ocr/report.json",
+        "stable": true,
+        "warm_ms": [
+          103.799,
+          102.77,
+          106.36,
+          101.87,
+          98.935
+        ],
+        "median_ms": 102.77,
+        "lines": [
+          {
+            "text": "构建完成 Build completed",
+            "confidence": 0.9803964,
+            "box": [
+              [
+                24,
+                22
+              ],
+              [
+                281,
+                22
+              ],
+              [
+                281,
+                50
+              ],
+              [
+                24,
+                50
+              ]
+            ]
+          },
+          {
+            "text": "go test /...",
+            "confidence": 0.85244924,
+            "box": [
+              [
+                23,
+                65
+              ],
+              [
+                140,
+                65
+              ],
+              [
+                140,
+                94
+              ],
+              [
+                23,
+                94
+              ]
+            ]
+          },
+          {
+            "text": "const total = price * 1.08;",
+            "confidence": 0.9880021,
+            "box": [
+              [
+                23,
+                107
+              ],
+              [
+                289,
+                107
+              ],
+              [
+                289,
+                134
+              ],
+              [
+                23,
+                134
+              ]
+            ]
+          },
+          {
+            "text": "if (count <= 10) { return \"OK\"; }",
+            "confidence": 0.97689945,
+            "box": [
+              [
+                23,
+                149
+              ],
+              [
+                337,
+                149
+              ],
+              [
+                337,
+                177
+              ],
+              [
+                23,
+                177
+              ]
+            ]
+          },
+          {
+            "text": "path: /tmp/sinan-ocr/report.json",
+            "confidence": 0.98602283,
+            "box": [
+              [
+                25,
+                193
+              ],
+              [
+                357,
+                193
+              ],
+              [
+                357,
+                218
+              ],
+              [
+                25,
+                218
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "构建完成 Build completed\ngo test /...\nconst total = price * 1.08;\nif (count <= 10) { return \"OK\"; }\npath: /tmp/sinan-ocr/report.json"
+        ],
+        "edit_distance": 1,
+        "reference_chars": 108,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "dense",
+        "expected": "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "actual": "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "stable": true,
+        "warm_ms": [
+          452.942,
+          486.488,
+          457.969,
+          475.418,
+          467.8
+        ],
+        "median_ms": 467.8,
+        "lines": [
+          {
+            "text": "第01行：离线识别测试 OCR sample 01, total = 12.50",
+            "confidence": 0.9595291,
+            "box": [
+              [
+                26,
+                25
+              ],
+              [
+                487,
+                25
+              ],
+              [
+                487,
+                48
+              ],
+              [
+                26,
+                48
+              ]
+            ]
+          },
+          {
+            "text": "第02行：离线识别测试 OCR sample 02, total = 24.50",
+            "confidence": 0.9824875,
+            "box": [
+              [
+                26,
+                63
+              ],
+              [
+                489,
+                62
+              ],
+              [
+                489,
+                90
+              ],
+              [
+                26,
+                91
+              ]
+            ]
+          },
+          {
+            "text": "第03行：离线识别测试 OCR sample 03, total = 36.50",
+            "confidence": 0.9553156,
+            "box": [
+              [
+                27,
+                105
+              ],
+              [
+                487,
+                105
+              ],
+              [
+                487,
+                128
+              ],
+              [
+                27,
+                128
+              ]
+            ]
+          },
+          {
+            "text": "第04行：离线识别测试 OCR sample 04, total = 48.50",
+            "confidence": 0.9746909,
+            "box": [
+              [
+                26,
+                144
+              ],
+              [
+                488,
+                144
+              ],
+              [
+                488,
+                170
+              ],
+              [
+                26,
+                170
+              ]
+            ]
+          },
+          {
+            "text": "第05行：离线识别测试 OCR sample 05, total = 60.50",
+            "confidence": 0.9713317,
+            "box": [
+              [
+                26,
+                184
+              ],
+              [
+                487,
+                184
+              ],
+              [
+                487,
+                210
+              ],
+              [
+                26,
+                210
+              ]
+            ]
+          },
+          {
+            "text": "第06行：离线识别测试 OCR sample 06, total = 72.50",
+            "confidence": 0.96419877,
+            "box": [
+              [
+                26,
+                224
+              ],
+              [
+                487,
+                224
+              ],
+              [
+                487,
+                250
+              ],
+              [
+                26,
+                250
+              ]
+            ]
+          },
+          {
+            "text": "第07行：离线识别测试 OCR sample 07, total = 84.50",
+            "confidence": 0.97565347,
+            "box": [
+              [
+                26,
+                264
+              ],
+              [
+                488,
+                264
+              ],
+              [
+                488,
+                290
+              ],
+              [
+                26,
+                290
+              ]
+            ]
+          },
+          {
+            "text": "第08行：离线识别测试 OCR sample 08, total = 96.50",
+            "confidence": 0.9763476,
+            "box": [
+              [
+                26,
+                304
+              ],
+              [
+                488,
+                304
+              ],
+              [
+                488,
+                330
+              ],
+              [
+                26,
+                330
+              ]
+            ]
+          },
+          {
+            "text": "第09行：离线识别测试 OCR sample 09, total = 108.50",
+            "confidence": 0.9721287,
+            "box": [
+              [
+                26,
+                344
+              ],
+              [
+                500,
+                344
+              ],
+              [
+                500,
+                370
+              ],
+              [
+                26,
+                370
+              ]
+            ]
+          },
+          {
+            "text": "第10行：离线识别测试 OCR sample 10, total = 120.50",
+            "confidence": 0.96556574,
+            "box": [
+              [
+                26,
+                384
+              ],
+              [
+                500,
+                384
+              ],
+              [
+                500,
+                410
+              ],
+              [
+                26,
+                410
+              ]
+            ]
+          },
+          {
+            "text": "第11行：离线识别测试 OCR sample 11, total = 132.50",
+            "confidence": 0.9605466,
+            "box": [
+              [
+                25,
+                424
+              ],
+              [
+                500,
+                424
+              ],
+              [
+                500,
+                450
+              ],
+              [
+                25,
+                450
+              ]
+            ]
+          },
+          {
+            "text": "第12行：离线识别测试 OCR sample 12, total = 144.50",
+            "confidence": 0.96098065,
+            "box": [
+              [
+                26,
+                464
+              ],
+              [
+                500,
+                464
+              ],
+              [
+                500,
+                490
+              ],
+              [
+                26,
+                490
+              ]
+            ]
+          },
+          {
+            "text": "第13行：离线识别测试 OCR sample 13, total = 156.50",
+            "confidence": 0.95978296,
+            "box": [
+              [
+                26,
+                504
+              ],
+              [
+                500,
+                504
+              ],
+              [
+                500,
+                530
+              ],
+              [
+                26,
+                530
+              ]
+            ]
+          },
+          {
+            "text": "第14行：离线识别测试 OCR sample 14, total = 168.50",
+            "confidence": 0.95760334,
+            "box": [
+              [
+                26,
+                544
+              ],
+              [
+                500,
+                544
+              ],
+              [
+                500,
+                570
+              ],
+              [
+                26,
+                570
+              ]
+            ]
+          },
+          {
+            "text": "第15行：离线识别测试 OCR sample 15, total = 180.50",
+            "confidence": 0.95957947,
+            "box": [
+              [
+                26,
+                584
+              ],
+              [
+                500,
+                584
+              ],
+              [
+                500,
+                610
+              ],
+              [
+                26,
+                610
+              ]
+            ]
+          },
+          {
+            "text": "第16行：离线识别测试 OCR sample 16, total = 192.50",
+            "confidence": 0.9637693,
+            "box": [
+              [
+                25,
+                624
+              ],
+              [
+                500,
+                624
+              ],
+              [
+                500,
+                650
+              ],
+              [
+                25,
+                650
+              ]
+            ]
+          },
+          {
+            "text": "第17行：离线识别测试 OCR sample 17, total = 204.50",
+            "confidence": 0.968928,
+            "box": [
+              [
+                25,
+                664
+              ],
+              [
+                500,
+                664
+              ],
+              [
+                500,
+                690
+              ],
+              [
+                25,
+                690
+              ]
+            ]
+          },
+          {
+            "text": "第18行：离线识别测试 OCR sample 18, total = 216.50",
+            "confidence": 0.956938,
+            "box": [
+              [
+                26,
+                704
+              ],
+              [
+                500,
+                704
+              ],
+              [
+                500,
+                730
+              ],
+              [
+                26,
+                730
+              ]
+            ]
+          },
+          {
+            "text": "第19行：离线识别测试 OCR sample 19, total = 228.50",
+            "confidence": 0.967548,
+            "box": [
+              [
+                26,
+                744
+              ],
+              [
+                501,
+                744
+              ],
+              [
+                501,
+                770
+              ],
+              [
+                26,
+                770
+              ]
+            ]
+          },
+          {
+            "text": "第20行：离线识别测试 OCR sample 20, total = 240.50",
+            "confidence": 0.97433454,
+            "box": [
+              [
+                26,
+                784
+              ],
+              [
+                500,
+                784
+              ],
+              [
+                500,
+                810
+              ],
+              [
+                26,
+                810
+              ]
+            ]
+          },
+          {
+            "text": "第21行：离线识别测试 OCR sample 21, total = 252.50",
+            "confidence": 0.9712674,
+            "box": [
+              [
+                26,
+                824
+              ],
+              [
+                500,
+                824
+              ],
+              [
+                500,
+                850
+              ],
+              [
+                26,
+                850
+              ]
+            ]
+          },
+          {
+            "text": "第22行：离线识别测试 OCR sample 22, total = 264.50",
+            "confidence": 0.9623183,
+            "box": [
+              [
+                26,
+                864
+              ],
+              [
+                500,
+                864
+              ],
+              [
+                500,
+                890
+              ],
+              [
+                26,
+                890
+              ]
+            ]
+          },
+          {
+            "text": "第23行：离线识别测试 OCR sample 23, total = 276.50",
+            "confidence": 0.969568,
+            "box": [
+              [
+                26,
+                904
+              ],
+              [
+                500,
+                904
+              ],
+              [
+                500,
+                930
+              ],
+              [
+                26,
+                930
+              ]
+            ]
+          },
+          {
+            "text": "第24行：离线识别测试 OCR sample 24, total = 288.50",
+            "confidence": 0.9647402,
+            "box": [
+              [
+                26,
+                944
+              ],
+              [
+                500,
+                944
+              ],
+              [
+                500,
+                970
+              ],
+              [
+                26,
+                970
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 832,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "two_columns",
+        "expected": "左栏：项目说明\n第一步准备图片\n第二步识别文字\n第三步复制结果\n右栏：处理状态\n任务已经完成\n图片不会上传\n退出清理内存",
+        "actual": "左栏：项目说明\n右栏：处理状态\n第一步准备图片\n任务已经完成\n第二步识别文字\n图片不会上传\n第三步复制结果\n退出清理内存",
+        "stable": true,
+        "warm_ms": [
+          91.312,
+          94.646,
+          88.347,
+          91.23,
+          88.214
+        ],
+        "median_ms": 91.23,
+        "lines": [
+          {
+            "text": "左栏：项目说明",
+            "confidence": 0.9997726,
+            "box": [
+              [
+                26,
+                26
+              ],
+              [
+                198,
+                26
+              ],
+              [
+                198,
+                54
+              ],
+              [
+                26,
+                54
+              ]
+            ]
+          },
+          {
+            "text": "右栏：处理状态",
+            "confidence": 0.99968827,
+            "box": [
+              [
+                576,
+                26
+              ],
+              [
+                749,
+                26
+              ],
+              [
+                749,
+                54
+              ],
+              [
+                576,
+                54
+              ]
+            ]
+          },
+          {
+            "text": "第一步准备图片",
+            "confidence": 0.9998731,
+            "box": [
+              [
+                26,
+                71
+              ],
+              [
+                197,
+                72
+              ],
+              [
+                197,
+                101
+              ],
+              [
+                25,
+                99
+              ]
+            ]
+          },
+          {
+            "text": "任务已经完成",
+            "confidence": 0.99983686,
+            "box": [
+              [
+                576,
+                72
+              ],
+              [
+                725,
+                72
+              ],
+              [
+                725,
+                99
+              ],
+              [
+                576,
+                99
+              ]
+            ]
+          },
+          {
+            "text": "第二步识别文字",
+            "confidence": 0.996222,
+            "box": [
+              [
+                26,
+                118
+              ],
+              [
+                198,
+                118
+              ],
+              [
+                198,
+                146
+              ],
+              [
+                26,
+                146
+              ]
+            ]
+          },
+          {
+            "text": "图片不会上传",
+            "confidence": 0.99992055,
+            "box": [
+              [
+                576,
+                118
+              ],
+              [
+                723,
+                118
+              ],
+              [
+                723,
+                145
+              ],
+              [
+                576,
+                145
+              ]
+            ]
+          },
+          {
+            "text": "第三步复制结果",
+            "confidence": 0.99969757,
+            "box": [
+              [
+                26,
+                164
+              ],
+              [
+                198,
+                164
+              ],
+              [
+                198,
+                192
+              ],
+              [
+                26,
+                192
+              ]
+            ]
+          },
+          {
+            "text": "退出清理内存",
+            "confidence": 0.99993306,
+            "box": [
+              [
+                575,
+                165
+              ],
+              [
+                723,
+                165
+              ],
+              [
+                723,
+                192
+              ],
+              [
+                575,
+                192
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "左栏：项目说明\n右栏：处理状态\n第一步准备图片\n任务已经完成\n第二步识别文字\n图片不会上传\n第三步复制结果\n退出清理内存"
+        ],
+        "edit_distance": 38,
+        "reference_chars": 53,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "table",
+        "expected": "项目               数量               金额\n键盘               2                  399.00\n鼠标               3                  129.50\n合计               5                  1186.50",
+        "actual": "项目\n数量\n金额\n键盘\n2\n399.00\n鼠标\n3\n129.50\n合计\n5\n1186.50",
+        "stable": true,
+        "warm_ms": [
+          79.076,
+          76.312,
+          82.01,
+          78.261,
+          74.48
+        ],
+        "median_ms": 78.261,
+        "lines": [
+          {
+            "text": "项目",
+            "confidence": 0.99999195,
+            "box": [
+              [
+                19,
+                21
+              ],
+              [
+                82,
+                21
+              ],
+              [
+                82,
+                65
+              ],
+              [
+                19,
+                65
+              ]
+            ]
+          },
+          {
+            "text": "数量",
+            "confidence": 0.9999014,
+            "box": [
+              [
+                270,
+                19
+              ],
+              [
+                334,
+                19
+              ],
+              [
+                334,
+                64
+              ],
+              [
+                270,
+                64
+              ]
+            ]
+          },
+          {
+            "text": "金额",
+            "confidence": 0.9992472,
+            "box": [
+              [
+                520,
+                19
+              ],
+              [
+                585,
+                19
+              ],
+              [
+                585,
+                66
+              ],
+              [
+                520,
+                66
+              ]
+            ]
+          },
+          {
+            "text": "键盘",
+            "confidence": 0.9997982,
+            "box": [
+              [
+                20,
+                65
+              ],
+              [
+                83,
+                65
+              ],
+              [
+                83,
+                110
+              ],
+              [
+                20,
+                110
+              ]
+            ]
+          },
+          {
+            "text": "2",
+            "confidence": 0.9999733,
+            "box": [
+              [
+                270,
+                68
+              ],
+              [
+                301,
+                68
+              ],
+              [
+                301,
+                111
+              ],
+              [
+                270,
+                111
+              ]
+            ]
+          },
+          {
+            "text": "399.00",
+            "confidence": 0.99997884,
+            "box": [
+              [
+                520,
+                65
+              ],
+              [
+                622,
+                67
+              ],
+              [
+                621,
+                112
+              ],
+              [
+                519,
+                110
+              ]
+            ]
+          },
+          {
+            "text": "鼠标",
+            "confidence": 0.9998488,
+            "box": [
+              [
+                21,
+                112
+              ],
+              [
+                84,
+                112
+              ],
+              [
+                84,
+                158
+              ],
+              [
+                21,
+                158
+              ]
+            ]
+          },
+          {
+            "text": "3",
+            "confidence": 0.9999094,
+            "box": [
+              [
+                270,
+                113
+              ],
+              [
+                301,
+                113
+              ],
+              [
+                301,
+                157
+              ],
+              [
+                270,
+                157
+              ]
+            ]
+          },
+          {
+            "text": "129.50",
+            "confidence": 0.99999505,
+            "box": [
+              [
+                521,
+                113
+              ],
+              [
+                622,
+                113
+              ],
+              [
+                622,
+                157
+              ],
+              [
+                521,
+                157
+              ]
+            ]
+          },
+          {
+            "text": "合计",
+            "confidence": 0.9999696,
+            "box": [
+              [
+                20,
+                156
+              ],
+              [
+                83,
+                156
+              ],
+              [
+                83,
+                206
+              ],
+              [
+                20,
+                206
+              ]
+            ]
+          },
+          {
+            "text": "5",
+            "confidence": 0.9999527,
+            "box": [
+              [
+                272,
+                160
+              ],
+              [
+                300,
+                160
+              ],
+              [
+                300,
+                201
+              ],
+              [
+                272,
+                201
+              ]
+            ]
+          },
+          {
+            "text": "1186.50",
+            "confidence": 0.99578613,
+            "box": [
+              [
+                523,
+                159
+              ],
+              [
+                637,
+                159
+              ],
+              [
+                637,
+                202
+              ],
+              [
+                523,
+                202
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "项目\n数量\n金额\n键盘\n2\n399.00\n鼠标\n3\n129.50\n合计\n5\n1186.50"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 34,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "blank",
+        "expected": "",
+        "actual": "",
+        "stable": true,
+        "warm_ms": [
+          37.079,
+          36.667,
+          36.42,
+          36.204,
+          36.587
+        ],
+        "median_ms": 36.587,
+        "lines": [],
+        "variant_samples": [
+          ""
+        ],
+        "edit_distance": 0,
+        "reference_chars": 0,
+        "matches_ort_ignoring_whitespace": true
+      }
+    ],
+    "engine": "RapidOCRLite 5.0.0a6 C ABI",
+    "first_call_ms": 117.857,
+    "go": "go1.26.0",
+    "init_ms": 83.826,
+    "isa": "neon",
+    "native_threads": 4,
+    "os": "darwin",
+    "peak_rss_bytes": 363888640,
+    "rss_after_destroy_and_go_gc_bytes": 363888640,
+    "rss_before_destroy_bytes": 363888640,
+    "supervision": {
+      "returncode": 0,
+      "stderr": "",
+      "wall_ms": 8545.839375001378,
+      "sampled_peak_rss_bytes": 363888640,
+      "max_child_processes": 0,
+      "pid_reaped": true
+    },
+    "all_cases_stable": true,
+    "stress": {
+      "returncode": 0,
+      "stderr": "",
+      "wall_ms": 49021.68712497223,
+      "sampled_peak_rss_bytes": 365871104,
+      "max_child_processes": 0,
+      "pid_reaped": true,
+      "repeats": 100,
+      "stable": true,
+      "variant_samples": [
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50"
+      ],
+      "peak_rss_bytes": 365871104,
+      "rss_before_destroy_bytes": 339623936,
+      "rss_after_destroy_and_go_gc_bytes": 339984384,
+      "first_ms": 492.158,
+      "last_ms": 487.655
+    },
+    "cancellation": {
+      "returncode": -9,
+      "kill_to_reap_ms": 4.324457957409322,
+      "pid_reaped": true
+    },
+    "invalid_input": {
+      "malformed_png": {
+        "returncode": 1,
+        "error": "invalid PNG: png: invalid format: not a PNG file"
+      },
+      "oversized_dimensions": {
+        "returncode": 1,
+        "error": "PNG exceeds 16 million pixels"
+      }
+    },
+    "os_network_denied": true
+  },
+  "upstream_fast_math": {
+    "arch": "arm64",
+    "backend": "CPU",
+    "cases": [
+      {
+        "name": "light",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": false,
+        "warm_ms": [
+          118.68,
+          123.018,
+          115.189,
+          119.209,
+          117.187
+        ],
+        "median_ms": 118.68,
+        "lines": [
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.98986983,
+            "box": [
+              [
+                27,
+                73
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                450,
+                105
+              ],
+              [
+                27,
+                105
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额 1234.56 元。",
+            "confidence": 0.96671236,
+            "box": [
+              [
+                27,
+                119
+              ],
+              [
+                567,
+                121
+              ],
+              [
+                567,
+                153
+              ],
+              [
+                27,
+                151
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.99983525,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "支持中文 English 混排与数字 2026\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 11,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "dark",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          126.483,
+          126.329,
+          121.545,
+          122.092,
+          125.53
+        ],
+        "median_ms": 125.53,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.99121284,
+            "box": [
+              [
+                27,
+                24
+              ],
+              [
+                316,
+                24
+              ],
+              [
+                316,
+                53
+              ],
+              [
+                27,
+                53
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.9965443,
+            "box": [
+              [
+                26,
+                71
+              ],
+              [
+                451,
+                71
+              ],
+              [
+                451,
+                103
+              ],
+              [
+                26,
+                103
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额1234.56 元。",
+            "confidence": 0.98353434,
+            "box": [
+              [
+                26,
+                120
+              ],
+              [
+                566,
+                121
+              ],
+              [
+                566,
+                151
+              ],
+              [
+                26,
+                150
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.9997331,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "small_12px",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "支持中文 English 混排与数字 2026\n订单编号SN-20261116，金额1234.56元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          98.844,
+          97.956,
+          97.068,
+          100.398,
+          99.718
+        ],
+        "median_ms": 98.844,
+        "lines": [
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.98090804,
+            "box": [
+              [
+                26,
+                58
+              ],
+              [
+                223,
+                58
+              ],
+              [
+                223,
+                76
+              ],
+              [
+                26,
+                76
+              ]
+            ]
+          },
+          {
+            "text": "订单编号SN-20261116，金额1234.56元。",
+            "confidence": 0.994852,
+            "box": [
+              [
+                27,
+                93
+              ],
+              [
+                279,
+                93
+              ],
+              [
+                279,
+                109
+              ],
+              [
+                27,
+                109
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.99679905,
+            "box": [
+              [
+                26,
+                126
+              ],
+              [
+                178,
+                126
+              ],
+              [
+                178,
+                144
+              ],
+              [
+                26,
+                144
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "支持中文 English 混排与数字 2026\n订单编号SN-20261116，金额1234.56元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 11,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "low_contrast",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号SN-20261116，金额1234.56元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          123.561,
+          122.222,
+          126.624,
+          128.113,
+          126.852
+        ],
+        "median_ms": 126.624,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.93667454,
+            "box": [
+              [
+                28,
+                24
+              ],
+              [
+                315,
+                24
+              ],
+              [
+                315,
+                53
+              ],
+              [
+                28,
+                53
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.9571004,
+            "box": [
+              [
+                28,
+                73
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                450,
+                103
+              ],
+              [
+                28,
+                103
+              ]
+            ]
+          },
+          {
+            "text": "订单编号SN-20261116，金额1234.56元。",
+            "confidence": 0.992762,
+            "box": [
+              [
+                28,
+                121
+              ],
+              [
+                566,
+                121
+              ],
+              [
+                566,
+                151
+              ],
+              [
+                28,
+                151
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.9997189,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号SN-20261116，金额1234.56元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "rotated_3deg",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          103.176,
+          104.013,
+          102.113,
+          98.732,
+          97.126
+        ],
+        "median_ms": 102.113,
+        "lines": [
+          {
+            "text": "司南 OCR 离线文字识别",
+            "confidence": 0.9975319,
+            "box": [
+              [
+                28,
+                79
+              ],
+              [
+                317,
+                64
+              ],
+              [
+                319,
+                97
+              ],
+              [
+                29,
+                113
+              ]
+            ]
+          },
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.99211234,
+            "box": [
+              [
+                29,
+                127
+              ],
+              [
+                454,
+                104
+              ],
+              [
+                456,
+                139
+              ],
+              [
+                31,
+                163
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额1234.56 元。",
+            "confidence": 0.98529625,
+            "box": [
+              [
+                32,
+                175
+              ],
+              [
+                572,
+                147
+              ],
+              [
+                574,
+                182
+              ],
+              [
+                34,
+                209
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.9999135,
+            "box": [
+              [
+                34,
+                223
+              ],
+              [
+                363,
+                206
+              ],
+              [
+                364,
+                240
+              ],
+              [
+                36,
+                257
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "transparent",
+        "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "actual": "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+        "stable": true,
+        "warm_ms": [
+          120.016,
+          116.745,
+          117.112,
+          119.936,
+          118.912
+        ],
+        "median_ms": 118.912,
+        "lines": [
+          {
+            "text": "支持中文 English 混排与数字 2026",
+            "confidence": 0.98986983,
+            "box": [
+              [
+                27,
+                73
+              ],
+              [
+                450,
+                73
+              ],
+              [
+                450,
+                105
+              ],
+              [
+                27,
+                105
+              ]
+            ]
+          },
+          {
+            "text": "订单编号 SN-20261116，金额 1234.56 元。",
+            "confidence": 0.96671236,
+            "box": [
+              [
+                27,
+                119
+              ],
+              [
+                567,
+                121
+              ],
+              [
+                567,
+                153
+              ],
+              [
+                27,
+                151
+              ]
+            ]
+          },
+          {
+            "text": "复制结果后，可以继续编辑。",
+            "confidence": 0.99983525,
+            "box": [
+              [
+                27,
+                169
+              ],
+              [
+                353,
+                169
+              ],
+              [
+                353,
+                199
+              ],
+              [
+                27,
+                199
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。"
+        ],
+        "edit_distance": 11,
+        "reference_chars": 71,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "terminal",
+        "expected": "构建完成 Build completed\ngo test ./...\nconst total = price * 1.08;\nif (count <= 10) { return \"OK\"; }\npath: /tmp/sinan-ocr/report.json",
+        "actual": "构建完成 Build completed\nconst total = price * 1.08;\nif (count <= 10) { return \"OK\"; }\npath: /tmp/sinan-ocr/report.json",
+        "stable": true,
+        "warm_ms": [
+          111.781,
+          105.916,
+          124.218,
+          108.277,
+          101.319
+        ],
+        "median_ms": 108.277,
+        "lines": [
+          {
+            "text": "构建完成 Build completed",
+            "confidence": 0.9804063,
+            "box": [
+              [
+                24,
+                22
+              ],
+              [
+                281,
+                22
+              ],
+              [
+                281,
+                50
+              ],
+              [
+                24,
+                50
+              ]
+            ]
+          },
+          {
+            "text": "const total = price * 1.08;",
+            "confidence": 0.98800236,
+            "box": [
+              [
+                23,
+                107
+              ],
+              [
+                289,
+                107
+              ],
+              [
+                289,
+                134
+              ],
+              [
+                23,
+                134
+              ]
+            ]
+          },
+          {
+            "text": "if (count <= 10) { return \"OK\"; }",
+            "confidence": 0.97689784,
+            "box": [
+              [
+                23,
+                149
+              ],
+              [
+                337,
+                149
+              ],
+              [
+                337,
+                177
+              ],
+              [
+                23,
+                177
+              ]
+            ]
+          },
+          {
+            "text": "path: /tmp/sinan-ocr/report.json",
+            "confidence": 0.9860258,
+            "box": [
+              [
+                25,
+                193
+              ],
+              [
+                357,
+                193
+              ],
+              [
+                357,
+                218
+              ],
+              [
+                25,
+                218
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "构建完成 Build completed\nconst total = price * 1.08;\nif (count <= 10) { return \"OK\"; }\npath: /tmp/sinan-ocr/report.json"
+        ],
+        "edit_distance": 11,
+        "reference_chars": 108,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "dense",
+        "expected": "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "actual": "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "stable": false,
+        "warm_ms": [
+          582.848,
+          480.803,
+          504.47,
+          474.549,
+          637.629
+        ],
+        "median_ms": 504.47,
+        "lines": [
+          {
+            "text": "第01行：离线识别测试 OCR sample 01, total = 12.50",
+            "confidence": 0.95955527,
+            "box": [
+              [
+                26,
+                25
+              ],
+              [
+                487,
+                25
+              ],
+              [
+                487,
+                48
+              ],
+              [
+                26,
+                48
+              ]
+            ]
+          },
+          {
+            "text": "第02行：离线识别测试 OCR sample 02, total = 24.50",
+            "confidence": 0.9824859,
+            "box": [
+              [
+                26,
+                63
+              ],
+              [
+                489,
+                62
+              ],
+              [
+                489,
+                90
+              ],
+              [
+                26,
+                91
+              ]
+            ]
+          },
+          {
+            "text": "第03行：离线识别测试 OCR sample 03, total = 36.50",
+            "confidence": 0.9552782,
+            "box": [
+              [
+                27,
+                105
+              ],
+              [
+                487,
+                105
+              ],
+              [
+                487,
+                128
+              ],
+              [
+                27,
+                128
+              ]
+            ]
+          },
+          {
+            "text": "第04行：离线识别测试 OCR sample 04, total = 48.50",
+            "confidence": 0.97468024,
+            "box": [
+              [
+                26,
+                144
+              ],
+              [
+                488,
+                144
+              ],
+              [
+                488,
+                170
+              ],
+              [
+                26,
+                170
+              ]
+            ]
+          },
+          {
+            "text": "第06行：离线识别测试 OCR sample 06, total = 72.50",
+            "confidence": 0.96421546,
+            "box": [
+              [
+                26,
+                224
+              ],
+              [
+                487,
+                224
+              ],
+              [
+                487,
+                250
+              ],
+              [
+                26,
+                250
+              ]
+            ]
+          },
+          {
+            "text": "第07行：离线识别测试 OCR sample 07, total = 84.50",
+            "confidence": 0.9756514,
+            "box": [
+              [
+                26,
+                264
+              ],
+              [
+                488,
+                264
+              ],
+              [
+                488,
+                290
+              ],
+              [
+                26,
+                290
+              ]
+            ]
+          },
+          {
+            "text": "第08行：离线识别测试 OCR sample 08, total = 96.50",
+            "confidence": 0.9763446,
+            "box": [
+              [
+                26,
+                304
+              ],
+              [
+                488,
+                304
+              ],
+              [
+                488,
+                330
+              ],
+              [
+                26,
+                330
+              ]
+            ]
+          },
+          {
+            "text": "第09行：离线识别测试 OCR sample 09, total = 108.50",
+            "confidence": 0.97212714,
+            "box": [
+              [
+                26,
+                344
+              ],
+              [
+                500,
+                344
+              ],
+              [
+                500,
+                370
+              ],
+              [
+                26,
+                370
+              ]
+            ]
+          },
+          {
+            "text": "第10行：离线识别测试 OCR sample 10, total = 120.50",
+            "confidence": 0.9655538,
+            "box": [
+              [
+                26,
+                384
+              ],
+              [
+                500,
+                384
+              ],
+              [
+                500,
+                410
+              ],
+              [
+                26,
+                410
+              ]
+            ]
+          },
+          {
+            "text": "第11行：离线识别测试 OCR sample 11, total = 132.50",
+            "confidence": 0.960559,
+            "box": [
+              [
+                25,
+                424
+              ],
+              [
+                500,
+                424
+              ],
+              [
+                500,
+                450
+              ],
+              [
+                25,
+                450
+              ]
+            ]
+          },
+          {
+            "text": "第12行：离线识别测试 OCR sample 12, total = 144.50",
+            "confidence": 0.9609717,
+            "box": [
+              [
+                26,
+                464
+              ],
+              [
+                500,
+                464
+              ],
+              [
+                500,
+                490
+              ],
+              [
+                26,
+                490
+              ]
+            ]
+          },
+          {
+            "text": "第13行：离线识别测试 OCR sample 13, total = 156.50",
+            "confidence": 0.95993096,
+            "box": [
+              [
+                26,
+                504
+              ],
+              [
+                500,
+                504
+              ],
+              [
+                500,
+                530
+              ],
+              [
+                26,
+                530
+              ]
+            ]
+          },
+          {
+            "text": "第14行：离线识别测试 OCR sample 14, total = 168.50",
+            "confidence": 0.9577116,
+            "box": [
+              [
+                26,
+                544
+              ],
+              [
+                500,
+                544
+              ],
+              [
+                500,
+                570
+              ],
+              [
+                26,
+                570
+              ]
+            ]
+          },
+          {
+            "text": "第15行：离线识别测试 OCR sample 15, total = 180.50",
+            "confidence": 0.95979357,
+            "box": [
+              [
+                26,
+                584
+              ],
+              [
+                500,
+                584
+              ],
+              [
+                500,
+                610
+              ],
+              [
+                26,
+                610
+              ]
+            ]
+          },
+          {
+            "text": "第16行：离线识别测试 OCR sample 16, total = 192.50",
+            "confidence": 0.96378493,
+            "box": [
+              [
+                25,
+                624
+              ],
+              [
+                500,
+                624
+              ],
+              [
+                500,
+                650
+              ],
+              [
+                25,
+                650
+              ]
+            ]
+          },
+          {
+            "text": "第17行：离线识别测试 OCR sample 17, total = 204.50",
+            "confidence": 0.96893215,
+            "box": [
+              [
+                25,
+                664
+              ],
+              [
+                500,
+                664
+              ],
+              [
+                500,
+                690
+              ],
+              [
+                25,
+                690
+              ]
+            ]
+          },
+          {
+            "text": "第18行：离线识别测试 OCR sample 18, total = 216.50",
+            "confidence": 0.9569284,
+            "box": [
+              [
+                26,
+                704
+              ],
+              [
+                500,
+                704
+              ],
+              [
+                500,
+                730
+              ],
+              [
+                26,
+                730
+              ]
+            ]
+          },
+          {
+            "text": "第19行：离线识别测试 OCR sample 19, total = 228.50",
+            "confidence": 0.9675453,
+            "box": [
+              [
+                26,
+                744
+              ],
+              [
+                501,
+                744
+              ],
+              [
+                501,
+                770
+              ],
+              [
+                26,
+                770
+              ]
+            ]
+          },
+          {
+            "text": "第20行：离线识别测试 OCR sample 20, total = 240.50",
+            "confidence": 0.9743342,
+            "box": [
+              [
+                26,
+                784
+              ],
+              [
+                500,
+                784
+              ],
+              [
+                500,
+                810
+              ],
+              [
+                26,
+                810
+              ]
+            ]
+          },
+          {
+            "text": "第21行：离线识别测试 OCR sample 21, total = 252.50",
+            "confidence": 0.9712677,
+            "box": [
+              [
+                26,
+                824
+              ],
+              [
+                500,
+                824
+              ],
+              [
+                500,
+                850
+              ],
+              [
+                26,
+                850
+              ]
+            ]
+          },
+          {
+            "text": "第23行：离线识别测试 OCR sample 23, total = 276.50",
+            "confidence": 0.96961457,
+            "box": [
+              [
+                26,
+                904
+              ],
+              [
+                500,
+                904
+              ],
+              [
+                500,
+                930
+              ],
+              [
+                26,
+                930
+              ]
+            ]
+          },
+          {
+            "text": "第24行：离线识别测试 OCR sample 24, total = 288.50",
+            "confidence": 0.9647474,
+            "box": [
+              [
+                26,
+                944
+              ],
+              [
+                500,
+                944
+              ],
+              [
+                500,
+                970
+              ],
+              [
+                26,
+                970
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+          "第01行：离线识别测试 OCR sample 01, total = 12.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第23行：离线识别测试 OCR sample 23, total = 276.50",
+          "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+          "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+          "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50"
+        ],
+        "edit_distance": 69,
+        "reference_chars": 832,
+        "matches_ort_ignoring_whitespace": false
+      },
+      {
+        "name": "two_columns",
+        "expected": "左栏：项目说明\n第一步准备图片\n第二步识别文字\n第三步复制结果\n右栏：处理状态\n任务已经完成\n图片不会上传\n退出清理内存",
+        "actual": "左栏：项目说明\n右栏：处理状态\n第一步准备图片\n任务已经完成\n第二步识别文字\n图片不会上传\n第三步复制结果\n退出清理内存",
+        "stable": true,
+        "warm_ms": [
+          88.155,
+          89.287,
+          84.311,
+          85.754,
+          84.183
+        ],
+        "median_ms": 85.754,
+        "lines": [
+          {
+            "text": "左栏：项目说明",
+            "confidence": 0.99977237,
+            "box": [
+              [
+                26,
+                26
+              ],
+              [
+                198,
+                26
+              ],
+              [
+                198,
+                54
+              ],
+              [
+                26,
+                54
+              ]
+            ]
+          },
+          {
+            "text": "右栏：处理状态",
+            "confidence": 0.99968797,
+            "box": [
+              [
+                576,
+                26
+              ],
+              [
+                749,
+                26
+              ],
+              [
+                749,
+                54
+              ],
+              [
+                576,
+                54
+              ]
+            ]
+          },
+          {
+            "text": "第一步准备图片",
+            "confidence": 0.9998722,
+            "box": [
+              [
+                26,
+                71
+              ],
+              [
+                197,
+                72
+              ],
+              [
+                197,
+                101
+              ],
+              [
+                25,
+                99
+              ]
+            ]
+          },
+          {
+            "text": "任务已经完成",
+            "confidence": 0.9998366,
+            "box": [
+              [
+                576,
+                72
+              ],
+              [
+                725,
+                72
+              ],
+              [
+                725,
+                99
+              ],
+              [
+                576,
+                99
+              ]
+            ]
+          },
+          {
+            "text": "第二步识别文字",
+            "confidence": 0.9962219,
+            "box": [
+              [
+                26,
+                118
+              ],
+              [
+                198,
+                118
+              ],
+              [
+                198,
+                146
+              ],
+              [
+                26,
+                146
+              ]
+            ]
+          },
+          {
+            "text": "图片不会上传",
+            "confidence": 0.9999199,
+            "box": [
+              [
+                576,
+                118
+              ],
+              [
+                723,
+                118
+              ],
+              [
+                723,
+                145
+              ],
+              [
+                576,
+                145
+              ]
+            ]
+          },
+          {
+            "text": "第三步复制结果",
+            "confidence": 0.9996975,
+            "box": [
+              [
+                26,
+                164
+              ],
+              [
+                198,
+                164
+              ],
+              [
+                198,
+                192
+              ],
+              [
+                26,
+                192
+              ]
+            ]
+          },
+          {
+            "text": "退出清理内存",
+            "confidence": 0.9999328,
+            "box": [
+              [
+                575,
+                165
+              ],
+              [
+                723,
+                165
+              ],
+              [
+                723,
+                192
+              ],
+              [
+                575,
+                192
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "左栏：项目说明\n右栏：处理状态\n第一步准备图片\n任务已经完成\n第二步识别文字\n图片不会上传\n第三步复制结果\n退出清理内存"
+        ],
+        "edit_distance": 38,
+        "reference_chars": 53,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "table",
+        "expected": "项目               数量               金额\n键盘               2                  399.00\n鼠标               3                  129.50\n合计               5                  1186.50",
+        "actual": "项目\n数量\n金额\n键盘\n2\n399.00\n鼠标\n3\n129.50\n合计\n5\n1186.50",
+        "stable": true,
+        "warm_ms": [
+          78.386,
+          86.733,
+          82.819,
+          81.159,
+          87.441
+        ],
+        "median_ms": 82.819,
+        "lines": [
+          {
+            "text": "项目",
+            "confidence": 0.9999919,
+            "box": [
+              [
+                19,
+                21
+              ],
+              [
+                82,
+                21
+              ],
+              [
+                82,
+                65
+              ],
+              [
+                19,
+                65
+              ]
+            ]
+          },
+          {
+            "text": "数量",
+            "confidence": 0.9999013,
+            "box": [
+              [
+                270,
+                19
+              ],
+              [
+                334,
+                19
+              ],
+              [
+                334,
+                64
+              ],
+              [
+                270,
+                64
+              ]
+            ]
+          },
+          {
+            "text": "金额",
+            "confidence": 0.9992471,
+            "box": [
+              [
+                520,
+                19
+              ],
+              [
+                585,
+                19
+              ],
+              [
+                585,
+                66
+              ],
+              [
+                520,
+                66
+              ]
+            ]
+          },
+          {
+            "text": "键盘",
+            "confidence": 0.99979806,
+            "box": [
+              [
+                20,
+                65
+              ],
+              [
+                83,
+                65
+              ],
+              [
+                83,
+                110
+              ],
+              [
+                20,
+                110
+              ]
+            ]
+          },
+          {
+            "text": "2",
+            "confidence": 0.9999716,
+            "box": [
+              [
+                270,
+                68
+              ],
+              [
+                301,
+                68
+              ],
+              [
+                301,
+                111
+              ],
+              [
+                270,
+                111
+              ]
+            ]
+          },
+          {
+            "text": "399.00",
+            "confidence": 0.99997854,
+            "box": [
+              [
+                520,
+                65
+              ],
+              [
+                622,
+                67
+              ],
+              [
+                621,
+                112
+              ],
+              [
+                519,
+                110
+              ]
+            ]
+          },
+          {
+            "text": "鼠标",
+            "confidence": 0.99984825,
+            "box": [
+              [
+                21,
+                112
+              ],
+              [
+                84,
+                112
+              ],
+              [
+                84,
+                158
+              ],
+              [
+                21,
+                158
+              ]
+            ]
+          },
+          {
+            "text": "3",
+            "confidence": 0.9999069,
+            "box": [
+              [
+                270,
+                113
+              ],
+              [
+                301,
+                113
+              ],
+              [
+                301,
+                157
+              ],
+              [
+                270,
+                157
+              ]
+            ]
+          },
+          {
+            "text": "129.50",
+            "confidence": 0.99999475,
+            "box": [
+              [
+                521,
+                113
+              ],
+              [
+                622,
+                113
+              ],
+              [
+                622,
+                157
+              ],
+              [
+                521,
+                157
+              ]
+            ]
+          },
+          {
+            "text": "合计",
+            "confidence": 0.9999693,
+            "box": [
+              [
+                20,
+                156
+              ],
+              [
+                83,
+                156
+              ],
+              [
+                83,
+                206
+              ],
+              [
+                20,
+                206
+              ]
+            ]
+          },
+          {
+            "text": "5",
+            "confidence": 0.9999521,
+            "box": [
+              [
+                272,
+                160
+              ],
+              [
+                300,
+                160
+              ],
+              [
+                300,
+                201
+              ],
+              [
+                272,
+                201
+              ]
+            ]
+          },
+          {
+            "text": "1186.50",
+            "confidence": 0.9957854,
+            "box": [
+              [
+                523,
+                159
+              ],
+              [
+                637,
+                159
+              ],
+              [
+                637,
+                202
+              ],
+              [
+                523,
+                202
+              ]
+            ]
+          }
+        ],
+        "variant_samples": [
+          "项目\n数量\n金额\n键盘\n2\n399.00\n鼠标\n3\n129.50\n合计\n5\n1186.50"
+        ],
+        "edit_distance": 0,
+        "reference_chars": 34,
+        "matches_ort_ignoring_whitespace": true
+      },
+      {
+        "name": "blank",
+        "expected": "",
+        "actual": "",
+        "stable": true,
+        "warm_ms": [
+          37.259,
+          36.432,
+          37.368,
+          36.403,
+          38.014
+        ],
+        "median_ms": 37.259,
+        "lines": [],
+        "variant_samples": [
+          ""
+        ],
+        "edit_distance": 0,
+        "reference_chars": 0,
+        "matches_ort_ignoring_whitespace": true
+      }
+    ],
+    "engine": "RapidOCRLite 5.0.0a6 C ABI",
+    "first_call_ms": 121.318,
+    "go": "go1.26.0",
+    "init_ms": 81.986,
+    "isa": "neon",
+    "native_threads": 4,
+    "os": "darwin",
+    "peak_rss_bytes": 344735744,
+    "rss_after_destroy_and_go_gc_bytes": 333332480,
+    "rss_before_destroy_bytes": 333217792,
+    "supervision": {
+      "returncode": 0,
+      "stderr": "",
+      "wall_ms": 8349.69662502408,
+      "sampled_peak_rss_bytes": 344604672,
+      "max_child_processes": 0,
+      "pid_reaped": true
+    },
+    "all_cases_stable": false,
+    "stress": {
+      "returncode": 0,
+      "stderr": "",
+      "wall_ms": 15971.220375038683,
+      "sampled_peak_rss_bytes": 361021440,
+      "max_child_processes": 0,
+      "pid_reaped": true,
+      "repeats": 30,
+      "stable": false,
+      "variant_samples": [
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第07行：离线识别测试 OCR sample 07, total = 84.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50",
+        "第01行：离线识别测试 OCR sample 01, total = 12.50\n第02行：离线识别测试 OCR sample 02, total = 24.50\n第03行：离线识别测试 OCR sample 03, total = 36.50\n第04行：离线识别测试 OCR sample 04, total = 48.50\n第05行：离线识别测试 OCR sample 05, total = 60.50\n第06行：离线识别测试 OCR sample 06, total = 72.50\n第08行：离线识别测试 OCR sample 08, total = 96.50\n第09行：离线识别测试 OCR sample 09, total = 108.50\n第10行：离线识别测试 OCR sample 10, total = 120.50\n第11行：离线识别测试 OCR sample 11, total = 132.50\n第12行：离线识别测试 OCR sample 12, total = 144.50\n第13行：离线识别测试 OCR sample 13, total = 156.50\n第14行：离线识别测试 OCR sample 14, total = 168.50\n第15行：离线识别测试 OCR sample 15, total = 180.50\n第16行：离线识别测试 OCR sample 16, total = 192.50\n第17行：离线识别测试 OCR sample 17, total = 204.50\n第18行：离线识别测试 OCR sample 18, total = 216.50\n第19行：离线识别测试 OCR sample 19, total = 228.50\n第20行：离线识别测试 OCR sample 20, total = 240.50\n第21行：离线识别测试 OCR sample 21, total = 252.50\n第22行：离线识别测试 OCR sample 22, total = 264.50\n第23行：离线识别测试 OCR sample 23, total = 276.50\n第24行：离线识别测试 OCR sample 24, total = 288.50"
+      ],
+      "peak_rss_bytes": 361283584,
+      "rss_before_destroy_bytes": 352468992,
+      "rss_after_destroy_and_go_gc_bytes": 352796672,
+      "first_ms": 467.628,
+      "last_ms": 501.76
+    },
+    "cancellation": {
+      "returncode": -9,
+      "kill_to_reap_ms": 4.096874967217445,
+      "pid_reaped": true
+    },
+    "invalid_input": {
+      "malformed_png": {
+        "returncode": 1,
+        "error": "invalid PNG: png: invalid format: not a PNG file"
+      },
+      "oversized_dimensions": {
+        "returncode": 1,
+        "error": "PNG exceeds 16 million pixels"
+      }
+    },
+    "os_network_denied": true
+  },
+  "diagnostics": {
+    "source-light-threads1.json": {
+      "arch": "arm64",
+      "backend": "CPU",
+      "cases": [
+        {
+          "name": "light",
+          "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "actual": "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "stable": true,
+          "warm_ms": [
+            251.234,
+            247.623,
+            250.098,
+            249.928,
+            248.748,
+            255.108,
+            253.604,
+            251.757,
+            251.439,
+            255.967,
+            250.253,
+            249.34,
+            250.953,
+            258.687,
+            252.307,
+            247.899,
+            252.469,
+            251.751,
+            247.974,
+            248.27
+          ],
+          "median_ms": 251.0935,
+          "lines": [
+            {
+              "text": "支持中文 English 混排与数字 2026",
+              "confidence": 0.98986983,
+              "box": [
+                [
+                  27,
+                  73
+                ],
+                [
+                  450,
+                  73
+                ],
+                [
+                  450,
+                  105
+                ],
+                [
+                  27,
+                  105
+                ]
+              ]
+            },
+            {
+              "text": "订单编号 SN-20261116，金额 1234.56 元。",
+              "confidence": 0.96671236,
+              "box": [
+                [
+                  27,
+                  119
+                ],
+                [
+                  567,
+                  121
+                ],
+                [
+                  567,
+                  153
+                ],
+                [
+                  27,
+                  151
+                ]
+              ]
+            },
+            {
+              "text": "复制结果后，可以继续编辑。",
+              "confidence": 0.99983525,
+              "box": [
+                [
+                  27,
+                  169
+                ],
+                [
+                  353,
+                  169
+                ],
+                [
+                  353,
+                  199
+                ],
+                [
+                  27,
+                  199
+                ]
+              ]
+            }
+          ],
+          "variant_samples": [
+            "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。"
+          ]
+        }
+      ],
+      "engine": "RapidOCRLite 5.0.0a6 C ABI",
+      "first_call_ms": 261.505,
+      "go": "go1.26.0",
+      "init_ms": 80.453,
+      "isa": "neon",
+      "native_threads": 1,
+      "os": "darwin",
+      "peak_rss_bytes": 162168832,
+      "rss_after_destroy_and_go_gc_bytes": 124698624,
+      "rss_before_destroy_bytes": 124682240
+    },
+    "source-light-threads4.json": {
+      "arch": "arm64",
+      "backend": "CPU",
+      "cases": [
+        {
+          "name": "light",
+          "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "actual": "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "stable": false,
+          "warm_ms": [
+            115.224,
+            114.292,
+            113.483,
+            114.342,
+            113.894,
+            123.18,
+            133.605,
+            116.594,
+            111.548,
+            117.507,
+            123.798,
+            131.891,
+            114.171,
+            115.854,
+            113.257,
+            117.19,
+            112.185,
+            113.956,
+            115.807,
+            116.42
+          ],
+          "median_ms": 115.5155,
+          "lines": [
+            {
+              "text": "支持中文 English 混排与数字 2026",
+              "confidence": 0.98986983,
+              "box": [
+                [
+                  27,
+                  73
+                ],
+                [
+                  450,
+                  73
+                ],
+                [
+                  450,
+                  105
+                ],
+                [
+                  27,
+                  105
+                ]
+              ]
+            },
+            {
+              "text": "订单编号 SN-20261116，金额 1234.56 元。",
+              "confidence": 0.96671236,
+              "box": [
+                [
+                  27,
+                  119
+                ],
+                [
+                  567,
+                  121
+                ],
+                [
+                  567,
+                  153
+                ],
+                [
+                  27,
+                  151
+                ]
+              ]
+            },
+            {
+              "text": "复制结果后，可以继续编辑。",
+              "confidence": 0.99983525,
+              "box": [
+                [
+                  27,
+                  169
+                ],
+                [
+                  353,
+                  169
+                ],
+                [
+                  353,
+                  199
+                ],
+                [
+                  27,
+                  199
+                ]
+              ]
+            }
+          ],
+          "variant_samples": [
+            "支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+            "支持中文 English 混排与数字 2026\n复制结果后，可以继续编辑。"
+          ]
+        }
+      ],
+      "engine": "RapidOCRLite 5.0.0a6 C ABI",
+      "first_call_ms": 115.704,
+      "go": "go1.26.0",
+      "init_ms": 80.165,
+      "isa": "neon",
+      "native_threads": 4,
+      "os": "darwin",
+      "peak_rss_bytes": 170016768,
+      "rss_after_destroy_and_go_gc_bytes": 128237568,
+      "rss_before_destroy_bytes": 128221184
+    },
+    "strict-light-threads4.json": {
+      "arch": "arm64",
+      "backend": "CPU",
+      "cases": [
+        {
+          "name": "light",
+          "expected": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "actual": "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。",
+          "stable": true,
+          "warm_ms": [
+            116.221,
+            115.674,
+            115.524,
+            117.684,
+            113.129,
+            116.48,
+            118.584,
+            120.625,
+            117.522,
+            112.987,
+            117.386,
+            117.916,
+            112.395,
+            114.878,
+            118.591,
+            118.345,
+            115.467,
+            119.14,
+            113.981,
+            113.365
+          ],
+          "median_ms": 116.35050000000001,
+          "lines": [
+            {
+              "text": "司南 OCR 离线文字识别",
+              "confidence": 0.98679096,
+              "box": [
+                [
+                  27,
+                  24
+                ],
+                [
+                  316,
+                  24
+                ],
+                [
+                  316,
+                  55
+                ],
+                [
+                  27,
+                  55
+                ]
+              ]
+            },
+            {
+              "text": "支持中文 English 混排与数字 2026",
+              "confidence": 0.9898716,
+              "box": [
+                [
+                  27,
+                  73
+                ],
+                [
+                  450,
+                  73
+                ],
+                [
+                  450,
+                  105
+                ],
+                [
+                  27,
+                  105
+                ]
+              ]
+            },
+            {
+              "text": "订单编号 SN-20261116，金额 1234.56 元。",
+              "confidence": 0.9667025,
+              "box": [
+                [
+                  27,
+                  119
+                ],
+                [
+                  567,
+                  121
+                ],
+                [
+                  567,
+                  153
+                ],
+                [
+                  27,
+                  151
+                ]
+              ]
+            },
+            {
+              "text": "复制结果后，可以继续编辑。",
+              "confidence": 0.9998354,
+              "box": [
+                [
+                  27,
+                  169
+                ],
+                [
+                  353,
+                  169
+                ],
+                [
+                  353,
+                  199
+                ],
+                [
+                  27,
+                  199
+                ]
+              ]
+            }
+          ],
+          "variant_samples": [
+            "司南 OCR 离线文字识别\n支持中文 English 混排与数字 2026\n订单编号 SN-20261116，金额 1234.56 元。\n复制结果后，可以继续编辑。"
+          ]
+        }
+      ],
+      "engine": "RapidOCRLite 5.0.0a6 C ABI",
+      "first_call_ms": 121.707,
+      "go": "go1.26.0",
+      "init_ms": 101.78,
+      "isa": "neon",
+      "native_threads": 4,
+      "os": "darwin",
+      "peak_rss_bytes": 168165376,
+      "rss_after_destroy_and_go_gc_bytes": 131137536,
+      "rss_before_destroy_bytes": 131104768
+    }
+  },
+  "baseline_evidence": "ocr-validation-results.json",
+  "metric": "Levenshtein after whitespace removal; no general accuracy claim",
+  "unverified": [
+    "other 5 OS/architecture targets",
+    "long-term leak freedom",
+    "real screenshot corpus",
+    "plugin integration",
+    "backend crash/orphan recovery",
+    "production redistribution attribution",
+    "UI and system capture"
+  ]
+}

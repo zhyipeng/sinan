@@ -72,3 +72,8 @@ GitHub 的 [runner 文档](https://docs.github.com/en/actions/reference/runners/
 本版增加宿主共享系统剪贴板 API（ADR 0066），配套计算、剪贴板插件 0.2.0；新插件要求司南 0.2.1 与初始化 `clipboard.v1` 能力。[六目标原生构建与无界面检查](https://github.com/zhyipeng/sinan/actions/runs/43806863705) 已通过，[v0.2.1 Release](https://github.com/zhyipeng/sinan/releases/tag/v0.2.1) 已公开；六个归档与 SHA256SUMS 的 GitHub SHA-256 已核验，实机验收仍未执行。macOS 仍为 ad-hoc 签名，Windows/Linux 仍为便携目录，系统依赖和真实桌面验收限制不变。
 
 初始 v0.2.0 标签的发布工作流因商店宿主版本写死为 0.1.0 而取消，未公开 Release；保留标签，不改写历史。v0.2.1 将商店兼容性与展示版本统一取自构建注入的宿主版本，使用 SemVer 比较最低版本（预发行版不能冒充同号正式版），开发构建显式使用当前能力基线。插件中心版本同步为 0.9.2，未增加协议字段。
+
+
+## v0.3.0 发布准备
+
+新增 `ui.image-command.v1`：会话 PNG 快照交付授权插件后台，配套 OCR 0.1.0 的主输入框图片匹配、原图预览及自动识别。OCR 最低宿主为 0.3.0，已发布 0.2.1 不兼容；源码开发基线和前端版本同步为 0.3.0，插件中心为 0.9.3。宿主仍执行六目标原生构建；OCR 首发资产仅为已验证的 macOS arm64，不增加其他平台的 OCR 支持声明。发布前通过既有无界面检查，真实 UI/系统剪贴板仍未验收，远端发行状态待工作流确认。

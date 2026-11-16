@@ -1,0 +1,133 @@
+{
+  "cases": [
+    {
+      "name": "light",
+      "matches_native_baseline": true,
+      "start_ms": 0.20054203923791647,
+      "text_sha256": "1431d02323cb682d85d63035c9bbef9b5d8edef182f3cfd79d368636ce8961e3"
+    },
+    {
+      "name": "dark",
+      "matches_native_baseline": true,
+      "start_ms": 0.06895896513015032,
+      "text_sha256": "bbbaa0a167b67c8cc292969dc02119a8f1b0b943894348decf47fece2e4c6615"
+    },
+    {
+      "name": "small_12px",
+      "matches_native_baseline": true,
+      "start_ms": 0.0601249048486352,
+      "text_sha256": "b3f7088aca4aa30288236110459c757decf9234a2852b33a03f3db1435d9a7a3"
+    },
+    {
+      "name": "low_contrast",
+      "matches_native_baseline": true,
+      "start_ms": 0.3189169801771641,
+      "text_sha256": "cccbd6cdeec4155526db3f0254aa0d34b73443d37eb6ef49f1ad09f446129432"
+    },
+    {
+      "name": "rotated_3deg",
+      "matches_native_baseline": true,
+      "start_ms": 0.062000006437301636,
+      "text_sha256": "bbbaa0a167b67c8cc292969dc02119a8f1b0b943894348decf47fece2e4c6615"
+    },
+    {
+      "name": "transparent",
+      "matches_native_baseline": true,
+      "start_ms": 0.04766706842929125,
+      "text_sha256": "1431d02323cb682d85d63035c9bbef9b5d8edef182f3cfd79d368636ce8961e3"
+    },
+    {
+      "name": "terminal",
+      "matches_native_baseline": true,
+      "start_ms": 0.10312499944120646,
+      "text_sha256": "f2e35c4a3243b06fa65f377e9120c28feb174857febf9f73a971f7d57b310a67"
+    },
+    {
+      "name": "dense",
+      "matches_native_baseline": true,
+      "start_ms": 0.0599580816924572,
+      "text_sha256": "9058978f130d39c6964a40b2d39b19e1fe78094177486628d23ea0e3bff2b4dc"
+    },
+    {
+      "name": "two_columns",
+      "matches_native_baseline": true,
+      "start_ms": 0.09362504351884127,
+      "text_sha256": "c8497d2a264b13c4be184232bc10f54e2dee02bd84a1bfe1f5ca16f5d8e99165"
+    },
+    {
+      "name": "table",
+      "matches_native_baseline": true,
+      "start_ms": 0.0753339845687151,
+      "text_sha256": "6684604d246fe2492e00b962298a042c748f8c9ff7be97b24f5fa8a6582ea513"
+    },
+    {
+      "name": "blank",
+      "matches_native_baseline": true,
+      "start_ms": 0.07966707926243544,
+      "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "normal_open_did_not_read_clipboard": true,
+  "single_worker_enforced": true,
+  "session_image_without_clipboard_read": true,
+  "non_image_rejected": true,
+  "explicit_cancel_reaped_worker": true,
+  "backend_kill_worker_exited": true,
+  "backend_kill_to_worker_exit_ms": 16.704375040717423,
+  "os_network_denied": true,
+  "real_clipboard_accessed": false,
+  "date": "2026-11-16",
+  "scope": "会话图片接口与 OCR 图片输入增量；旧轮次报告保持历史证据",
+  "package": {
+    "id": "tools.ocr",
+    "version": "0.1.0",
+    "os": "darwin",
+    "arch": "arm64",
+    "file": "tools.ocr-0.1.0-darwin-arm64.zip",
+    "sha256": "2742dd3f45f04cf999dbbed6b0c40cb926b177792dd4d5cd025faafdbefd2d36",
+    "size": 29148371
+  },
+  "checks": {
+    "host_desktop_test": "passed: frontend typecheck/build + headless JS + all Go race tests, native UI disabled",
+    "host_desktop_build": "passed: macOS arm64, no application launch",
+    "official_npm_test": "passed: 108 JS, 3 packaging, four plugin Go race suites",
+    "ocr_backend_build_vet": [
+      "darwin-arm64",
+      "darwin-amd64",
+      "windows-arm64",
+      "windows-amd64",
+      "linux-arm64",
+      "linux-amd64"
+    ],
+    "sdk_snapshot_replay": "base commit + explicit patch + file hashes passed",
+    "host_package_inspect": "passed using rebuilt sinanctl",
+    "ui_vm_tests": 8,
+    "host_after_final_change": "kernel race tests and desktop build passed after non-image null response update"
+  },
+  "not_verified": [
+    "真实剪贴板",
+    "三端原生 WebView、图片粘贴与快捷键交互",
+    "Windows/Linux 完整原生 OCR 包",
+    "macOS amd64 完整包",
+    "远端 CI",
+    "正式发布或上架"
+  ],
+  "host_source_sha256": {
+    "internal/kernel/ui_calls.go": "64af80b60510d049eccbdf83ad8933be4f9986a12f5048c6556ed3f058018e91",
+    "internal/plugin/uiview/session.go": "75d29ea7a96106cdaa4772f892338bf90bb060fd77b4d4b9ace594386d53cbbb",
+    "internal/plugin/transport/process.go": "22fe3f8d3f7ef005ca80dc809792086391519d76f79ce2156dead65f087559f1",
+    "packages/plugin-protocol/protocol.go": "d88a9a6bb1bdb717f7bd0885b5ec7d9f659039ee653c1574236218765e945bfa",
+    "packages/plugin-sdk/server.go": "5bed589dffcf5afb9cc828c995a463acfcf7192e325833e5d96ffaf575a7e5ab",
+    "packages/plugin-sdk/ui/index.js": "090d2e4345f1a39c9c40ba9cbddecef37f4fdec181c383d5a19e56c356a8df94"
+  },
+  "plugin_source_sha256": {
+    "plugins/ocr/ui/app.js": "1cf278c4670508f9c6dfe3a144b9eb1ae4c00d1ee25e9bc60f71822143a1e059",
+    "plugins/ocr/ui/index.html": "5e43405504e983d50f74558ca8228920c3a6e4ce7654f294d0d2efafdaf2c791",
+    "plugins/ocr/ui/style.css": "b10562340a4edbad0e33cf2999ff3fbc8c2df940270ef51f15485d055199a11d",
+    "plugins/ocr/backend/main.go": "9ef7dce7c97ed423c4f690d3d7ae456b0d8455fcf1bc5583c7bb51e7bf0768ab",
+    "plugins/ocr/backend/jobs.go": "15b07d121b699c6cc2deb3b890579d3de3a293da99b9c4da47fdbb143f0019ab",
+    "plugins/ocr/manifest.json": "15111c11806f40e4e669b19f6a5bfdf71ab632af2d1cdf8d189290929ad23b51",
+    "plugins/ocr/tests/stdio-smoke.py": "18f5a8e918496ea7d0fa676819d5790fc14a9c99eb5cc856f763d00d839a2370",
+    "third_party/sinan/UPSTREAM.json": "4d36f65d2d969b53171b283f538bac0d0c7c3cb8699bd777eb14b9664331f1a9"
+  }
+}

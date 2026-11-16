@@ -1,0 +1,165 @@
+{
+  "date": "2026-11-16",
+  "plugin": "tools.ocr",
+  "version": "0.1.0",
+  "status": "local macOS arm64 build, not published",
+  "stdio": {
+    "cases": [
+      {
+        "name": "light",
+        "matches_native_baseline": true,
+        "start_ms": 0.30949991196393967,
+        "text_sha256": "1431d02323cb682d85d63035c9bbef9b5d8edef182f3cfd79d368636ce8961e3"
+      },
+      {
+        "name": "dark",
+        "matches_native_baseline": true,
+        "start_ms": 0.25579100474715233,
+        "text_sha256": "bbbaa0a167b67c8cc292969dc02119a8f1b0b943894348decf47fece2e4c6615"
+      },
+      {
+        "name": "small_12px",
+        "matches_native_baseline": true,
+        "start_ms": 0.5445830756798387,
+        "text_sha256": "b3f7088aca4aa30288236110459c757decf9234a2852b33a03f3db1435d9a7a3"
+      },
+      {
+        "name": "low_contrast",
+        "matches_native_baseline": true,
+        "start_ms": 0.18375006038695574,
+        "text_sha256": "cccbd6cdeec4155526db3f0254aa0d34b73443d37eb6ef49f1ad09f446129432"
+      },
+      {
+        "name": "rotated_3deg",
+        "matches_native_baseline": true,
+        "start_ms": 1.7702080076560378,
+        "text_sha256": "bbbaa0a167b67c8cc292969dc02119a8f1b0b943894348decf47fece2e4c6615"
+      },
+      {
+        "name": "transparent",
+        "matches_native_baseline": true,
+        "start_ms": 0.1794580603018403,
+        "text_sha256": "1431d02323cb682d85d63035c9bbef9b5d8edef182f3cfd79d368636ce8961e3"
+      },
+      {
+        "name": "terminal",
+        "matches_native_baseline": true,
+        "start_ms": 0.19058294128626585,
+        "text_sha256": "f2e35c4a3243b06fa65f377e9120c28feb174857febf9f73a971f7d57b310a67"
+      },
+      {
+        "name": "dense",
+        "matches_native_baseline": true,
+        "start_ms": 0.3552499692887068,
+        "text_sha256": "9058978f130d39c6964a40b2d39b19e1fe78094177486628d23ea0e3bff2b4dc"
+      },
+      {
+        "name": "two_columns",
+        "matches_native_baseline": true,
+        "start_ms": 0.15337509103119373,
+        "text_sha256": "c8497d2a264b13c4be184232bc10f54e2dee02bd84a1bfe1f5ca16f5d8e99165"
+      },
+      {
+        "name": "table",
+        "matches_native_baseline": true,
+        "start_ms": 0.24295796174556017,
+        "text_sha256": "6684604d246fe2492e00b962298a042c748f8c9ff7be97b24f5fa8a6582ea513"
+      },
+      {
+        "name": "blank",
+        "matches_native_baseline": true,
+        "start_ms": 0.2008749870583415,
+        "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "normal_open_did_not_read_clipboard": true,
+    "single_worker_enforced": true,
+    "non_image_rejected": true,
+    "explicit_cancel_reaped_worker": true,
+    "backend_kill_worker_exited": true,
+    "backend_kill_to_worker_exit_ms": 23.026208044029772,
+    "os_network_denied": true,
+    "real_clipboard_accessed": false
+  },
+  "runtime_path_with_spaces_and_chinese_tested": true,
+  "package": {
+    "id": "tools.ocr",
+    "version": "0.1.0",
+    "os": "darwin",
+    "arch": "arm64",
+    "file": "tools.ocr-0.1.0-darwin-arm64.zip",
+    "sha256": "cb3a7db8dd805c1d8b12c25e392310c4823191095742062e4edbb5d9e972f2c3",
+    "size": 29146537,
+    "unpacked_bytes": 37314555,
+    "contains_executable_worker": true,
+    "native_minimum_macos": {
+      "backend/plugin": "12.0.0",
+      "backend/ocr-worker": "12.0.0",
+      "lib/libppocr.5.dylib": "12.0.0"
+    },
+    "older_macos_execution_verified": false
+  },
+  "sdk_snapshot_commit_unchanged": "718cc495ed3a95231b5d4d4296881f1d1119002c",
+  "checks": {
+    "frontend_tests": 104,
+    "python_packaging_tests": 3,
+    "go_race_modules": [
+      "clipboard",
+      "translate",
+      "calculator",
+      "ocr"
+    ],
+    "ocr_backend_cross_compile_and_vet": [
+      "darwin-arm64",
+      "darwin-amd64",
+      "windows-arm64",
+      "windows-amd64",
+      "linux-arm64",
+      "linux-amd64"
+    ],
+    "native_worker_vet": "darwin-arm64",
+    "native_pipeline": "real worker with synthetic Host API",
+    "CI_updated_but_remote_not_run": true
+  },
+  "source_sha256": {
+    ".github/workflows/platforms.yml": "5d73ef44706bffee588fa7db3b5a922b24a6fef61015459d74a5c2ae54033186",
+    "package.json": "4e440b0b66a2570da7b1f26dbf7ad4343533e2f7e957b73d3af5b98cdd545ba2",
+    "plugins/ocr/README.md": "21ec20cc3c34282868b59221f59b7e07a92d6174cdcb5e8ce72c69486669a838",
+    "plugins/ocr/THIRD_PARTY_NOTICES.txt": "585729320e63fa8214698e4aaa422e67df43c3657bb32a334a0ea89aaf4cd1e1",
+    "plugins/ocr/backend/jobs.go": "9433869e157a2390a1bb93e6e0a89a4a0fbf7bcfc8d307930c5fe8f68c7d6fc3",
+    "plugins/ocr/backend/jobs_test.go": "8245ac8d53e88de7d8926b8ef5b93e630d1ddcf2eefb3f3048b6eda70630b8d1",
+    "plugins/ocr/backend/main.go": "a9e17dcb894cd7abedb67fdc4fb00c872397f83049de904252b8aeb3ffebf769",
+    "plugins/ocr/backend/process.go": "943195c8eed9f056c60595386c97a3d861a579b878612d8a7ec2e050a11bb2cc",
+    "plugins/ocr/backend/process_test.go": "83fe47f0eebc5542fde790ec30d40c9c7c1b8f14c8fc301da9a670be96c00cd6",
+    "plugins/ocr/backend/process_unix.go": "f3ab8a53ed88d8d6eda1329c9c7eae878f3569628d6e0feb35808280cd17cafe",
+    "plugins/ocr/backend/process_windows.go": "780c9060247d9534e23fe5948cfdcbcd47b3d06245ee9db05559356aaf01d586",
+    "plugins/ocr/go.mod": "3550536d0963b7699df83ec1a161aef46527058b49e4fd1708ecfdad4a444d7b",
+    "plugins/ocr/icon.svg": "9c376ec082fbfc6eb13c581d049767c78fe20e6ea90247ef265c509d1dcae7da",
+    "plugins/ocr/internal/workerio/wire.go": "5648127dc327dcd9dc3bdab0d8459a19106dbcd4e140b31650f5b8e928a388be",
+    "plugins/ocr/internal/workerio/wire_test.go": "1b77162573dab39c56343261fc2685c00c168e44343a9ffd8410eff012d419e5",
+    "plugins/ocr/manifest.json": "9b000dbc5cefc40e1a7d391728acb02c9f56aa62106d7add84c9236922b6ed73",
+    "plugins/ocr/native/Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "plugins/ocr/native/strict-fp.cmake": "d60b5e71aa9fed05a92dba76cb87b3aa177b5f65e626a65542124de047c77664",
+    "plugins/ocr/tests/app.test.mjs": "67da68eed9acd5eb80886a68248c54a6ef520179165771b447e370dfb72935dd",
+    "plugins/ocr/tests/stdio-smoke.py": "b37419de5f90ac13e375e72c1b14cd7b20319db8eaced336e853b7cebd23773d",
+    "plugins/ocr/tests/stdio-smoke.py.lock": "916a151cf3b189f4c369e066773d1f770685c4d5be9181851e0e5fe5aa4dc3f9",
+    "plugins/ocr/ui/app.js": "59569adb93829d6e9e2eb9e3434f89b498a2cdf1e327d6efed8232501e76c511",
+    "plugins/ocr/ui/index.html": "c85ea8021c5debe5c135798c3fb4b6c362800b18d5798cd5382cbe7b78fa2e36",
+    "plugins/ocr/ui/style.css": "a2aea0cd924f45fe1da5bb98c63748439f228dbe9d849055ab060598c48880ca",
+    "plugins/ocr/worker/main.go": "8f67fc93cbe6974a35b888a87f9482c50c2d0d404c4a921f6edafaa5798d4d8e",
+    "scripts/build-ocr.mjs": "56fbbb470d7272c821bfb77a7eb92b32c85b5047352da59d387623315613cd94",
+    "scripts/check-ocr-backend.mjs": "934e7793232aa31acd3d71d5b494e879c2f3936246c66ad36bd53e339aff4b27",
+    "scripts/package.py": "c3645c46576a56613db4429fadfb932cc23308b09676ad4a5550bdaf0cb29e5a",
+    "scripts/test.mjs": "18a69ebcde7706cf6da03379f13ffc99918089956da7d924665a62936dc2579c",
+    "scripts/tests/test_package.py": "d8966b5243fee819e0469907f2312c1c1ac106b0e435a84d50cc05ccfbdd4261"
+  },
+  "not_verified": [
+    "real desktop UI",
+    "real system clipboard",
+    "full Windows/Linux native worker packaging",
+    "macOS amd64 native worker",
+    "screenshot capture",
+    "session image input",
+    "public release/redistribution audit"
+  ]
+}
