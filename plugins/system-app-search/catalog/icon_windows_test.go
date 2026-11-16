@@ -32,19 +32,29 @@ func TestPlatformWindowsApplicationIcons(t *testing.T) {
 	decodePlatformIcon(t, readIcon(executable))
 	iconPath := filepath.Join(t.TempDir(), "自定义图标.ico")
 	writePlatformIcon(t, iconPath)
-	icon := readIcon(iconPath)
-	img := decodePlatformIcon(t, icon)
+	checkPlatformCustomIcon(t, readIcon(iconPath))
+	shortcut := filepath.Join(t.TempDir(), "自定义快捷方式.lnk")
+	writePlatformShortcut(t, shortcut, executable, iconPath)
+	// The Shell may render a shortcut overlay or use another raster size.
+	// Check the fixture's visible artwork instead of requiring identical PNGs.
+	checkPlatformCustomIcon(t, readIcon(shortcut))
+}
+
+func checkPlatformCustomIcon(t *testing.T, value string) {
+	t.Helper()
+	img := decodePlatformIcon(t, value)
 	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0 {
 		t.Fatal("transparent corner became opaque")
 	}
-	r, g, b, a := img.At(applicationIconSize/2, applicationIconSize/2).RGBA()
-	if r < 0xf000 || g > 0x1000 || b > 0x1000 || a < 0xf000 {
-		t.Fatalf("custom icon color was not preserved: %d %d %d %d", r, g, b, a)
-	}
-	shortcut := filepath.Join(t.TempDir(), "自定义快捷方式.lnk")
-	writePlatformShortcut(t, shortcut, executable, iconPath)
-	if got := readIcon(shortcut); got != icon {
-		t.Fatal("shortcut did not resolve its custom icon")
+	// The red interior distinguishes the custom fixture from the executable's
+	// default icon while leaving the lower-left shortcut overlay unconstrained.
+	for y := 20; y < 32; y++ {
+		for x := 24; x < 40; x++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			if r < 0xf000 || g > 0x1000 || b > 0x1000 || a < 0xf000 {
+				t.Fatalf("custom icon color was not preserved at %d,%d: %d %d %d %d", x, y, r, g, b, a)
+			}
+		}
 	}
 }
 
