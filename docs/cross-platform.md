@@ -167,3 +167,10 @@ UI 使用本地打包 React、BigInt、静态 CSS 和宿主明暗主题，目标
 JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.0 已发布并登记到商店，每个版本均有三系统 arm64/amd64 六目标包及摘要。独立官方插件的[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43799988731) 无界面测试与构建通过；30 个包的清单版本、图标、原生架构和 GitHub 资产摘要已核验，实机 UI 仍未验收。
 
 本体提交 a9aebba 的[六目标 CI](https://github.com/zhyipeng/sinan/actions/runs/43799819453)中，macOS/Linux 两种架构通过；Windows amd64/arm64 在 `TestPlatformWindowsApplicationIcons` 的 WScript.Shell 创建中文快捷方式夹具时失败，尚未解决。该失败与独立插件的 CI、发行资产分别记录，不将本体描述为全平台回归通过。
+
+
+### Windows 图标测试夹具修复
+
+`TestPlatformWindowsApplicationIcons` 的快捷方式夹具改用显式 `IShellLinkW` 与 `IPersistFile.Save`，以 UTF-16 设置目标、图标与保存路径，替代在 Windows 两种架构 CI 中保存中文路径失败的 WScript.Shell 自动化。保留中文 ICO、中文 LNK、透明度及自定义快捷方式图标断言，并检查快捷方式确实保存到目标中文路径；不跳过测试、不修改生产图标提取或其余平台实现。COM 对象在固定线程初始化并按逆序释放。
+
+本地 macOS 应用目录竞态回归通过，Windows amd64/arm64 测试程序交叉编译及对应静态检查通过；目标 Windows 测试运行待远端 CI 验证。修复仅涉及无界面测试，不启动应用、WebView 或系统授权窗口。

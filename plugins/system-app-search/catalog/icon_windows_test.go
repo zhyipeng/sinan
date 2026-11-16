@@ -11,10 +11,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"unsafe"
 
 	ole "github.com/go-ole/go-ole"
-	"github.com/go-ole/go-ole/oleutil"
+	"golang.org/x/sys/windows"
 )
 
 // This exercises only offscreen GDI bitmaps and Shell metadata; it never opens
@@ -102,32 +104,75 @@ func writePlatformShortcut(t *testing.T, path, target, icon string) {
 		}
 	}
 	defer ole.CoUninitialize()
-	object, err := oleutil.CreateObject("WScript.Shell")
+	// Request the Unicode Shell interface explicitly. The WScript.Shell fixture
+	// failed to save Chinese shortcut names on both Windows CI architectures.
+	// Keep all fixture paths in UTF-16 instead of depending on script automation.
+	link, err := ole.CreateInstance(
+		ole.NewGUID("{00021401-0000-0000-C000-000000000046}"), // CLSID_ShellLink
+		ole.NewGUID("{000214F9-0000-0000-C000-000000000046}"), // IID_IShellLinkW
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer object.Release()
-	shell, err := object.QueryInterface(ole.IID_IDispatch)
+	defer link.Release()
+	linkTable := (*platformShellLinkVtbl)(unsafe.Pointer(link.RawVTable))
+	targetPath, err := windows.UTF16PtrFromString(target)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer shell.Release()
-	value, err := oleutil.CallMethod(shell, "CreateShortcut", path)
+	hr, _, _ := syscall.SyscallN(linkTable.SetPath, uintptr(unsafe.Pointer(link)), uintptr(unsafe.Pointer(targetPath)))
+	checkPlatformShortcutResult(t, "IShellLinkW.SetPath", hr)
+	runtime.KeepAlive(targetPath)
+	iconPath, err := windows.UTF16PtrFromString(icon)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer value.Clear()
-	link := value.ToIDispatch()
-	for key, property := range map[string]string{"TargetPath": target, "IconLocation": icon + ",0"} {
-		result, err := oleutil.PutProperty(link, key, property)
-		if err != nil {
-			t.Fatal(err)
-		}
-		result.Clear()
+	hr, _, _ = syscall.SyscallN(linkTable.SetIconLocation, uintptr(unsafe.Pointer(link)), uintptr(unsafe.Pointer(iconPath)), 0)
+	checkPlatformShortcutResult(t, "IShellLinkW.SetIconLocation", hr)
+	runtime.KeepAlive(iconPath)
+
+	var file *ole.IUnknown
+	if err := link.PutQueryInterface(ole.NewGUID("{0000010B-0000-0000-C000-000000000046}"), &file); err != nil { // IID_IPersistFile
+		t.Fatal(err)
 	}
-	result, err := oleutil.CallMethod(link, "Save")
+	defer file.Release()
+	fileTable := (*platformPersistFileVtbl)(unsafe.Pointer(file.RawVTable))
+	shortcutPath, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result.Clear()
+	hr, _, _ = syscall.SyscallN(fileTable.Save, uintptr(unsafe.Pointer(file)), uintptr(unsafe.Pointer(shortcutPath)), 1)
+	checkPlatformShortcutResult(t, "IPersistFile.Save", hr)
+	runtime.KeepAlive(shortcutPath)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("shortcut was not saved at its Unicode path: %v", err)
+	}
+}
+
+// Test-only COM layouts, in Windows SDK declaration order. Both interfaces
+// inherit IUnknown; IPersistFile also includes IPersist.GetClassID.
+// https://learn.microsoft.com/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishelllinkw
+// https://learn.microsoft.com/windows/win32/api/objidl/nn-objidl-ipersistfile
+type platformShellLinkVtbl struct {
+	ole.IUnknownVtbl
+	GetPath, GetIDList, SetIDList            uintptr
+	GetDescription, SetDescription           uintptr
+	GetWorkingDirectory, SetWorkingDirectory uintptr
+	GetArguments, SetArguments               uintptr
+	GetHotkey, SetHotkey                     uintptr
+	GetShowCmd, SetShowCmd                   uintptr
+	GetIconLocation, SetIconLocation         uintptr
+	SetRelativePath, Resolve, SetPath        uintptr
+}
+
+type platformPersistFileVtbl struct {
+	ole.IUnknownVtbl
+	GetClassID, IsDirty, Load, Save uintptr
+}
+
+func checkPlatformShortcutResult(t *testing.T, operation string, result uintptr) {
+	t.Helper()
+	if result != 0 {
+		t.Fatalf("%s failed: %v", operation, ole.NewError(result))
+	}
 }
