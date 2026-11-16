@@ -3,12 +3,14 @@ import Shortcut, {type ShortcutBridge} from './Shortcut';
 import PluginShortcuts,{type PluginShortcutsBridge} from './PluginShortcuts';
 import Theme,{type ThemeBridge} from './Theme';
 import LLM,{type LLMBridge} from './LLM';
+import Search, {type SearchBridge} from './Search';
 import Updates,{type UpdateBridge} from './Updates';
 
 export type SettingsSchema = { id: string; title: string; type: string; options?: { value: string; label: string }[] | null; placeholder?: string | null };
 export type ConfigurablePlugin = { id: string; name: string; uiViews?: {permissions?:string[]|null}[]|null;settings?: SettingsSchema[] | null };
 export type SettingsSnapshot = { revision: number; values: Record<string, string[]> };
 export type SettingsBridge = {
+  search:SearchBridge;
   llm:LLMBridge;
   updates:UpdateBridge;
   theme:ThemeBridge;
@@ -111,6 +113,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
     <PluginShortcuts bridge={bridge.pluginShortcuts} />
     <Updates bridge={bridge.updates} />
     <LLM bridge={bridge.llm} plugins={plugins.filter(p=>p.uiViews?.some(v=>v.permissions?.includes("llm")))} />
+    <Search bridge={bridge.search} />
     {notice && <p className="settings-notice" role="status">{notice}</p>}
     {error && <p className="error" role="alert">{error}</p>}
   </div>;

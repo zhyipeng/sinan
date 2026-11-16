@@ -1596,3 +1596,47 @@ output {
 .update-notice { flex-shrink: 0; padding: 4px 9px; margin-right: 10px; font-size: 11px; border-radius: 6px; color: var(--accent); }
 
 .settings-field input.llm-key{display:block;width:100%;margin-bottom:10px;padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--sinan-background);color:inherit;font-size:12.5px}
+
+.search-open-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.search-open-toggle input {
+  appearance: none;
+  width: 32px;
+  height: 20px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--sinan-muted);
+  cursor: pointer;
+}
+
+.search-open-toggle input::before {
+  content: '';
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sinan-surface);
+}
+
+.search-open-toggle input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.search-open-toggle input:checked::before {
+  transform: translateX(12px);
+}
+
+.search-open-toggle input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -49,6 +49,12 @@ export interface PluginInfo {
     "searchProviders": manifest$0.SearchProvider[] | null;
 }
 
+export interface SearchPreferences {
+    "spaceToOpen": boolean;
+    "revision": number;
+    "error"?: string;
+}
+
 export interface Snapshot {
     "plugins": PluginInfo[] | null;
     "diagnostics": string[] | null;

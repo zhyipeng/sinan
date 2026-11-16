@@ -59,7 +59,10 @@ jobs:
         run: |
           node --test packages/plugin-sdk/theme/runtime.test.mjs
           node --test internal/plugin/uihost/gtk_bridge.test.mjs internal/plugin/uihost/webview_bridge.test.mjs
-          node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs
+          node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs apps/desktop/frontend/tests/searchKeyboard.test.mjs
+      - name: Windows search preferences regression
+        if: runner.os == 'Windows'
+        run: go test ./internal/kernel -run '^TestSearchPreferences'
       - name: Windows host update regression
         if: runner.os == 'Windows'
         run: go test ./internal/buildinfo ./internal/hostupdate ./plugins/system-settings/update

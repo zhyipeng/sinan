@@ -8,6 +8,7 @@ import { pluginViews, settingsBridge } from './pluginViews';
 import {UpdateNotice} from '../../../../plugins/system-settings/frontend/Updates';
 import { keyCombination, formatShortcut } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Recovery from './Recovery';
+import { isSearchOpenKey } from './searchKeyboard';
 import PluginViewBoundary from './PluginViewBoundary';
 import type { SettingsSchema } from '../../../../plugins/system-settings/frontend/Settings';
 import { Execute, LauncherStatus, Refresh, ResizeLauncher, Snapshot, StartSearch, CancelSearch, HideLauncher, OpenSettings, OpenPluginCommand, OpenPluginCommandWithInput, DetachShortcutSettings, DetachTrustedView, CloseTrustedView, ClosePluginView, StartPasteSearch, ClearPaste, OpenPasteCommand, ResetToSearch } from '../bindings/sinan/apps/desktop/hostservice';
@@ -23,6 +24,8 @@ function normalize(snapshot: { plugins: (Omit<Plugin, 'commands'> & { commands: 
 
 export default function App() {
   const [data, setData] = useState<Data>({ plugins: [], diagnostics: [] });
+  const [spaceToOpen, setSpaceToOpen] = useState(false);
+  const searchPreferencesRevision = useRef(-1);
   const [query, setQuery] = useState('');
   const [pasted, setPasted] = useState<PastedInput>();
   const [pasteReading, setPasteReading] = useState(false);
@@ -63,6 +66,18 @@ export default function App() {
     setData(normalize(snapshot));
     setConnected(true);
   }
+
+  useEffect(() => {
+    let alive = true;
+    const receive = (state: {spaceToOpen: boolean; revision: number; error?: string}) => {
+      if (!alive || state.revision < searchPreferencesRevision.current) return;
+      searchPreferencesRevision.current = state.revision;
+      setSpaceToOpen(!state.error && state.spaceToOpen);
+    };
+    const off = settingsBridge.search.subscribe(receive);
+    void settingsBridge.search.load().then(receive).catch(() => {});
+    return () => { alive = false; off(); };
+  }, []);
 
   useEffect(() => {
     Snapshot().then(snapshot => { setData(normalize(snapshot)); setConnected(true); })
@@ -374,11 +389,11 @@ export default function App() {
           {pasted.kind==='image' ? <img src={pasted.previewURL} alt="粘贴的图片" /> : <span>{pasted.text.replace(/\s+/g,' ').trim().slice(0,160)}</span>}
         </div> : <svg className={`compass${searching ? ' searching' : ''}`} viewBox="0 0 24 24" aria-hidden="true"><circle cx="11.2" cy="11.2" r="8.2"/><path d="m18.2 18.2 2.4 2.4"/><g className="compass-needle" transform="translate(11.2 11.2) rotate(45)"><path className="compass-tip" d="M0-6.5-2.8.5 0-1 2.8.5Z"/><path className="compass-tail" d="M-2.3 1.7 0 .3 2.3 1.7 0 6.5Z"/></g></svg>}
         <input ref={searchRef} autoFocus spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" aria-label="搜索命令" role="combobox" aria-autocomplete="list" aria-expanded={hasQuery} aria-controls="search-results" aria-activedescendant={hasQuery && commands[selected] ? `search-result-${selected}` : undefined} placeholder={pasted ? "筛选结果…" : pasteReading ? "正在读取图片…" : "搜索…"} onPaste={event=>void handlePaste(event)} value={query} onChange={event => { pasteLoading.current++;setPasteReading(false);setQuery(event.target.value); setSelection({ key: '', manual: false }); setOutput(''); setError(''); }} onKeyDown={event => {
-          if (event.nativeEvent.isComposing) return;
+          if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
           if (event.key === 'Backspace' && pasted && query.length===0) {event.preventDefault();backspacePaste();return;}
           if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1); }
           if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1); }
-          if (event.key === 'Enter' && hasQuery) { event.preventDefault(); choose(selected); }
+          if (isSearchOpenKey(event.nativeEvent, spaceToOpen) && hasQuery) { event.preventDefault(); choose(selected); }
         }} />
         <button className="manage-button" aria-label="管理插件" title="管理插件" onClick={openManager}>···{shortcutError && <span className="warning-dot" />}</button>
         <UpdateNotice bridge={settingsBridge.updates} onOpen={()=>void OpenSettings().catch(()=>setError('无法打开设置。'))}/>
@@ -390,7 +405,7 @@ export default function App() {
           </button>)}
           {!commands.length && <div className="empty">{searching ? '搜索中…' : '没有匹配的命令'}</div>}
         </div>
-        <footer><span>{commands.length} 个结果{searching ? ' · 搜索中…' : searchFailures ? ` · ${searchFailures} 个来源暂不可用` : ''}</span><span>↑ ↓ 选择　↵ 打开　esc 返回 / 隐藏</span></footer>
+        <footer><span>{commands.length} 个结果{searching ? ' · 搜索中…' : searchFailures ? ` · ${searchFailures} 个来源暂不可用` : ''}</span><span>↑ ↓ 选择　{spaceToOpen ? '↵ / 空格' : '↵'} 打开　esc 返回 / 隐藏</span></footer>
       </>}
     </section>}
     {!active && output && <output aria-live="polite">{output}</output>}

@@ -254,12 +254,20 @@ export function SavePluginShortcut(pluginID: string, commandID: string, value: s
     return $Call.ByID(67871415, pluginID, commandID, value, revision);
 }
 
+export function SaveSearchPreferences(spaceToOpen: boolean, revision: number): $CancellablePromise<kernel$0.SearchPreferences> {
+    return $Call.ByID(2382920932, spaceToOpen, revision);
+}
+
 export function SaveShortcut(value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
     return $Call.ByID(2913582280, value, revision);
 }
 
 export function SaveTheme(mode: string, revision: number): $CancellablePromise<protocol$0.ThemeState> {
     return $Call.ByID(1993998295, mode, revision);
+}
+
+export function SearchPreferences(): $CancellablePromise<kernel$0.SearchPreferences> {
+    return $Call.ByID(3764556503);
 }
 
 export function SetPluginEnabled(pluginID: string, enabled: boolean): $CancellablePromise<kernel$0.PluginInfo> {

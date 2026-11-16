@@ -5,5 +5,6 @@ export type {
     PackagePreview,
     PluginDataInfo,
     PluginInfo,
+    SearchPreferences,
     Snapshot
 } from "./models.js";
