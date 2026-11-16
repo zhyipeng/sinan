@@ -160,3 +160,10 @@ UI 使用本地打包 React、BigInt、静态 CSS 和宿主明暗主题，目标
 内置插件与独立官方插件统一使用 40×40 浅色圆角底板与蓝色线条 SVG，规范分别记入各仓库 AGENTS.md；商店内嵌图标与对应源码同步，仅修改资料图标，不改写历史发行资产。图标为静态基础 SVG，不新增平台依赖、协议、权限或主题运行逻辑。
 
 本次 8 个图标通过宿主加载校验，商店资料静态校验、源码一致性及历史发行元数据不变检查通过；官方插件本机 macOS arm64 构建通过。Windows/Linux 构建、三个目标 WebView 的真实显示与 DPI 验收未执行；已安装旧包的图标需等待后续正常版本更新。
+
+
+### 官方图标更新与计算上架
+
+JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.0 已发布并登记到商店，每个版本均有三系统 arm64/amd64 六目标包及摘要。独立官方插件的[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43799988731) 无界面测试与构建通过；30 个包的清单版本、图标、原生架构和 GitHub 资产摘要已核验，实机 UI 仍未验收。
+
+本体提交 a9aebba 的[六目标 CI](https://github.com/zhyipeng/sinan/actions/runs/43799819453)中，macOS/Linux 两种架构通过；Windows amd64/arm64 在 `TestPlatformWindowsApplicationIcons` 的 WScript.Shell 创建中文快捷方式夹具时失败，尚未解决。该失败与独立插件的 CI、发行资产分别记录，不将本体描述为全平台回归通过。
