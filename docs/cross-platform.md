@@ -166,14 +166,13 @@ UI 使用本地打包 React、BigInt、静态 CSS 和宿主明暗主题，目标
 
 JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.0 已发布并登记到商店，每个版本均有三系统 arm64/amd64 六目标包及摘要。独立官方插件的[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43799988731) 无界面测试与构建通过；30 个包的清单版本、图标、原生架构和 GitHub 资产摘要已核验，实机 UI 仍未验收。
 
-本体提交 a9aebba 的[六目标 CI](https://github.com/zhyipeng/sinan/actions/runs/43799819453)中，macOS/Linux 两种架构通过；Windows amd64/arm64 在 `TestPlatformWindowsApplicationIcons` 的 WScript.Shell 创建中文快捷方式夹具时失败，尚未解决。该失败与独立插件的 CI、发行资产分别记录，不将本体描述为全平台回归通过。
+本体提交 a9aebba 的[六目标 CI](https://github.com/zhyipeng/sinan/actions/runs/43799819453)中，macOS/Linux 两种架构通过；Windows amd64/arm64 在 `TestPlatformWindowsApplicationIcons` 的 WScript.Shell 创建中文快捷方式夹具时失败；后续修复与验证见下文。该失败与独立插件的 CI、发行资产分别记录，不将本体描述为全平台回归通过。
 
 
 ### Windows 图标测试夹具修复
 
-`TestPlatformWindowsApplicationIcons` 的快捷方式夹具改用显式 `IShellLinkW` 与 `IPersistFile.Save`，以 UTF-16 设置目标、图标与保存路径，替代在 Windows 两种架构 CI 中保存中文路径失败的 WScript.Shell 自动化。保留中文 ICO、中文 LNK、透明度及自定义快捷方式图标断言，并检查快捷方式确实保存到目标中文路径；不跳过测试、不修改生产图标提取或其余平台实现。COM 对象在固定线程初始化并按逆序释放。
+`TestPlatformWindowsApplicationIcons` 的快捷方式夹具改用显式 `IShellLinkW` 与 `IPersistFile.Save`，以 UTF-16 设置目标、图标与保存路径，替代在 Windows 两种架构 CI 中保存中文路径失败的 WScript.Shell 自动化。保留中文 ICO、中文 LNK，并检查快捷方式确实保存到目标中文路径；COM 对象在固定线程初始化并按逆序释放。
 
-本地 macOS 应用目录竞态回归通过，Windows amd64/arm64 测试程序交叉编译及对应静态检查通过；目标 Windows 测试运行待远端 CI 验证。修复仅涉及无界面测试，不启动应用、WebView 或系统授权窗口。
+自定义图标断言核验输出尺寸、透明角及红色图形的内部像素，拒绝空图标或默认图标；不要求 Shell 渲染的快捷方式图标与直接读取 ICO 的 PNG 字节完全相同，允许覆盖标记或栅格化差异。修复仅涉及无界面测试，不跳过原生用例、不修改生产图标提取或其他平台实现，不启动应用、WebView 或系统授权窗口。
 
-
-首轮远端验证确认中文 LNK 已成功保存；Windows amd64 随后触发原有 PNG 字节完全相等断言。快捷方式由 Shell 渲染，测试改为核验自定义红色图形的内部像素、透明角与输出尺寸，不约束快捷方式覆盖标记或缩放造成的字节差异；仍拒绝返回默认图标。最终六目标结果待下一轮 CI 确认。
+本地 macOS 应用目录竞态回归、Windows amd64/arm64 测试程序交叉编译及对应静态检查通过。提交 `66631a5` 的[六目标 CI](https://github.com/zhyipeng/sinan/actions/runs/43802650469) 全部通过：macOS、Windows、Linux 的 amd64/arm64 原生构建、现有平台无界面回归及归档成功；Windows 两架构实际执行并通过了修复后的图标用例。Windows 仍采用 CI 规定的回归子集，不等同于全仓测试或实机 UI 验收。
