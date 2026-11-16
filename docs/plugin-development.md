@@ -82,7 +82,7 @@ node scripts/build.mjs --dev --plugins-dir /absolute/path/to/plugins
 
 ## 自动发布与目录 PR
 
-标签 `vX.Y.Z` 必须对应 manifest.version。工作流在 Ubuntu 上以 CGO_ENABLED=0 交叉编译 darwin/arm64 和 darwin/amd64，生成 ZIP、SHA-256 及 release.json；仅标签触发发布，手动执行也须选择版本标签。Go 源码先在运行器本机执行测试与静态检查，不在 Linux 运行 macOS 二进制。原生库依赖或其他平台需自行调整运行器/矩阵，不把交叉编译描述为实机验证。
+发布标签优先使用 `<plugin-id>-vX.Y.Z`，ID 和版本必须对应 manifest；兼容既有 `vX.Y.Z`。同仓库内不同插件可使用相同版本号，版本唯一性按插件 ID 判断。工作流在 Ubuntu 上以 CGO_ENABLED=0 交叉编译 darwin/arm64 和 darwin/amd64，生成 ZIP、SHA-256 及 release.json；仅标签触发发布，手动执行也须选择版本标签。Go 源码先在运行器本机执行测试与静态检查，不在 Linux 运行 macOS 二进制。原生库依赖或其他平台需自行调整运行器/矩阵，不把交叉编译描述为实机验证。
 
 GitHub Actions 已固定第三方动作提交，构建任务只有读取仓库权限，发布任务才有 contents 写权限。已存在 Release 不覆盖；部分发布失败需人工处理，不能在同版本静默换包。
 
@@ -97,7 +97,7 @@ GitHub Actions 已固定第三方动作提交，构建任务只有读取仓库�
 
 当前 macOS 动态插件内容使用独立配置的 WKWebView，作为现有 Wails 主窗口的原生子视图呈现在内容区；搜索、设置、插件管理和动态页面在同一个 NSWindow 中切换，页头直接使用可信 Shell 的同一 React 组件。返回移除动态内容并恢复搜索；拆出复用现有 Wails 窗口和整棵原生视图树，再创建新的搜索主窗口。页面不进入可信 WebView 的 DOM 或 React 树，也不获得 Wails Bridge。UI 原生控制器现位于宿主进程，不再声称具备独立 UI 客体进程故障隔离。无后端 React 和 Go + React 模板均沿用该机制，前端不自行打开窗口，不重复绘制宿主标题栏和返回/拆出按钮。
 
-模板选择器显示 React 名称，内部模板类型 html/go-html 保留以兼容已有调用；新项目元数据的 templateVersion 为 3。旧项目不会自动迁移，新项目需先 npm ci 再构建。发布工作流也先执行 npm ci，开发软链接和审核 PR 机制保持。
+模板选择器显示 React 名称，内部模板类型 html/go-html 保留以兼容已有调用；新项目元数据的 templateVersion 为 4。旧项目不会自动迁移，新项目需先 npm ci 再构建。发布工作流也先执行 npm ci，开发软链接和审核 PR 机制保持。
 
 
 插件的宿主页头与插件管理统一使用 58 DIP 高度、箭头返回/拆出、标题/来源分层和主题色；拆出后保留页头并切换为关闭按钮。业务组件只维护下方内容区，不复制导航栏。普通插件页头直接复用可信主窗口组件，现有 HTML 插件同样适用；独立 UI helper 仅保留给探测及历史原生验证，不参与普通页面打开。

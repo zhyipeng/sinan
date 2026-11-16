@@ -25,7 +25,7 @@ import (
 //go:embed templates/*
 var templates embed.FS
 
-const TemplateVersion = "3"
+const TemplateVersion = "4"
 
 type Options struct {
 	Name      string `json:"name"`

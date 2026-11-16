@@ -33,7 +33,7 @@ node scripts/build.mjs --dev --plugins-dir /absolute/path/to/plugins
 
 ## 发布
 
-更新 manifest.version 为 x.y.z，发布标签 vX.Y.Z 时需与清单一致。工作流编译 darwin/arm64、darwin/amd64（CGO_ENABLED=0），产生根目录含 manifest.json 的 ZIP、SHA-256 和 release.json，拒绝覆盖已有 Release。原生库或其他平台需求必须显式调整构建矩阵，不将跨编译当作运行验证。
+更新 manifest.version 为 x.y.z，发布标签优先使用 __PLUGIN_ID__-vX.Y.Z，旧 vX.Y.Z 仍兼容；ID 和版本必须与清单一致。工作流编译 darwin/arm64、darwin/amd64（CGO_ENABLED=0），产生根目录含 manifest.json 的 ZIP、SHA-256 和 release.json，拒绝覆盖已有 Release。原生库或其他平台需求必须显式调整构建矩阵，不将跨编译当作运行验证。
 
 跨仓审核 PR 为可选项：仓库变量 SINAN_REGISTRY_REPOSITORY=owner/repo，秘密 SINAN_REGISTRY_TOKEN 需要目标目录仓库 Contents 与 Pull requests 写权限（私有源仓库还需读取源 Release）。凭据只放在 GitHub Secrets，不写入项目。默认 GITHUB_TOKEN 不具有任意其他仓库写权限。
 

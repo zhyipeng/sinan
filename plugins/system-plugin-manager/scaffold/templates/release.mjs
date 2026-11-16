@@ -6,7 +6,7 @@ const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
 const repository = process.env.GITHUB_REPOSITORY;
 const tag = process.env.RELEASE_TAG;
 const commit = process.env.GITHUB_SHA;
-if (!/^[\w.-]+\/[\w.-]+$/.test(repository ?? '') || tag !== `v${manifest.version}` || !/^[a-f0-9]{40}$/.test(commit ?? '')) throw new Error('仓库、标签或提交元数据无效');
+if (!/^[\w.-]+\/[\w.-]+$/.test(repository ?? '') || ![`v${manifest.version}`, `${manifest.id}-v${manifest.version}`].includes(tag) || !/^[a-f0-9]{40}$/.test(commit ?? '')) throw new Error('仓库、标签或提交元数据无效');
 const assets = [];
 for (const name of (await readdir('dist/release')).filter(name => /^asset-[a-z]+-[a-z0-9]+\.json$/.test(name)).sort()) {
   const asset = JSON.parse(await readFile(`dist/release/${name}`, 'utf8'));

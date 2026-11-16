@@ -49,7 +49,7 @@ node scripts/build.mjs --dev --plugins-dir /absolute/path/to/plugins
 
 ## GitHub Release 与目录审核 PR
 
-`.github/workflows/release.yml` 在推送与清单版本一致的 `vX.Y.Z` 标签时自动构建 darwin/arm64 和 darwin/amd64，生成 ZIP、摘要并发布 Release；手动运行需选择已有版本标签。工作流默认使用 CGO_ENABLED=0，包含原生库时自行调整运行器和构建矩阵。无后端 React 模板同样产出两个架构包，不代表其他平台 UI 已验证。
+`.github/workflows/release.yml` 在推送与清单 ID/版本一致的 `__PLUGIN_ID__-vX.Y.Z` 标签（兼容旧 `vX.Y.Z`）时自动构建 darwin/arm64 和 darwin/amd64，生成 ZIP、摘要并发布 Release；手动运行需选择已有版本标签。工作流默认使用 CGO_ENABLED=0，包含原生库时自行调整运行器和构建矩阵。无后端 React 模板同样产出两个架构包，不代表其他平台 UI 已验证。
 
 可选配置 GitHub 仓库变量 `SINAN_REGISTRY_REPOSITORY`（owner/repo）和 Secrets 中的 `SINAN_REGISTRY_TOKEN`，后者需要目标仓库 Contents 与 Pull requests 写权限。私有源仓库还需该凭据有读取源 Release 权限。未配置目录变量就跳过 PR；配置变量但缺少凭据则明确失败，已发布 Release 保留。跨仓凭据不能用默认 GITHUB_TOKEN 替代。
 

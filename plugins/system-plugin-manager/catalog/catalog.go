@@ -115,6 +115,13 @@ func CompareVersions(a, b string) int {
 	}
 	return 0
 }
+
+// Tags are repository-wide; namespacing lets plugins version independently.
+// Legacy tags remain valid so existing catalog records keep working.
+func validReleaseTag(pluginID, version, tag string) bool {
+	return tag == "v"+version || tag == pluginID+"-v"+version
+}
+
 func (r Release) Compatible() bool {
 	return r.Compatibility.API == "1" && (r.Compatibility.UI == "1" || r.Compatibility.UI == "2") && CompareVersions(HostVersion, r.MinHostVersion) >= 0
 }
@@ -158,7 +165,7 @@ func Validate(e Entry) error {
 	}
 	seen := map[string]bool{}
 	for _, r := range e.Releases {
-		if r.SchemaVersion != 1 || r.PluginID != e.ID || strings.TrimSpace(r.Name) == "" || len([]rune(r.Name)) > 64 || !validVersion(r.Version) || !validVersion(r.MinHostVersion) || !repositoryPattern.MatchString(r.Repository) || r.Tag != "v"+r.Version || r.ReleaseID <= 0 || seen[r.Version] || len(r.Assets) == 0 || len(r.Assets) > 8 {
+		if r.SchemaVersion != 1 || r.PluginID != e.ID || strings.TrimSpace(r.Name) == "" || len([]rune(r.Name)) > 64 || !validVersion(r.Version) || !validVersion(r.MinHostVersion) || !repositoryPattern.MatchString(r.Repository) || !validReleaseTag(r.PluginID, r.Version, r.Tag) || r.ReleaseID <= 0 || seen[r.Version] || len(r.Assets) == 0 || len(r.Assets) > 8 {
 			return errors.New("发布版本记录无效")
 		}
 		if e.Source.Repository == nil || *e.Source.Repository != "https://github.com/"+r.Repository {

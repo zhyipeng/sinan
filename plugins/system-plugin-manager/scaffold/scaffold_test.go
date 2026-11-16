@@ -199,3 +199,72 @@ func installFrontend(t *testing.T, directory string) {
 		t.Fatalf("frontend dependency install failed: %v %s", err, out)
 	}
 }
+
+func TestGeneratedReleaseToolsAcceptIndependentTags(t *testing.T) {
+	result, err := Create(Options{Name: "标签测试", ID: "local.example", Template: "html", Directory: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{"dist/plugin", "dist/release"} {
+		if err := os.MkdirAll(filepath.Join(result.Directory, dir), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(result.Directory, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(result.Directory, "dist/plugin/manifest.json"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(result.Directory, "deny-publish.mjs"), []byte(`import cp from 'node:child_process'; import {syncBuiltinESMExports} from 'node:module'; cp.execFileSync=()=>{throw new Error('unexpected external command')}; syncBuiltinESMExports();`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		python, err = exec.LookPath("python")
+	}
+	if err != nil {
+		t.Fatal("Python required for release packaging checks")
+	}
+	for _, tc := range []struct {
+		tag   string
+		valid bool
+	}{
+		{"v0.1.0", true}, {"local.example-v0.1.0", true},
+		{"other.example-v0.1.0", false}, {"local.example-v0.2.0", false},
+		{"local.example-v0.1.0/../x", false},
+	} {
+		t.Run(tc.tag, func(t *testing.T) {
+			pack := exec.Command(python, "scripts/package.py", tc.tag)
+			pack.Dir = result.Directory
+			pack.Env = append(os.Environ(), "GOOS="+runtime.GOOS, "GOARCH="+runtime.GOARCH)
+			output, err := pack.CombinedOutput()
+			if (err == nil) != tc.valid {
+				t.Fatalf("package validation: %v %s", err, output)
+			}
+			// Remove packaged fixture metadata; intercept all child processes as a
+			// second guard so a regression can never invoke the real gh command.
+			if err := os.RemoveAll(filepath.Join(result.Directory, "dist/release")); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(result.Directory, "dist/release"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			release := exec.Command("node", "--import", "./deny-publish.mjs", "scripts/release.mjs")
+			release.Dir = result.Directory
+			release.Env = append(os.Environ(), "GITHUB_REPOSITORY=example/plugins", "GITHUB_SHA="+strings.Repeat("a", 40), "RELEASE_TAG="+tc.tag)
+			output, err = release.CombinedOutput()
+			if err == nil {
+				t.Fatal("empty release unexpectedly published")
+			}
+			want := "仓库、标签或提交元数据无效"
+			if tc.valid {
+				want = "没有可发布产物"
+			}
+			if !strings.Contains(string(output), want) {
+				t.Fatalf("release validation: %s", output)
+			}
+		})
+	}
+}

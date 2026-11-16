@@ -124,3 +124,7 @@ LLM 配置管理已移到设置插件 0.6.0，通用请求与凭据留在 core�
 独立官方仓库新增 `tools.calendar` 0.1.2，使用 React DayPicker 10.0.2、React 19.3.1 和 chinese-days 1.5.10 本地打包，只读展示月历、农历、节日、节气和中国大陆放假/补班数据。沿用声明式运行时、隔离 HTML UI、桥 2 ready 和包内图标，不新增宿主协议、权限、系统依赖或持久化，All-in-Plugin 边界不变；首发使用 0.1.2，避免覆盖官方仓库已有的 v0.1.0 / v0.1.1 标签。
 
 公历范围 1901–2099，假期数据覆盖 2004–2027，未收录年份显式降级。目标语法沿用 Safari 16.4 / Chromium 119 / Firefox 115；CSS 静态输出并跟随宿主主题，无 CDN、动态 style 注入、平台路径或 X11/Wayland 调用。六平台/架构复用纯前端包，三系统 CI 追加无界面测试与构建。[三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43791121005) 无界面测试与构建通过；[0.1.2 Release](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/v0.1.2) 的六目标包及摘要已正式上传。各目标 OS 的插件实机运行、WKWebView/WebView2/WebKitGTK、输入法、焦点、主题和 DPI 的真实 UI 验证仍未执行，发行状态不代表实机交互验收通过。
+
+## 插件独立发布标签
+
+宿主共享 Go 商店校验、插件脚手架与登记仓库 Python 校验同步接受 `<plugin-id>-v<version>`，兼容旧 `v<version>`。官方仓库提供跨平台 Node 标签生成入口，不依赖 shell 拼接或平台命令；包名、平台枚举、Asset ID/摘要和安装语义不变。三端无需新增原生依赖，但都需更新宿主后才能接受新标签记录；旧客户端可能退回整个目录缓存。历史已上架资产不迁移，目标运行及 UI 验收不由元数据测试替代。见 [ADR 0065](adr/0065-independent-plugin-release-tags.md)。

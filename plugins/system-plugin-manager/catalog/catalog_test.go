@@ -169,3 +169,43 @@ func TestCatalogOfficialOnlyReportsRateLimit(t *testing.T) {
 		t.Fatalf("expected rate-limit error, got %v", err)
 	}
 }
+
+func TestIndependentPluginReleaseTags(t *testing.T) {
+	for _, tc := range []struct {
+		tag   string
+		valid bool
+	}{
+		{"v0.1.0", true}, {"example.store-v0.1.0", true},
+		{"other.store-v0.1.0", false}, {"example.store-v0.2.0", false},
+		{"example.store/v0.1.0", false}, {"example.store-v0.1.0/../x", false},
+		{"example.store-v0.1.0-rc.1", false}, {"", false},
+	} {
+		t.Run(tc.tag, func(t *testing.T) {
+			_, loader, _, _ := serviceFixture(t)
+			entry := loader.snapshot.Entries[0]
+			entry.Releases[0].Tag = tc.tag
+			a := &entry.Releases[0].Assets[0]
+			a.URL = "https://github.com/" + entry.Releases[0].Repository + "/releases/download/" + tc.tag + "/" + a.File
+			if err := Validate(entry); (err == nil) != tc.valid {
+				t.Fatalf("Validate: %v, want valid=%v", err, tc.valid)
+			}
+		})
+	}
+	for _, id := range []string{"tools.calendar", "tools.clipboard"} {
+		_, loader, _, _ := serviceFixture(t)
+		entry := loader.snapshot.Entries[0]
+		entry.ID = id
+		r := &entry.Releases[0]
+		r.PluginID, r.Tag = id, id+"-v"+r.Version
+		a := &r.Assets[0]
+		a.File = id + "-" + r.Version + "-" + a.OS + "-" + a.Arch + ".zip"
+		a.URL = "https://github.com/" + r.Repository + "/releases/download/" + r.Tag + "/" + a.File
+		if err := Validate(entry); err != nil {
+			t.Fatalf("same version in same repository: %s: %v", id, err)
+		}
+		entry.Releases = append(entry.Releases, *r)
+		if Validate(entry) == nil {
+			t.Fatal("same plugin version duplicated")
+		}
+	}
+}

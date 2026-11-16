@@ -15,7 +15,7 @@ if not re.fullmatch(r'[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+', manifest['id']):
 version = manifest['version']
 if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
     raise SystemExit('manifest.version 必须为 x.y.z')
-if len(sys.argv) == 2 and sys.argv[1] != f'v{version}':
+if len(sys.argv) == 2 and sys.argv[1] not in (f'v{version}', f"{manifest['id']}-v{version}"):
     raise SystemExit('Release 标签必须与 manifest.version 一致')
 os_name, arch = os.environ.get('GOOS'), os.environ.get('GOARCH')
 if os_name not in ('darwin', 'linux', 'windows') or arch not in ('amd64', 'arm64'):

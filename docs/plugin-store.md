@@ -22,7 +22,7 @@ JSON 工具 0.4.1 已发布并登记，提供 macOS arm64、amd64 安装包；�
 | --- | --- |
 | schemaVersion、pluginId、name | 记录版本 1，插件 ID 与资料一致，包名称与该发布记录一致 |
 | version、minHostVersion | 三段数值版本；当前宿主版本 0.1.0；不支持预发布标签 |
-| repository、tag、commit、releaseId | owner/repo，v 加版本，40 位源码提交摘要，正整数 Release ID |
+| repository、tag、commit、releaseId | owner/repo，`<plugin-id>-v<version>`（兼容旧 `v<version>`），40 位源码提交摘要，正整数 Release ID |
 | compatibility | apiVersion 为 1；uiBridgeVersion 为 1 或 2 |
 | assets | 当前 OS/架构匹配的发行资产，至少一个、最多八个 |
 
@@ -71,3 +71,9 @@ JSON 工具 0.4.1 已发布并登记，提供 macOS arm64、amd64 安装包；�
 - 同一请求依次尝试候选，任一返回 200/304 即采用；全部失败时按主因归类为「GitHub 请求受限」「插件目录暂不可用」或「无法连接」。已有缓存时仍回退显示缓存并提示。
 - 为兼容镜像的规范化跳转（如 `github.chenc.dev` 将 `https://` 规范化为 `/https:/`），允许与首个请求同主机的 HTTPS 重定向；跨主机重定向继续拒绝。下载重定向仍只允许已批准的 GitHub 资产域名或同主机。
 - 镜像只改变请求出口，不改变目录内容校验、资产 SHA-256、大小、ZIP 解压限制、指纹与信任流程。不读取任何本机 GitHub 凭据。见 [ADR 0052](adr/0052-github-mirror-acceleration.md)。
+
+## 插件独立发布标签
+
+不同插件可在同一源码仓库使用相同版本号。新发布使用 `<plugin-id>-v<version>`，例如 `tools.calendar-v0.1.0` 和 `tools.clipboard-v0.1.0`；标签中的 ID、版本必须与发布记录严格一致。既有 `v<version>` 继续接受，同一插件仍禁止重复版本，文件名和资产校验规则不变。桌面应用自身的 `v<version>` 发布标签不受影响。
+
+这是目录标签约束的兼容扩展，不增加 JSON 字段、权限、SDK 或桥版本；旧宿主会拒绝新格式记录，且可能回退整个目录快照。应先更新宿主，再使用新格式登记发行。现有已发布记录与资产不改写、不降级，未来新增版本无需为其他插件跳号。见 [ADR 0065](adr/0065-independent-plugin-release-tags.md)。

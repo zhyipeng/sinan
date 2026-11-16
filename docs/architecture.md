@@ -428,3 +428,7 @@ Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和
 ### 全局共享 LLM 能力（2026-11-14）
 
 按用户新指令，LLM 配置、加密凭据与通用请求执行由 core 统一提供；配置 UI 属于设置插件，提示词、输入与业务语义属于调用插件。多套全局配置供声明 `llm` 的插件按请求 ID 选择，未指定时采用插件覆盖或全局默认；Key 不返回插件。任务由会话绑定和生命周期取消管理。翻译 0.3.0 移除自己的配置管理和 LLM HTTP 客户端；开发期直接忽略 0.2.0 私有配置，不实现迁移。此段更新 ADR 0063 的 LLM 业务承载安排，加密存储机制继续。见 [ADR 0064](adr/0064-shared-llm-capability.md)。
+
+### 插件独立版本与发布标签
+
+目录接受 `<plugin-id>-v<version>`，并兼容既有 `v<version>`；版本唯一性按插件 ID 判断，同仓库不同插件可使用相同版本号。字段、资源和权限边界不变；旧宿主需升级才能读取新标签记录，发行前按此顺序部署，不改写历史资产。见 [ADR 0065](adr/0065-independent-plugin-release-tags.md)。
