@@ -92,7 +92,7 @@ func (s *Service) Load(ctx context.Context, force bool) (View, error) {
 	for _, p := range s.Backend.Snapshot().Plugins {
 		installed[p.ID] = p
 	}
-	result := View{Entries: []Item{}, Revision: snapshot.Revision, UpdatedAt: snapshot.UpdatedAt, Stale: snapshot.Stale, Notice: snapshot.Notice, OS: runtime.GOOS, Arch: runtime.GOARCH, HostVersion: HostVersion}
+	result := View{Entries: []Item{}, Revision: snapshot.Revision, UpdatedAt: snapshot.UpdatedAt, Stale: snapshot.Stale, Notice: snapshot.Notice, OS: runtime.GOOS, Arch: runtime.GOARCH, HostVersion: HostVersion()}
 	for _, entry := range snapshot.Entries {
 		p := installed[entry.ID]
 		if entry.Icon == "" {

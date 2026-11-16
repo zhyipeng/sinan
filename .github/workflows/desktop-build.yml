@@ -63,6 +63,9 @@ jobs:
       - name: Windows search preferences and clipboard authority regression
         if: runner.os == 'Windows'
         run: go test ./internal/kernel -run '^TestSearchPreferences|^TestClipboardAuthority'
+      - name: Windows catalog host version regression
+        if: runner.os == 'Windows'
+        run: go test ./plugins/system-plugin-manager/catalog -run '^TestPlatformCatalogHostVersion'
       - name: Clipboard validation without desktop access
         if: runner.os == 'Windows'
         run: go test ./internal/clipboard

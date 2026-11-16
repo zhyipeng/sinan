@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sinan/internal/buildinfo"
 	"sinan/internal/plugin/ghmirror"
 	"sinan/internal/plugin/icon"
 	"sinan/internal/plugin/manifest"
@@ -24,7 +25,17 @@ import (
 )
 
 const Repository = "zhyipeng/sinan-plugin-registry"
-const HostVersion = "0.1.0"
+
+// Development builds expose the capabilities of the current source baseline.
+func HostVersion() string {
+	if buildinfo.Version == "dev" {
+		return "0.2.1"
+	}
+	if !buildinfo.ValidVersion(buildinfo.Version) {
+		return "0.0.0"
+	}
+	return buildinfo.Version
+}
 
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 var repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*$`)
@@ -123,7 +134,7 @@ func validReleaseTag(pluginID, version, tag string) bool {
 }
 
 func (r Release) Compatible() bool {
-	return r.Compatibility.API == "1" && (r.Compatibility.UI == "1" || r.Compatibility.UI == "2") && CompareVersions(HostVersion, r.MinHostVersion) >= 0
+	return r.Compatibility.API == "1" && (r.Compatibility.UI == "1" || r.Compatibility.UI == "2") && validVersion(r.MinHostVersion) && buildinfo.Compare(HostVersion(), r.MinHostVersion) >= 0
 }
 func (r Release) Asset(osName, arch string) (Asset, bool) {
 	for _, a := range r.Assets {
