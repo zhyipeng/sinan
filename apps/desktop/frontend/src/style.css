@@ -1409,6 +1409,10 @@ output {
   margin-top: 16px;
 }
 
+.plugin-center > .install {
+  margin: 0 0 14px;
+}
+
 .install > label:first-child {
   display: block;
   font-size: 13px;

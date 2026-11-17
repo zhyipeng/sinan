@@ -143,6 +143,10 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
         <button disabled={busy||projectBusy} aria-expanded={showMore} onClick={()=>setShowMore(value=>!value)}>更多</button>
       </div>
     </div>
+    {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage();}}>
+      <label htmlFor="directory">安装 / 更新插件</label>
+      <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()}>{busy?'处理中…':'安装 / 更新'}</button></div>
+    </form>}
     {tab==='installed'?<div id="installed-panel" role="tabpanel" aria-labelledby="installed-tab">
       <div className="store-toolbar"><input aria-label="搜索已安装插件" placeholder="搜索已安装插件…" value={query} onChange={event=>setQuery(event.target.value)}/><button disabled={busy||projectBusy} onClick={()=>void perform(async()=>{})}>刷新</button></div>
       <div className="store-layout">
@@ -170,10 +174,6 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
         {['failed','cancelled'].includes(task.state)&&<button disabled={tasks.some(other=>other.pluginId===task.pluginId&&['downloading','installing'].includes(other.state))} onClick={()=>void storeBridge.load(true).then(catalog=>storeBridge.install(task.pluginId,task.version,catalog.revision)).catch(reason=>setError(String(reason)))}>重试</button>}
       </div>)}
     </section>}
-    {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage();}}>
-      <label htmlFor="directory">安装 / 更新插件</label>
-      <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()}>{busy?'处理中…':'安装 / 更新'}</button></div>
-    </form>}
 
     {data.diagnostics.map((diagnostic,index)=><p className="error" key={index}>{diagnostic}</p>)}
     {error&&<p className="error" role="alert">{error}</p>}
