@@ -229,3 +229,29 @@ func TestInputMatchScore(t *testing.T) {
 		t.Fatal("legacy score changed")
 	}
 }
+
+func TestHiddenCommandsRequireScopedWindowExecution(t *testing.T) {
+	valid := func() Manifest {
+		return Manifest{ID: "example.capture", Name: "Capture", Version: "0.1.0", APIVersion: "1", Runtime: Runtime{Kind: "process", Entry: "backend/plugin"}, Contributes: Contributions{Commands: []Command{{ID: "capture", Title: "Capture", UIView: "editor", StartHidden: true, Shortcut: "CmdOrCtrl+Shift+A"}, {ID: "region", Title: "Region", SearchOnly: true}}, UIViews: []protocol.UIView{{ID: "editor", Entry: "index.html", BridgeVersion: "2", Commands: []string{"region"}, Permissions: []string{"window.execute"}}}}, ActivationEvents: []string{"onCommand:capture"}}
+	}
+	mf := valid()
+	mf.Contributes.UIViews[0].Permissions = []string{"window.execute", "window.show", "window.hide", "file.savePNG", "file.openImage", "clipboard.read"}
+	if err := mf.Validate(); err != nil {
+		t.Fatal("six separately declared image permissions rejected", err)
+	}
+	mf.Contributes.UIViews[0].Permissions = append(mf.Contributes.UIViews[0].Permissions, "storage")
+	if mf.Validate() == nil {
+		t.Fatal("permission declaration limit ignored")
+	}
+	mf = valid()
+	if err := mf.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*Manifest){func(m *Manifest) { m.Contributes.UIViews[0].Permissions = nil }, func(m *Manifest) { m.Contributes.UIViews[0].BridgeVersion = "1" }, func(m *Manifest) { m.Contributes.Commands[0].UIView = "" }, func(m *Manifest) { m.Contributes.Commands[0].SearchOnly = true }, func(m *Manifest) { m.Permissions = []string{"window.execute"} }} {
+		mf = valid()
+		mutate(&mf)
+		if mf.Validate() == nil {
+			t.Fatal("invalid hidden command accepted")
+		}
+	}
+}

@@ -401,3 +401,28 @@ snapshot, err := host.ClipboardRead(ctx, 0)
 - 宿主把快照经后端 RPC `command.executeImage` 交给同一插件实例，参数为 `{commandId,input:"",image:<PNG base64>}`（Go `CommandParams.Image []byte`）；页面桥请求不含正文，保持 64 KiB/192 KiB、500 ms、单在途及每分钟 120 次限制。仅该后端方法允许小于 6 MiB 的请求帧；SDK 拒绝空图和超过 4 MiB 的图片，普通 `command.execute` 禁止携带图片，普通 RPC 的 1 MiB 限制不变。识别等耗时业务仍应在插件后台异步执行。
 
 UI 与后端权限不互相继承。不增加网络、文件访问或完整 Wails Bridge，不声称独立进程具备安全沙箱。此扩展与 OCR worker 的私有 stdin 管道独立，见 [ADR 0068](adr/0068-session-image-commands.md)。
+
+
+## 隐藏窗口执行（未发布，ADR 0076）
+
+`ui.window-execute.v1` 表示配套宿主支持会话窗口任务。HTML 视图命令的可选 `startHidden: true` 在加载前隐藏所属窗口与主窗口，要求 process、桥 2、关联视图的 `window.execute` 权限，且不能为 searchOnly。普通命令不受影响。
+
+桥请求 `{ "method": "window.execute", "commandId": "capture-region", "input": "" }` 对应 SDK `executeHidden`。只可执行当前视图 commands 中列出的同插件非视图命令，不接受额外身份或窗口参数；沿用 64 KiB 请求、192 KiB 返回、现有资源/调用预算与 CSP，单调用预算 125 秒，撤销取消。宿主隐藏所属窗口和主窗口，任务结束后只恢复仍属于原会话的窗口。其他方法仍为 500ms；WebView2 页面等待仅对该方法为 127 秒，其余为 2 秒。隐藏页面未启动任务时有五秒恢复兜底。
+
+该字段、权限、SDK 与能力尚未发行，不能将 v0.3.1 作为兼容构建；旧宿主会拒绝新清单。第三方 UI 仍不进入可信主页面，不开放完整 Wails Bridge；原生进程没有系统权限沙箱保证。见 [ADR 0076](adr/0076-hidden-window-commands.md)。
+
+window.execute 同日补充：后台 CommandResult.dismiss=true 时，宿主撤销当前临时视图并保持窗口隐藏，不自动呈现结果页面；Text 仅交给插件处理，不参与宿主业务判断。隐藏启动命令通信失败同样结束临时视图，旧会话不能关闭新页面。截图插件仅在有效 PNG 生成后请求呈现后处理。
+
+## 延迟呈现与 PNG 保存（未发布增量）
+
+`ui.image-output.v1` 表示宿主支持以下 UI Bridge 2 增量；已发布 v0.3.1 不支持。视图分别声明 `window.show`、`window.hide`、`file.savePNG` 权限；命令调用还须出现在该视图 `commands` 中。`{method:'window.show'}` / `{method:'window.hide'}` 不接受额外字段，仅控制当前会话窗口；隐藏同步隐藏主窗口。SDK 对应 `showWindow()` / `hideWindow()`。
+
+`CommandResult.keepHidden?:boolean` 仅在 `window.execute` 中控制完成后的恢复；`dismiss` 优先。插件可在读取和解码成功后显式显示，避免提前打开空页面。隐藏启动未开始任务的超时兜底改为清理，不显示编辑器。
+
+`savePNG(commandId,input)` 对应 `{method:'file.savePNG',commandId,input}`，input 为 32 字符不含冒号的上传标识。宿主从声明的导出命令拉取 `<input>:<offset>`，每次返回 CommandResult.text 的 JSON `{size:number,data:base64}`；块不超过 36 KiB、响应不超过 192 KiB，总 PNG 不超过 8 MiB / 3200 万像素，必须完整解码。仅校验成功后弹 Wails 原生保存对话框。选定路径不回传给插件，取消不写文件并返回 `{saved:false}`，成功返回 `{saved:true}`；错误拒绝调用。125 秒请求预算和 WebView2 的 127 秒等待仅扩展至该方法；撤销或超时后不写入，但 Wails 对话框没有通用的强制取消接口。详见 [ADR 0078](adr/0078-screenshot-output-and-presentation.md)。
+
+## 图片文件导入（未发布增量）
+
+`ui.image-input.v1` 增加 `file.openImage` 视图权限和 `{method:'file.openImage'}` / SDK `openImage()`，不接受路径或其他字段。宿主通过当前会话所属窗口弹 Wails 单文件选择对话框；取消返回 null，成功返回已有 UIImage 元数据（url/mimeType/width/height/bytes）。支持 PNG/JPEG/GIF 首帧；源文件最多 8 MiB、1600 万像素，完整解码并转为最多 4 MiB PNG，附加到会话私有资源，选择路径不回传插件。图片读取或解码失败拒绝调用，页面决定保留当前编辑内容。
+
+该方法采用 125 秒预算，WebView2 等待 127 秒；会话撤销后不返回新快照。单视图权限声明上限由 4 调整为 6，所有权限仍须分别声明；普通调用时限、资源/请求/响应和并发预算、CSP 不变。粘贴图片复用已有 `clipboard.readImage`，需视图 `clipboard.read` 权限。详见 [ADR 0079](adr/0079-image-import-and-paste.md)。

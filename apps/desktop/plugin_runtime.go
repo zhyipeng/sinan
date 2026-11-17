@@ -115,8 +115,21 @@ func (h *HostService) openShortcutCommand(owner string) {
 	if id == "" {
 		return
 	}
+	h.embedded.mu.Lock()
+	busy := false
+	for _, entry := range h.embedded.entries {
+		if entry.session != nil && entry.session.Binding().PluginID == id && (entry.executing || entry.awaitingTask) {
+			busy = true
+		}
+	}
+	h.embedded.mu.Unlock()
+	if busy {
+		return
+	}
 	// Capture before showing the Shell. show() also captures targets for ordinary opens.
-	h.launcher.show()
+	if !h.commandStartsHidden(id, command) {
+		h.launcher.show()
+	}
 	h.launcher.mu.Lock()
 	window := h.launcher.window
 	h.launcher.mu.Unlock()
@@ -128,6 +141,18 @@ func (h *HostService) openShortcutCommand(owner string) {
 }
 
 func (h *HostService) callInputHost(ctx context.Context, session *uiview.Session, req protocol.UIRequest) (json.RawMessage, error) {
+	if req.Method == "file.openImage" {
+		return h.callOpenImage(ctx, session)
+	}
+	if req.Method == "file.savePNG" {
+		return h.callSavePNG(ctx, session, req)
+	}
+	if req.Method == "window.show" || req.Method == "window.hide" {
+		return h.callWindowVisibility(ctx, session, req)
+	}
+	if req.Method == "window.execute" {
+		return h.callWindowCommand(ctx, session, req)
+	}
 	if req.Method != "input.paste" || h.embedded == nil {
 		return nil, errors.New("输入接口不可用")
 	}
@@ -139,7 +164,7 @@ func (h *HostService) callInputHost(ctx context.Context, session *uiview.Session
 			break
 		}
 	}
-	if entry == nil || !session.Active() || entry.pasting {
+	if entry == nil || !session.Active() || entry.pasting || entry.executing {
 		h.embedded.mu.Unlock()
 		return nil, errors.New("当前视图不可输入或正在粘贴")
 	}

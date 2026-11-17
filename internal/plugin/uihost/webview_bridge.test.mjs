@@ -6,12 +6,12 @@ import vm from 'node:vm';
 const entry='https://test.sinan.invalid/index.html';
 const script=readFileSync(new URL('webview_page_bridge.js',import.meta.url),'utf8').replaceAll('__SINAN_ENTRY__',JSON.stringify(entry));
 function fixture({top=true,url=entry,sendError=false}={}) {
-  const sent=[], listeners=[], timers=new Map(); let timerID=0;
+  const delays=[], sent=[], listeners=[], timers=new Map(); let timerID=0;
   const page={location:{href:url}, chrome:{webview:{postMessage(data){if(sendError)throw new Error('internal diagnostic');sent.push(structuredClone(data));},addEventListener(name,listener){if(name==='message')listeners.push(listener);}}}};
   page.Document=class { execCommand(command) { return command==='selectAll'; } };
   page.top=top?page:{};
-  vm.runInNewContext(script,{window:page,setTimeout(fn){const id=++timerID;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}});
-  return {page,sent,timers,reply(data){for(const listener of listeners)listener({data});},expire(){for(const fn of [...timers.values()])fn();timers.clear();}};
+  vm.runInNewContext(script,{window:page,setTimeout(fn,delay){delays.push(delay);const id=++timerID;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}});
+  return {page,sent,timers,delays,reply(data){for(const listener of listeners)listener({data});},expire(){for(const fn of [...timers.values()])fn();timers.clear();}};
 }
 
 test('WebView2 facade keeps the existing narrow SDK shape',async()=>{
@@ -73,4 +73,14 @@ test('foreign documents and frames get no compatibility bridge',()=>{
     assert.equal(Object.getOwnPropertyDescriptor(f.page.Document.prototype,'execCommand').configurable,false);
     f.page.print();assert.equal(f.sent.length,0);
   }
+});
+
+test('window execution and native PNG save receive bounded long deadlines',async()=>{
+ const f=fixture();const long=f.page.webkit.messageHandlers.sinanCall.postMessage({method:'window.execute',commandId:'region'});assert.equal(f.delays.at(-1),127000);f.reply({channel:'sinan:reply',id:1,result:{text:'done'}});await long;
+ const save=f.page.webkit.messageHandlers.sinanCall.postMessage({method:'file.savePNG',commandId:'save'});assert.equal(f.delays.at(-1),127000);f.reply({channel:'sinan:reply',id:2,result:{saved:false}});await save;
+ const ordinary=f.page.webkit.messageHandlers.sinanCall.postMessage({method:'command.execute',commandId:'region'});assert.equal(f.delays.at(-1),2000);f.reply({channel:'sinan:reply',id:3,result:{text:'done'}});await ordinary;
+});
+
+test('file.openImage receives the dialog deadline',async()=>{
+ const f=fixture();const opened=f.page.webkit.messageHandlers.sinanCall.postMessage({method:'file.openImage'});assert.equal(f.delays.at(-1),127000);f.reply({channel:'sinan:reply',id:1,result:null});assert.equal(await opened,null);
 });

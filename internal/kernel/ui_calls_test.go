@@ -252,3 +252,98 @@ func TestUIEncryptedStorageIsExplicitAndSessionBound(t *testing.T) {
 	next.Message([]byte(`{"kind":"ready","version":2}`))
 	callUI(t, next, `{"method":"storage.encrypted.get"}`)
 }
+
+func TestWindowCommandsRequireDeclarationAndOriginalSession(t *testing.T) {
+	m := manager(t)
+	s, src := callableUI(t, m)
+	calls := 0
+	m.SetUIHostCall(func(ctx context.Context, session *uiview.Session, req protocol.UIRequest) (json.RawMessage, error) {
+		calls++
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) < 120*time.Second {
+			t.Error("window command lacks bounded long deadline")
+		}
+		return m.ExecuteViewCommand(ctx, session, req.CommandID, req.Input)
+	})
+	request := []byte(`{"method":"window.execute","commandId":"echo","input":"capture-result"}`)
+	if _, err := s.Call(context.Background(), request); err == nil || calls != 0 {
+		t.Fatal("undeclared window operation reached host")
+	}
+	mf, err := manifest.Load(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf.Version = "0.2.0"
+	mf.Contributes.UIViews[0].Permissions = append(mf.Contributes.UIViews[0].Permissions, "window.execute")
+	writeManifest(t, src, mf)
+	if _, err = m.Upgrade(src, true); err != nil {
+		t.Fatal(err)
+	}
+	s = openUI(t, m, "example.native")
+	s.Message([]byte(`{"kind":"ready","version":2}`))
+	result, err := s.Call(context.Background(), request)
+	if err != nil || !strings.Contains(string(result), "capture-result") || calls != 1 {
+		t.Fatal("declared window command failed", string(result), err)
+	}
+	for _, raw := range []string{`{"method":"window.execute","commandId":"crash"}`, `{"method":"window.execute","commandId":"echo","pluginId":"other.plugin"}`, `{"method":"window.execute","commandId":"echo","value":null}`, `{"method":"window.execute","commandId":"echo","method":"window.execute"}`} {
+		if _, err = s.Call(context.Background(), []byte(raw)); err == nil {
+			t.Fatal("invalid window command accepted")
+		}
+	}
+	if calls != 1 {
+		t.Fatal("unauthorized command reached host")
+	}
+	s.Revoke()
+	if _, err = m.ExecuteViewCommand(context.Background(), s, "echo", ""); err == nil {
+		t.Fatal("host revived revoked session")
+	}
+}
+
+func TestImageOutputRequiresViewPermissionAndDeclaredExporter(t *testing.T) {
+	for _, method := range []string{"file.savePNG", "file.openImage", "window.show", "window.hide"} {
+		t.Run(method, func(t *testing.T) {
+			m := manager(t)
+			s, src := callableUI(t, m)
+			calls := 0
+			m.SetUIHostCall(func(_ context.Context, _ *uiview.Session, _ protocol.UIRequest) (json.RawMessage, error) {
+				calls++
+				return json.RawMessage(`null`), nil
+			})
+			request := protocol.UIRequest{Method: method}
+			if method == "file.savePNG" {
+				request.CommandID = "echo"
+				request.Input = strings.Repeat("a", 32)
+			}
+			raw, _ := json.Marshal(request)
+			if _, err := s.Call(context.Background(), raw); err == nil || calls != 0 {
+				t.Fatal("undeclared output reached host")
+			}
+			mf, err := manifest.Load(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mf.Version = "0.2.0"
+			mf.Contributes.UIViews[0].Permissions = []string{method}
+			writeManifest(t, src, mf)
+			if _, err = m.Upgrade(src, true); err != nil {
+				t.Fatal(err)
+			}
+			s = openUI(t, m, "example.native")
+			s.Message([]byte(`{"kind":"ready","version":2}`))
+			if _, err = s.Call(context.Background(), raw); err != nil || calls != 1 {
+				t.Fatal(err, calls)
+			}
+			if method == "file.savePNG" {
+				request.CommandID = "crash"
+				raw, _ = json.Marshal(request)
+				if _, err = s.Call(context.Background(), raw); err == nil || calls != 1 {
+					t.Fatal("undeclared exporter reached host")
+				}
+			}
+			s.Revoke()
+			if _, err = s.Call(context.Background(), raw); err == nil {
+				t.Fatal("revoked view still accessed output")
+			}
+		})
+	}
+}

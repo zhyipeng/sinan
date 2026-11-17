@@ -133,12 +133,18 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		}
 		return marshalUIResult(string(value.Content.Data))
 	}
-	if req.Method == "input.paste" {
+	if req.Method == "input.paste" || req.Method == "window.execute" || req.Method == "window.show" || req.Method == "window.hide" || req.Method == "file.savePNG" || req.Method == "file.openImage" {
 		handler := m.uiHostCall
-		allowed := slices.Contains(view.Permissions, "input.paste")
+		allowed := slices.Contains(view.Permissions, req.Method)
+		if (req.Method == "window.execute" || req.Method == "file.savePNG") && !slices.Contains(view.Commands, req.CommandID) {
+			allowed = false
+		}
 		m.mutationMu.Unlock()
 		if !allowed || handler == nil {
-			return nil, errors.New("此视图未声明输入权限或平台不支持")
+			if req.Method == "window.execute" {
+				return nil, errors.New("此视图未声明窗口执行权限、命令或宿主不支持")
+			}
+			return nil, errors.New("此视图未声明所需权限、命令或宿主不支持")
 		}
 		return handler(ctx, session, req)
 	}
@@ -220,4 +226,26 @@ func attachClipboardImage(session *uiview.Session, content protocol.ClipboardCon
 		return nil, errors.New("图片会话已失效")
 	}
 	return marshalUIResult(image)
+}
+
+// ExecuteViewCommand is host-only: identity, package fingerprint and allowed
+// command are rechecked against the original session before dispatch.
+func (m *Manager) ExecuteViewCommand(ctx context.Context, session *uiview.Session, commandID, input string) (json.RawMessage, error) {
+	if len(input) > uiview.MaxCallBytes {
+		return nil, errors.New("命令参数过长")
+	}
+	binding := session.Binding()
+	p, err := m.lookup(binding.PluginID)
+	if err != nil {
+		return nil, err
+	}
+	if p.fingerprint != binding.Fingerprint {
+		return nil, errors.New("插件会话已替换")
+	}
+	for _, view := range p.manifest.Contributes.UIViews {
+		if view.ID == binding.ViewID {
+			return m.callUIView(ctx, p, session, view, protocol.UIRequest{Method: "command.execute", CommandID: commandID, Input: input}, protocol.UILaunchContext{})
+		}
+	}
+	return nil, errors.New("插件会话不可用")
 }

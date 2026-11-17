@@ -467,3 +467,19 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 ## 主窗口透明度
 
 设置插件通用分类追加主窗口整体透明度滑块。内核负责独立配置、校验及持久化，宿主通过平台适配设置原生窗口不透明度，覆盖文字与同窗口隔离内容；拆出后恢复独立窗口不透明。第三方隔离及公开插件协议、SDK、权限边界不变，平台能力与失败回退见 [ADR 0074](adr/0074-main-window-opacity.md)。
+
+
+### 独立截图插件首版
+
+官方仓库新增未发布 `tools.screenshot` 0.1.0：区域截图、箭头/矩形/文字标注、撤销重做、显式复制与 PNG 保存均属于插件。初始实现见 [ADR 0075](adr/0075-screenshot-plugin.md)。后续按用户要求拆为“截图”和“截图后处理”双入口，新增默认 CmdOrCtrl+Shift+A 全局截图热键；前者隐藏窗口后直接选区，完成后自动进入编辑器，后者只打开编辑器。
+
+通用机制由宿主提供：`startHidden` 命令声明、视图级 `window.execute` 权限及 `ui.window-execute.v1` 能力；SDK executeHidden 只执行当前会话已声明的同插件后台命令；截图取得有效图片后恢复后处理，取消或未生成图片时以既有 dismiss 结果清理临时视图，窗口保持隐藏，撤销或替换后不恢复。普通调用预算、CSP 和 All-in-Plugin 边界不变，截图业务仍在独立插件。需配套本轮宿主，已发布 v0.3.1 不支持；未发布或登记新资产。见 [ADR 0076](adr/0076-hidden-window-commands.md)。
+
+
+### 截图后处理组件
+
+独立截图插件已按用户确认接入固定 Painterro 1.2.92，采用包内源码的可追溯私有构建适配，组件工具与历史留在插件层。样式静态化、图标为 DOM 内静态 SVG、文字直接绘入 Canvas，截图与导出均通过已有桥，不放宽 CSP、不增加宿主协议/SDK/权限。双入口、全局热键与无图片时结束流程不变。适配、许可、缓存预算与无界面验证边界见 [ADR 0077](adr/0077-painterro-screenshot-editor.md)。
+
+截图输出与呈现补充：宿主新增会话限定的 window.show/window.hide、file.savePNG 权限和 ui.image-output.v1 能力；后台仅分块导出 PNG，宿主验证后通过 Wails 原生保存对话框写入用户确认的位置，不暴露路径或任意文件写入接口。window.execute 的 keepHidden 结果支持页面解码成功后再显示，取消/无图继续清理，隐藏页面超时不显示空编辑器。复制成功后的隐藏由插件调用通用窗口能力。见 [ADR 0078](adr/0078-screenshot-output-and-presentation.md)。
+
+截图后处理输入补充：新增会话级 file.openImage 权限及 ui.image-input.v1，宿主原生选图、校验并转为受限 PNG 快照，复用会话资源 URL；业务页面负责导入入口、Command/Ctrl+V 与编辑器载入。图片粘贴沿用 clipboard.readImage，路径与任意文件读取能力不进入页面桥，CSP 不变。视图权限数量上限由 4 调整为 6。见 [ADR 0079](adr/0079-image-import-and-paste.md)。

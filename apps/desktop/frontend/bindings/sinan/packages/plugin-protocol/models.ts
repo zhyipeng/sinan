@@ -4,6 +4,7 @@
 export interface CommandResult {
     "text": string;
     "dismiss"?: boolean;
+    "keepHidden"?: boolean;
 }
 
 /**

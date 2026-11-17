@@ -248,11 +248,11 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		return nil, errors.New("UI 请求无效")
 	}
 	switch req.Method {
-	case "command.execute", "command.executeImage":
+	case "command.execute", "command.executeImage", "window.execute", "file.savePNG":
 		if len(fields) > 3 || fields["revision"] != nil || fields["value"] != nil || req.CommandID == "" {
 			return nil, errors.New("命令请求无效")
 		}
-	case "clipboard.readImage", "clipboard.readText", "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste":
+	case "clipboard.readImage", "clipboard.readText", "llm.config", "storage.get", "storage.encrypted.get", "launch.get", "input.paste", "window.show", "window.hide", "file.openImage":
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}
@@ -281,7 +281,11 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 	default:
 		return nil, errors.New("已有 UI 调用正在处理")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	budget := 500 * time.Millisecond
+	if req.Method == "window.execute" || req.Method == "file.savePNG" || req.Method == "file.openImage" {
+		budget = 125 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	unsubscribe := s.OnRevoke(cancel)
 	defer unsubscribe()

@@ -69,6 +69,7 @@ type SearchProvider struct {
 }
 
 type Command struct {
+	StartHidden     bool                    `json:"startHidden,omitempty"`
 	Shortcut        string                  `json:"shortcut,omitempty"`
 	View            string                  `json:"view,omitempty"`
 	ID              string                  `json:"id"`
@@ -154,6 +155,21 @@ func (m Manifest) Validate() error {
 	for _, c := range m.Contributes.Commands {
 		if c.InputMatchScore != nil && (len(c.InputMatchers) == 0 || math.IsNaN(*c.InputMatchScore) || math.IsInf(*c.InputMatchScore, 0) || *c.InputMatchScore < 0 || *c.InputMatchScore > .95) {
 			return errors.New("内容匹配分数须为 0 到 0.95 的有限数值，并声明输入匹配规则")
+		}
+		if c.StartHidden {
+			allowed := false
+			for _, view := range m.Contributes.UIViews {
+				if view.ID == c.UIView && view.BridgeVersion == protocol.UIRequestBridgeVersion {
+					for _, permission := range view.Permissions {
+						if permission == "window.execute" {
+							allowed = true
+						}
+					}
+				}
+			}
+			if !allowed || c.SearchOnly || m.Runtime.Kind != "process" {
+				return errors.New("后台视图命令需要桥 2、关联视图及 window.execute 权限")
+			}
 		}
 		if c.Shortcut != "" && (c.UIView == "" || len(c.Shortcut) > 128 || strings.TrimSpace(c.Shortcut) != c.Shortcut) {
 			return errors.New("全局快捷键必须关联 HTML 视图命令")
@@ -297,12 +313,12 @@ func validUICapabilities(view protocol.UIView, mf Manifest) bool {
 	}
 	permissions := map[string]bool{}
 	for _, permission := range view.Permissions {
-		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm" && permission != "clipboard.read" && permission != "clipboard.write") {
+		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm" && permission != "clipboard.read" && permission != "clipboard.write" && permission != "window.execute" && permission != "window.show" && permission != "window.hide" && permission != "file.savePNG" && permission != "file.openImage") {
 			return false
 		}
 		permissions[permission] = true
 	}
-	if len(view.Permissions) > 4 || len(view.Commands) > 16 {
+	if len(view.Permissions) > 6 || len(view.Commands) > 16 {
 		return false
 	}
 	seen := map[string]bool{}

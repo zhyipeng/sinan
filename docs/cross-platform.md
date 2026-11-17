@@ -275,3 +275,51 @@ Windows 使用固定 LLVM-MinGW UCRT 工具链及包内对应 C++/线程运行�
 设置「通用」在既有内容后追加透明度滑块，范围 0%–70%，默认 0%，拖动即时应用并持久保存。透明度同时作用于主窗口文字与原生承载的内容；拆出窗口恢复不透明，新主窗口按保存值恢复。macOS 使用 NSWindow alphaValue，Windows 使用 layered HWND 的整体 alpha，Linux GTK3 使用 widget opacity；Linux 检查 screen 合成能力，无合成时明确显示不可用，不以 CSS 背景模拟系统窗口透明。X11/Wayland 的 compositor、WebKit 子视图与 DPI 仍需分别实机核验。详见 [ADR 0074](adr/0074-main-window-opacity.md)。
 
 本轮 macOS arm64 标准 `node scripts/desktop.mjs test`（前端类型检查、生产构建、18 项 JS 及全量 Go 竞态回归）和标准桌面/配套程序构建通过；最终原生改动的定向竞态测试及桌面构建通过，相关 Go 静态检查通过。Linux arm64 无显示服务器、禁网容器中，GTK3 平台/内核/桌面透明度定向竞态回归、静态检查及原生桌面构建通过；平台用例只传 nil 句柄，不创建窗口。Windows amd64/arm64 平台、内核、桌面测试程序交叉编译和静态检查通过，未在 Windows 运行；macOS amd64、Linux amd64 本轮未构建。Windows CI 已追加相关无界面用例，远端未运行。三端真实窗口透明合成、滑块拖动、嵌入/拆出、焦点、DPI 与 Linux X11/Wayland 显示效果未实机验收，不将无界面测试或交叉编译描述为真实 UI 验证；没有发布或修改另外两个插件仓库。
+
+
+### 截图插件首版（未发布）
+
+独立官方 `tools.screenshot` 0.1.0 新增区域捕获与隔离 Canvas 标注。macOS 使用系统 screencapture 并依赖屏幕录制授权；Windows 使用系统 Windows PowerShell/WinForms/GDI，处理虚拟桌面原点与线程 DPI 感知；Linux X11 需要 scrot，Wayland 仅支持可运行 grim/slurp 的 screencopy/layer-shell 合成器，GNOME/KDE Portal 未接入。缺少桌面、工具、授权或能力时明确失败，不宣称通用 Wayland 支持。
+
+保存使用各平台图片目录的 Sinan 子目录；复制复用宿主剪贴板及其 X11/Wayland 工具依赖。原图/导出限制 8 MiB、3200 万像素，Windows 虚拟桌面自身也受像素预算限制；初始分块沿用当前桥预算与 CSP；随后增加双入口、隐藏窗口和全局热键的配套宿主扩展，见下述 ADR 0076。实现、生命周期和本轮验证见 [ADR 0075](adr/0075-screenshot-plugin.md)。
+
+本轮未运行真实系统截图、屏幕授权、系统剪贴板、三端 WKWebView/WebView2/WebKitGTK、多屏/DPI、焦点和隐藏/拆出验收，未发布或上架。六目标后端交叉编译/包检查不能替代 Windows/Linux 目标运行与三端桌面验收；三平台 CI 仅配置接入，尚未远端执行。
+
+本轮 macOS arm64：官方仓库 119 项 JS、11 项 Python、五个后台竞态检查，以及截图六目标静态检查通过；标准全矩阵构建与通用打包通过，截图六个 ZIP 的入口架构、执行位、图标、UI 源构建与摘要一致。临时宿主目录 inspect 和本机真实 stdio 合成图片（约 1 MiB / 29 块）复制失败重试、标识重放拒绝及退出检查通过，系统剪贴板由模拟 Host API 替代。未运行 Windows/Linux 目标二进制，未执行真实截图或 UI 验收。
+
+### 截图双入口与全局热键（未发布）
+
+截图新增“截图”直接选区和“截图后处理”打开编辑器两个入口，默认 macOS Command+Shift+A、Windows/Linux Ctrl+Shift+A；沿用插件热键配置及平台注册。宿主在加载隐藏命令页面前隐藏主窗口，执行受视图权限限制的 window.execute 后恢复原活动会话窗口；热键不预先显示 Shell；同日后续改为仅有有效截图时恢复后处理，取消、无文件、空图片或无效 PNG 时清理临时页面并保持隐藏，已替换或撤销会话不影响新窗口。仅窗口任务调用采用 125 秒预算，WebView2 对应等待 127 秒，其他方法预算不变；SDK 快照及 manifest Schema 同步。实际依赖 ui.window-execute.v1，已发布 v0.3.1 不支持。详见 [ADR 0076](adr/0076-hidden-window-commands.md)。
+
+共用 Wails 窗口和三端隔离承载，不改变系统选区适配；GNOME/KDE Portal、真实多屏/DPI、系统授权、热键与隐藏/恢复焦点仍未验收。登记仓库格式及已有发行资产不变，本轮未发布。验证结果与第一轮区分记录于 ADR 0076。
+
+本轮续验：macOS arm64 标准无界面入口（19 项 JS、全仓 Go 竞态及前端构建）、最终定向窗口任务竞态检查和标准桌面构建通过；官方仓库 121 项 JS、11 项 Python、五个后台竞态检查与截图六目标构建/静态检查通过。六个截图 ZIP 和模拟 Host API 的真实 stdio 合成图上传/失败重试/退出通过，SDK 来源补丁可重放。Windows 两架构 manifest/uiview/kernel/desktop、Linux 两架构共享 manifest/uiview/kernel 测试程序交叉编译及静态检查通过，未在目标系统运行；Linux 桌面与 macOS amd64 宿主本轮未构建。Windows CI 补充窗口任务、隐藏命令与桥预算回归，但远端未执行。未运行真实截图、热键注册、原生 WebView、系统授权、焦点或多屏验收，未安装到现有用户配置或发布。
+
+截图取消补充：使用现有 CommandResult.dismiss 标志实现无图片时结束截图，宿主共用 Go 路径清理当前会话，主窗口重置搜索但保持隐藏，拆出窗口关闭且不呼出主窗口；隐藏启动的命令通信失败也结束临时页面。没有增加原生平台调用、协议字段、权限或 SDK 方法。组件调研仅解析官方资料和 npm 包，不安装、执行或替换候选组件。
+
+取消分支本轮：macOS arm64 标准无界面回归、本机标准构建及最终窗口任务竞态检查通过；官方 121 项 JS、11 项 Python、五个后台竞态检查（截图 10 项 Go 用例）、六目标截图构建/打包及模拟 Host API 的真实 stdio 合成图片检查通过。Windows 两架构桌面测试程序交叉编译和静态检查、截图六目标静态检查通过，未在 Windows/Linux 运行或执行真实系统截图/窗口验收。
+
+
+### Painterro 后处理适配（未发布）
+
+截图编辑器改用固定 Painterro 1.2.92，三端共用私有源码适配和静态 CSS；字体图标改为 DOM SVG 节点，棋盘格改为 CSS，文字用 Canvas，原图用 ImageBitmap，不新增 UI 资源类型或 CSP 许可。保留 Command/Ctrl 与输入法组合处理，归一 wheelDelta/deltaY，释放事件和观察器。后端、系统截图、路径、剪贴板与 Linux X11/Wayland 依赖未改变，GNOME/KDE Portal 仍未接入。
+
+本机 macOS arm64：官方 127 项 JS、11 项 Python 和五个后台竞态检查通过；实际 Painterro 以无浏览器 DOM/模拟 Canvas 验证了工具、裁剪/像素化、历史、文字与导出，不能代替 WebView/CSP 或真实图像渲染验收。六目标截图构建/打包、严格宿主 UI 资源加载与临时目录 inspect、ZIP/许可/摘要检查通过。界面 4 个资源合计 148,227 字节，未放宽宿主预算；未在 Windows/Linux 运行后端或执行三端真实 WebView、截图、系统剪贴板、输入法、焦点、多屏及性能验收。没有发布或上架。详见 [ADR 0077](adr/0077-painterro-screenshot-editor.md)。
+
+截图工具栏样式补充：统一颜色按钮与控制栏尺寸，去掉会叠压标签的上游棋盘格负边距装饰；数值输入使用 12px 字号、固定宽度并隐藏原生步进按钮，布尔项统一为 20px 复选框，保留键盘数值编辑和选中状态。三端复用静态 CSS，未修改协议、SDK、权限或平台适配。14 项截图无界面回归、三端目标 CSS 解析、六目标构建及通用打包通过；界面仍为 4 个资源，当前共 149,935 字节。未启动真实桌面或 WebView，深浅主题、原生输入控件、DPI 和窄窗口视觉效果未实机验收。
+
+### 截图复制、原生保存与延迟呈现（ADR 0078）
+
+截图插件“复制并关闭”及 Command/Ctrl+C 共用成功复制后隐藏窗口的流程；保存改为共享 Go 适配调用 Wails SaveFile，对话框绑定原窗口并复用防失焦机制，取消不写文件。原生后台不再探测各平台图片目录或自动写文件，保存路径仅宿主持有。新增 ui.image-output.v1 与视图权限 window.show/window.hide/file.savePNG；PNG 分块和完整校验在弹窗前完成。有效截图返回 keepHidden，页面载入后再显示；取消/无图清理，隐藏页面未启动的超时处理不再打开空编辑器。
+
+macOS arm64 标准无界面回归及桌面构建通过，新增输出/权限/撤销用例另经 desktop/kernel/uiview 定向竞态回归与 WebView2 页面桥测试通过。官方仓库 129 项 JS、11 项 Python、五个后台竞态检查通过；清除旧固定目录实现后截图后台另经竞态回归。截图六目标构建、通用打包、真实 stdio 的合成 PNG 分块导出/复制失败重试/退出检查通过，SDK 来源补丁重放与摘要复核通过。Windows arm64/amd64 desktop/manifest/uiview/kernel 测试程序交叉编译和 vet 通过；Linux arm64/amd64 共享 manifest/uiview/kernel 交叉编译和 vet 通过，未在目标系统执行，Linux 桌面本轮未原生构建。最终 UI 为 4 个资源、150,246 字节。
+
+三端系统截图、复制后隐藏、原生保存对话框、覆盖确认、焦点和多屏/DPI 未实机验证；未启动桌面、浏览器、WebView 或系统对话框，未访问真实屏幕/系统剪贴板，未安装、发布或新增登记仓库资产。Wails 原生对话框无通用强制取消句柄，超时或撤销后用户仍需关闭已有对话框，返回后不写文件。
+
+### 后处理图片导入与粘贴（ADR 0079）
+
+新增宿主通用 file.openImage 与 ui.image-input.v1，通过 Wails AppKit/Windows/GTK 单文件选择对话框导入 PNG/JPEG/GIF 首帧，完整解码转为当前会话私有 PNG；输入 8 MiB、1600 万像素，输出最多 4 MiB。页面使用 Image.decode/createImageBitmap，不放宽 CSP 或资源预算。粘贴复用 clipboard.readImage，只在用户 Command/Ctrl+V 或原生 paste 时读取；文字输入和输入法组合保留原行为。权限分别声明，单视图权限上限由 4 调整为 6；file.openImage 的对话框预算与 file.savePNG 一致。
+
+macOS arm64 标准宿主无界面回归及桌面构建通过；PNG/JPEG/GIF 规范化、损坏/截断、像素/字节限制、输出编码上限与权限/撤销/请求字段均有无界面覆盖。官方仓库无界面测试、截图六目标构建/通用打包、合成 PNG 的真实 stdio 分块检查及 SDK 来源补丁/摘要检查通过；最终页面用例共 13 项，覆盖直接导入、双平台快捷键、原生 paste、无图/取消/解码失败保留当前图片及迟到结果。Windows arm64/amd64 desktop/manifest/uiview/kernel 测试程序交叉编译和 vet 通过；Linux arm64/amd64 共享 manifest/uiview/kernel 交叉编译和 vet 通过，未执行目标测试程序。Windows CI 补充这些无界面用例，远端未执行。
+
+最终截图 UI 为 4 个资源、151,526 字节。Linux 桌面本轮未原生构建；三端原生文件对话框、选图格式/路径、WebView 图片解码、实际剪贴板、输入法与焦点未实机验证。未启动桌面或浏览器、未读取系统剪贴板、未安装或发布；登记仓库无变化。仍须配套本轮新宿主，旧宿主不支持新权限和能力。

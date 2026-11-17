@@ -23,11 +23,14 @@ type embeddedSurface interface {
 	Done() <-chan struct{}
 }
 type embeddedEntry struct {
-	inputTarget uintptr
-	pasting     bool
-	view        embeddedSurface
-	session     *uiview.Session
-	window      *application.WebviewWindow
+	inputTarget  uintptr
+	pasting      bool
+	executing    bool
+	awaitingTask bool
+	hiddenLaunch bool
+	view         embeddedSurface
+	session      *uiview.Session
+	window       *application.WebviewWindow
 }
 type embeddedViews struct {
 	mu       sync.Mutex
@@ -46,11 +49,27 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	if window == nil {
 		return errors.New("窗口不可用")
 	}
+	hidden := h.commandStartsHidden(id, commandID)
+	if hidden {
+		h.hideCommandWindows(window)
+	}
 	state := h.embedded
 	state.mu.Lock()
 	state.sequence[window]++
 	sequence := state.sequence[window]
 	state.mu.Unlock()
+	opened := false
+	defer func() {
+		if hidden && !opened {
+			state.mu.Lock()
+			current := state.sequence[window] == sequence
+			state.mu.Unlock()
+			if current && ctx.Err() == nil {
+				window.Show()
+				window.Focus()
+			}
+		}
+	}()
 	var session *uiview.Session
 	var err error
 	if content != nil {
@@ -111,7 +130,7 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	h.launcher.mu.Lock()
 	target := h.launcher.inputTarget
 	h.launcher.mu.Unlock()
-	entry = &embeddedEntry{inputTarget: target, view: nativeView, session: session, window: window}
+	entry = &embeddedEntry{inputTarget: target, view: nativeView, session: session, window: window, awaitingTask: hidden, hiddenLaunch: hidden}
 	state.mu.Lock()
 	if state.sequence[window] != sequence || !session.Active() || check != nil && !check() {
 		state.mu.Unlock()
@@ -134,7 +153,9 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	if !h.launcher.isMain(window) {
 		nativeView.SetDetached()
 	}
-	nativeView.Show()
+	if !hidden {
+		nativeView.Show()
+	}
 	binding := session.Binding()
 	h.launcher.mu.Lock()
 	if detached, ok := h.launcher.detached[window.ID()]; ok {
@@ -143,6 +164,10 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	}
 	h.launcher.mu.Unlock()
 	committed = true
+	opened = true
+	if hidden {
+		go h.recoverHiddenView(entry)
+	}
 	window.DispatchWailsEvent(&application.CustomEvent{Name: "plugin-view:open", Sender: "kernel.views", Data: map[string]string{"pluginId": id, "viewId": binding.ViewID, "commandId": commandID, "title": binding.HeaderTitle}})
 	go func() {
 		<-nativeView.Done()

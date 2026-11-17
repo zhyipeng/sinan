@@ -6,6 +6,7 @@
 import * as protocol$0 from "../../../packages/plugin-protocol/models.js";
 
 export interface Command {
+    "startHidden"?: boolean;
     "shortcut"?: string;
     "view"?: string;
     "id": string;
