@@ -238,6 +238,12 @@ Windows 把 `Alt+Space` 当作窗口系统菜单组合，`RegisterHotKey` 注册
 
 [OCR 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.1.0) 已公开并登记商店，最低宿主为 0.3.1；仅 macOS arm64 完整包，约 27.80 MiB。ZIP 已回下载核对摘要、大小、清单、模型摘要、原生架构、执行位、图标和许可；[插件三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43830703763) 通过，但不代表 Windows/Linux 完整 OCR 支持。商店使用真实 Release/Asset ID，其余平台不登记。核验数据见[正式发行结果](research/ocr-release-validation-results.json)。以上不代替真实桌面、系统剪贴板、授权与 WebView 实机验收。
 
+### OCR 0.2.0 六目标原生发行（2026-11-17）
+
+[OCR 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.2.0) 已公开并登记 macOS、Windows、Linux 的 arm64/amd64 六个完整原生包，最低宿主仍为 0.3.1，保留 0.1.0 的既有资产和记录。[原生矩阵](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44006353531) 在六个目标 runner 上通过真实 ZIP 中文/空格路径重定位、11 图各两次、取消和后台退出回收；不是后台交叉编译。独立发布 job 仅解析并复核六份 ZIP、模型、架构、执行位、许可证和报告，公开包摘要与 SHA256SUMS 相符。
+
+Windows 使用固定 LLVM-MinGW UCRT 工具链及包内对应 C++/线程运行库，以 PE GUI 子系统避免后台 conhost；Linux 基线为 Ubuntu 24.04/glibc 2.39 + 系统 libstdc++，X11/xclip、Wayland/wl-clipboard 的宿主依赖不变。模型/字典 UTF-8 路径只在构建私有副本修补，原始上游不变，宿主/SDK/公开协议无改动。跨 ISA 的终端图均可能漏一个点但位置不同，报告保留差异；源文本编辑距离和字符差不劣于既有基准、每图两次稳定，不将合成检查描述为完美准确率。三端真实 WebView、系统剪贴板、输入法、权限、多屏及旧版 macOS 实机仍未验收；Windows/Linux 未做 OS 级禁网。决策见 [ADR 0071](adr/0071-ocr-native-platform-packages.md)，证据见[六目标核验数据](research/ocr-cross-platform-validation-results.json)。
+
 ### 剪贴板历史排序与图片预览
 
 官方剪贴板插件新增复制成功后前移并持久保存排序；左侧按可见项加载缩略图，右侧在可用详情区域等比放大，预览最高 1280×960 并自适应满足既有 192 KiB UI 响应预算。复制保留原始图片，写入失败不前移；索引保存失败明确提示且保留原排序。实现位于独立插件，共用 Go、Canvas/createImageBitmap 与静态 CSS，沿用既有三端引擎目标；不改变宿主协议、SDK、权限、原生系统适配或 X11/Wayland 依赖，无登记仓库格式或发行资产变更。
