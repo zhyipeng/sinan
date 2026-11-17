@@ -234,6 +234,10 @@ export function ResizeLauncher(height: number): $CancellablePromise<void> {
     return $Call.ByID(2198789619, height);
 }
 
+export function SaveAutoStart(enabled: boolean): $CancellablePromise<$models.StartupState> {
+    return $Call.ByID(2526012483, enabled);
+}
+
 export function SaveDetachShortcut(value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
     return $Call.ByID(1332948311, value, revision);
 }
@@ -262,8 +266,16 @@ export function SaveShortcut(value: string, revision: number): $CancellablePromi
     return $Call.ByID(2913582280, value, revision);
 }
 
+export function SaveSilentStartup(enabled: boolean, revision: number): $CancellablePromise<$models.StartupState> {
+    return $Call.ByID(1685425184, enabled, revision);
+}
+
 export function SaveTheme(mode: string, revision: number): $CancellablePromise<protocol$0.ThemeState> {
     return $Call.ByID(1993998295, mode, revision);
+}
+
+export function SaveWindowOpacity(percent: number, revision: number): $CancellablePromise<kernel$0.WindowOpacityPreferences> {
+    return $Call.ByID(2725818883, percent, revision);
 }
 
 export function SearchPreferences(): $CancellablePromise<kernel$0.SearchPreferences> {
@@ -291,6 +303,10 @@ export function StartPasteSearch(sequence: number, value: protocol$0.PasteConten
 
 export function StartSearch(sequence: number, query: string): $CancellablePromise<void> {
     return $Call.ByID(1083380061, sequence, query);
+}
+
+export function StartupSettings(): $CancellablePromise<$models.StartupState> {
+    return $Call.ByID(2922250345);
 }
 
 export function Stop(pluginID: string): $CancellablePromise<void> {
@@ -349,4 +365,8 @@ export function Uninstall(pluginID: string): $CancellablePromise<void> {
  */
 export function UpdateStatus(): $CancellablePromise<update$0.State> {
     return $Call.ByID(3157615900);
+}
+
+export function WindowOpacitySettings(): $CancellablePromise<kernel$0.WindowOpacityPreferences> {
+    return $Call.ByID(698064973);
 }

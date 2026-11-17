@@ -138,9 +138,10 @@ export default function App() {
     void DetachShortcutSettings().then(applyDetachShortcut).catch(() => {});
     const offDetachShortcut = Events.On('detach-shortcut:changed', event => applyDetachShortcut(event.data as {active:string;shortcut:string;revision:number}));
     const offDetached = Events.On('view:detached', () => { detachedRef.current = true; setDetached(true); });
+    const offOpacityError = Events.On('window-opacity:error', event => setError(String(event.data)));
     const offPluginShortcutError = Events.On('plugin-shortcut:error', event => setError(String(event.data)));
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
-    return () => { offShow(); offReset(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); offPluginShortcutError(); };
+    return () => { offShow(); offReset(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); offPluginShortcutError(); offOpacityError(); };
   }, []);
 
   useEffect(() => {

@@ -26,3 +26,11 @@ export interface ShortcutState {
     "error": string;
     "ready": boolean;
 }
+
+export interface StartupState {
+    "silent": boolean;
+    "revision": number;
+    "error"?: string;
+    "autoStart": boolean;
+    "autoStartError": string;
+}

@@ -12,6 +12,7 @@ import (
 	"sinan/internal/plugin/distribution"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/search"
+	"sinan/internal/startup"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
 	"sinan/plugins/system-plugin-manager/catalog"
@@ -23,6 +24,10 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	opacity              *windowOpacityController
+	startupMu            sync.Mutex
+	startup              startup.Registration
+	startupError         string
 	updates              *settingsupdate.Service
 	updatesContext       context.Context
 	updatesCancel        context.CancelFunc

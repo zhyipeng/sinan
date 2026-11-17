@@ -4,12 +4,16 @@ import PluginShortcuts,{type PluginShortcutsBridge} from './PluginShortcuts';
 import Theme,{type ThemeBridge} from './Theme';
 import LLM,{type LLMBridge} from './LLM';
 import Search, {type SearchBridge} from './Search';
+import WindowOpacity, {type WindowOpacityBridge} from './WindowOpacity';
+import Startup, {type StartupBridge} from './Startup';
 import Updates,{type UpdateBridge} from './Updates';
 
 export type SettingsSchema = { id: string; title: string; type: string; options?: { value: string; label: string }[] | null; placeholder?: string | null };
 export type ConfigurablePlugin = { id: string; name: string; uiViews?: {permissions?:string[]|null}[]|null;settings?: SettingsSchema[] | null };
 export type SettingsSnapshot = { revision: number; values: Record<string, string[]> };
 export type SettingsBridge = {
+  startup:StartupBridge;
+  windowOpacity:WindowOpacityBridge;
   search:SearchBridge;
   llm:LLMBridge;
   updates:UpdateBridge;
@@ -132,6 +136,8 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
       <section className="settings-panel" id="settings-panel-general" hidden={category !== 'general'} aria-labelledby="settings-heading-general">
         <header className="settings-panel-heading"><h1 id="settings-heading-general">通用</h1></header>
         <Theme bridge={bridge.theme} />
+        <Startup bridge={bridge.startup} />
+        <WindowOpacity bridge={bridge.windowOpacity} />
       </section>
       <section className="settings-panel" id="settings-panel-search" hidden={category !== 'search'} aria-labelledby="settings-heading-search">
         <header className="settings-panel-heading"><h1 id="settings-heading-search">搜索</h1></header>

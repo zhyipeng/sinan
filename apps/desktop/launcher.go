@@ -24,14 +24,15 @@ type trustedWindow struct {
 }
 
 type launcher struct {
-	inputTarget   uintptr
-	window        *application.WebviewWindow
-	mu            sync.Mutex
-	shortcutError string
-	screenID      string
-	detached      map[uint]trustedWindow
-	newWindow     func() *application.WebviewWindow
-	dialogs       map[*application.WebviewWindow]int
+	inputTarget    uintptr
+	window         *application.WebviewWindow
+	mu             sync.Mutex
+	shortcutError  string
+	opacityPercent int
+	screenID       string
+	detached       map[uint]trustedWindow
+	newWindow      func() *application.WebviewWindow
+	dialogs        map[*application.WebviewWindow]int
 }
 
 func (l *launcher) show() {
@@ -232,6 +233,8 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	replacement := l.newWindow()
 	l.detached[window.ID()] = trustedWindow{window: window, key: key}
 	l.window = replacement
+	restoreOpacity := l.opacityPercent >= 30 && l.opacityPercent < 100
+	l.opacityPercent = 100
 	l.mu.Unlock()
 	window.RegisterKeyBinding("escape", nil)
 	window.SetFrameless(false)
@@ -241,7 +244,15 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	x, y := window.Position()
 	window.SetSize(launcherWidth, launcherMaxHeight)
 	window.SetPosition(x, y)
-	application.InvokeSync(func() { platform.DetachPanel(window.NativeWindow()) })
+	application.InvokeSync(func() {
+		platform.DetachPanel(window.NativeWindow())
+		// A detached view no longer carries the main window's transparency.
+		if restoreOpacity {
+			if err := platform.SetWindowOpacity(window.NativeWindow(), 100); err != nil {
+				window.DispatchWailsEvent(&application.CustomEvent{Name: "window-opacity:error", Data: err.Error(), Sender: "kernel.settings"})
+			}
+		}
+	})
 	window.DispatchWailsEvent(&application.CustomEvent{Name: "view:detached", Sender: "kernel.views"})
 	window.Show()
 	window.Focus()

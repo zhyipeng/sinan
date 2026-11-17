@@ -261,3 +261,17 @@ Windows 使用固定 LLVM-MinGW UCRT 工具链及包内对应 C++/线程运行�
 本机 macOS arm64 通过 `node scripts/desktop.mjs test`（前端构建、18 项 JS 无界面用例及全量 Go 竞态回归），标准入口 `node scripts/desktop.mjs build` 的本机桌面及配套程序构建通过。新增任务用例覆盖无页面参与的实际安装、去重、并发上限、校验失败、取消重试及退出收尾。catalog 测试程序的 macOS/Windows/Linux arm64、amd64 六目标交叉编译通过；Windows CI 已追加任务回归，尚未远端执行。未执行 Windows/Linux 目标运行、三端真实窗口切换、隐藏/拆出及 WebView 交互验收，不把交叉编译视为实机通过；改动尚未发行。
 
 同日后续：任务列表移至「已安装」「发现」之后的独立「下载安装」Tab，并用标准 HTML progress 显示实际下载字节、总大小与百分比。总量来自目录资产，缺失 Content-Length 不影响计算；镜像重试归零，校验和安装分别显示阶段，不模拟安装百分比。沿用三端共享 Go 下载器及 WebView 标准控件，无公开协议、SDK、权限或登记格式变化。本机重新通过完整无界面测试及标准构建；分块下载、缺失响应长度、镜像回退与任务进度快照测试通过竞态检查，distribution / catalog 两个测试程序的六目标交叉编译通过。Windows CI 增补任务与进度用例，远端尚未运行；三端真实 WebView 进度条外观、窗口和 Tab 交互未验收。
+
+
+### 静默启动与开机自启
+
+设置「通用」在外观之后追加两个独立开关，默认关闭。静默启动下次启动生效，以隐藏状态创建主输入框，仍可从托盘和快捷键呼出；开机自启按当前用户登录触发，不强制静默。macOS 使用用户 LaunchAgent，Windows 使用 HKCU Run，Linux 使用 XDG Autostart（需要对应桌面会话支持，X11/Wayland 分别待实机核验）。开发自定义插件目录及探测/验收实例禁止修改系统自启；用户移动程序后需重新开启以更新路径。详见 [ADR 0073](adr/0073-startup-preferences.md)。
+
+本轮 macOS arm64 通过标准入口 `node scripts/desktop.mjs test`（前端类型检查、生产构建、18 项 JS 及全量 Go 竞态回归），新增偏好/注册文件/宿主假注册器竞态测试及相关 Go 静态检查通过；`node scripts/desktop.mjs build` 本机桌面及配套程序构建通过。自启包三系统 arm64/amd64 六目标测试程序交叉编译和静态检查通过，Windows 两架构桌面测试程序交叉编译通过；不代表目标系统测试已运行。三平台 CI 沿用原生构建矩阵，Windows 追加启动偏好与自启无界面检查，尚未远端执行。未修改当前用户真实自启项，未执行实际登录、自启进程启动、真实桌面隐藏/呼出及三端 WebView 验收；未发布或调整插件发行资产。
+
+
+### 主窗口整体透明度
+
+设置「通用」在既有内容后追加透明度滑块，范围 0%–70%，默认 0%，拖动即时应用并持久保存。透明度同时作用于主窗口文字与原生承载的内容；拆出窗口恢复不透明，新主窗口按保存值恢复。macOS 使用 NSWindow alphaValue，Windows 使用 layered HWND 的整体 alpha，Linux GTK3 使用 widget opacity；Linux 检查 screen 合成能力，无合成时明确显示不可用，不以 CSS 背景模拟系统窗口透明。X11/Wayland 的 compositor、WebKit 子视图与 DPI 仍需分别实机核验。详见 [ADR 0074](adr/0074-main-window-opacity.md)。
+
+本轮 macOS arm64 标准 `node scripts/desktop.mjs test`（前端类型检查、生产构建、18 项 JS 及全量 Go 竞态回归）和标准桌面/配套程序构建通过；最终原生改动的定向竞态测试及桌面构建通过，相关 Go 静态检查通过。Linux arm64 无显示服务器、禁网容器中，GTK3 平台/内核/桌面透明度定向竞态回归、静态检查及原生桌面构建通过；平台用例只传 nil 句柄，不创建窗口。Windows amd64/arm64 平台、内核、桌面测试程序交叉编译和静态检查通过，未在 Windows 运行；macOS amd64、Linux amd64 本轮未构建。Windows CI 已追加相关无界面用例，远端未运行。三端真实窗口透明合成、滑块拖动、嵌入/拆出、焦点、DPI 与 Linux X11/Wayland 显示效果未实机验收，不将无界面测试或交叉编译描述为真实 UI 验证；没有发布或修改另外两个插件仓库。

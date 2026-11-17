@@ -21,6 +21,7 @@ import (
 	"sinan/internal/platform"
 	"sinan/internal/plugin/uihost"
 	"sinan/internal/plugin/uiwindows"
+	"sinan/internal/startup"
 	"sinan/internal/theme"
 	pluginmanager "sinan/plugins/system-plugin-manager"
 	settingsupdate "sinan/plugins/system-settings/update"
@@ -100,6 +101,17 @@ func run() error {
 		}
 	}
 	host := &HostService{manager: manager, probeEnabled: *uiProbe, migrationNotice: migrationNotice}
+	host.startupError = "开发和验收实例不支持开机自启"
+	if useBundledPlugins {
+		executable, err := os.Executable()
+		if err == nil {
+			host.startup, err = startup.New(executable)
+		}
+		host.startupError = ""
+		if err != nil {
+			host.startupError = "无法初始化开机自启配置"
+		}
+	}
 	host.updatesContext, host.updatesCancel = context.WithCancel(context.Background())
 	defer host.updatesCancel()
 	appURL := "/"
@@ -157,6 +169,7 @@ func run() error {
 	})
 	manager.SetUIHostCall(host.callInputHost)
 	host.launcher = &launcher{detached: map[uint]trustedWindow{}}
+	host.opacity = &windowOpacityController{manager: manager, apply: host.launcher.setOpacity}
 	var shellSequence uint
 	newShell := func(url string, hidden bool) *application.WebviewWindow {
 		shellSequence++
@@ -201,6 +214,9 @@ func run() error {
 			},
 			BackgroundColour: themeColour(themeState, appearance), URL: url,
 		})
+		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(_ *application.WindowEvent) {
+			go host.restoreWindowOpacity(window)
+		})
 		window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 			if host.launcher.isMain(window) {
 				event.Cancel()
@@ -221,7 +237,9 @@ func run() error {
 
 		return window
 	}
-	window := newShell(appURL, false)
+	startupPrefs, startupErr := manager.StartupPreferences()
+	// Start hidden rather than showing then hiding, to avoid a focus flash.
+	window := newShell(appURL, startupErr == nil && startupPrefs.Silent && !*uiProbe && !*acceptance)
 	host.launcher.window = window
 	host.launcher.newWindow = func() *application.WebviewWindow { return newShell("/", true) }
 	if *pluginUI && !*uiProbe && uihost.EmbeddedSupported {

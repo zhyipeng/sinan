@@ -6,5 +6,6 @@ export type {
     PluginDataInfo,
     PluginInfo,
     SearchPreferences,
-    Snapshot
+    Snapshot,
+    WindowOpacityPreferences
 } from "./models.js";

@@ -59,3 +59,9 @@ export interface Snapshot {
     "plugins": PluginInfo[] | null;
     "diagnostics": string[] | null;
 }
+
+export interface WindowOpacityPreferences {
+    "percent": number;
+    "revision": number;
+    "error"?: string;
+}
