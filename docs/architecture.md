@@ -497,3 +497,11 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 ### 自启服务复用 Wails
 
 按用户指令，开机自启改用当前锁定 Wails 3 的 `app.Autostart`，删除自行维护的三端原生注册代码。已有注册按库状态复用，写入后复核实际状态；静默启动、设置插件边界和开发实例限制保持，详见 [ADR 0082](adr/0082-wails-autostart.md)。
+
+## 2026-11-17 配套发行
+
+[Sinan 0.4.0](https://github.com/zhyipeng/sinan/releases/tag/v0.4.0)、[截图 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.screenshot-v0.1.0) 和 [OCR 0.3.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.3.0) 已公开发行，三者均提供 macOS/Windows/Linux × arm64/amd64 六目标资产。截图及新 OCR 的最低宿主为 0.4.0，OCR 仍是截图的可选依赖。此前“未发布”描述记录开发阶段，以本节发行状态为准。
+
+宿主[六目标原生构建与无界面回归](https://github.com/zhyipeng/sinan/actions/runs/44070459519)、截图[构建与发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44070601312)、OCR[六目标原生验证](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44071389046)及[正式发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44072351423)均成功。OCR 首轮 Windows amd64 的测试观测竞态已修复：worker 在 is_running/status 两次查询间退出时按已退出处理，保留存活超时与其他错误的失败判断，新增三项确定性单元用例；修复后的六目标验证全部通过。
+
+宿主包含依赖与页面交接、窗口保留及 Wails 自启迁移，截图包含编辑器、导入/粘贴、原生保存与 OCR 跳转。以上为原生构建、无界面测试和发行完成，尚未执行真实桌面/WebView、截图授权、焦点、多屏、登录自启和实际安装升级验收；独立进程不构成 OS 沙箱。旧版本资产保持不可变。

@@ -357,3 +357,11 @@ Windows arm64/amd64 desktop/manifest/uiview/kernel 测试程序交叉编译和 v
 macOS 13+ 有效 bundle 由 Wails 使用 SMAppService，其他支持场景采用 LaunchAgent；库的 LaunchAgent 分支会尝试 bootstrap/bootout，不能沿用旧代码「不立即加载」的保证。Windows/Linux 继续由库提供当前用户 Run/XDG 自启；Linux 桌面会话与 X11/Wayland 运行依赖、搬迁路径及系统策略仍需实机验证。详见 [ADR 0082](adr/0082-wails-autostart.md)。
 
 本轮 macOS arm64 标准 `node scripts/desktop.mjs test`（前端类型检查、构建、JS 无界面回归与全量 Go 竞态检查）和 `node scripts/desktop.mjs build` 通过；新增 Wails 假服务定向竞态用例与桌面静态检查通过。Linux arm64 无显示服务器、禁网容器中，GTK3 桌面定向竞态测试、静态检查及原生桌面构建通过；Windows amd64/arm64 桌面测试程序交叉编译、静态检查通过，未在 Windows 执行。macOS amd64、Linux amd64 本轮未构建。CI 已移除被删除内部包的引用，远端未运行。没有调用真实 Wails 自启服务、创建 application、修改本机登录项或触发系统授权/原生 UI；三端登录、自启进程、旧注册迁移、系统批准与真实桌面行为尚未验收，未发布。
+
+## 2026-11-17 配套发行
+
+[Sinan 0.4.0](https://github.com/zhyipeng/sinan/releases/tag/v0.4.0)、[截图 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.screenshot-v0.1.0) 和 [OCR 0.3.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.3.0) 已公开发行，三者均提供 macOS/Windows/Linux × arm64/amd64 六目标资产。截图及新 OCR 的最低宿主为 0.4.0，OCR 仍是截图的可选依赖。此前“未发布”描述记录开发阶段，以本节发行状态为准。
+
+宿主[六目标原生构建与无界面回归](https://github.com/zhyipeng/sinan/actions/runs/44070459519)、截图[构建与发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44070601312)、OCR[六目标原生验证](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44071389046)及[正式发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44072351423)均成功。OCR 首轮 Windows amd64 的测试观测竞态已修复：worker 在 is_running/status 两次查询间退出时按已退出处理，保留存活超时与其他错误的失败判断，新增三项确定性单元用例；修复后的六目标验证全部通过。
+
+宿主包含依赖与页面交接、窗口保留及 Wails 自启迁移，截图包含编辑器、导入/粘贴、原生保存与 OCR 跳转。以上为原生构建、无界面测试和发行完成，尚未执行真实桌面/WebView、截图授权、焦点、多屏、登录自启和实际安装升级验收；独立进程不构成 OS 沙箱。旧版本资产保持不可变。
