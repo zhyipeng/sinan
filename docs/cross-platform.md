@@ -230,3 +230,10 @@ JSON 工具 0.4.4、剪贴板 0.1.2、翻译 0.3.1、日历 0.1.3 和计算 0.1.
 ### Windows 呼出快捷键 Alt+Space
 
 Windows 把 `Alt+Space` 当作窗口系统菜单组合，`RegisterHotKey` 注册后前台窗口仍会收到 `WM_SYSCOMMAND`/`SC_KEYMENU` 并弹出标题栏右键菜单，导致设置无法录入该热键。宿主现通过 Wails `WndProcInterceptor` 在自有窗口内吞掉该系统菜单消息：录入时原生捕获 `Alt+Space` 并投递 `shortcut:recorded`，已配置时交给全局热键的 `WM_HOTKEY` 切换；未配置且未录入时保持系统默认菜单。为避免 UI 消息线程等待控制器锁，录入与配置状态分别用原子布尔值暴露，并在快捷键变更回调中刷新。该实现仅 Windows 构建安装拦截器，不修改全局热键注册、插件协议、SDK 或设置存储格式。新增消息判定与规范化单元测试，Windows amd64 本机 `go vet` 及相关用例通过；Windows 真实桌面、WebView2 键盘与系统菜单、macOS/Linux 真实输入法与焦点仍未实机验收。详见 [ADR 0070](adr/0070-windows-alt-space-shortcut.md)。
+
+
+### OCR 与宿主正式发行核验（2026-11-17）
+
+[Sinan v0.3.1](https://github.com/zhyipeng/sinan/releases/tag/v0.3.1) 已公开，[六目标原生发布流水线](https://github.com/zhyipeng/sinan/actions/runs/43831907925) 全部成功，六个公开归档的 GitHub SHA-256 与 SHA256SUMS 已逐项核对。首发对应源码 d7fc059；随后源码的自适应管道截止时间、迁移及开发启动修复不据此声称已进入同一发行资产。v0.3.0 未公开，旧标签保留。
+
+[OCR 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.1.0) 已公开并登记商店，最低宿主为 0.3.1；仅 macOS arm64 完整包，约 27.80 MiB。ZIP 已回下载核对摘要、大小、清单、模型摘要、原生架构、执行位、图标和许可；[插件三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43830703763) 通过，但不代表 Windows/Linux 完整 OCR 支持。商店使用真实 Release/Asset ID，其余平台不登记。核验数据见[正式发行结果](research/ocr-release-validation-results.json)。以上不代替真实桌面、系统剪贴板、授权与 WebView 实机验收。

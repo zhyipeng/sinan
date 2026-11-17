@@ -391,9 +391,9 @@ snapshot, err := host.ClipboardRead(ctx, 0)
 平台依赖及未验收边界见 [ADR 0066](adr/0066-host-clipboard-api.md) 与[跨平台适配](cross-platform.md)。
 
 
-## 会话图片命令（工作树新增，未发布）
+## 会话图片命令（宿主 v0.3.1）
 
-初始化能力 `ui.image-command.v1` 表示宿主支持以下 UI Bridge 2 扩展。不能将已发布 v0.2.1 或相同 API 1 视为具备此能力；原生插件应检查 `hostCapabilities`，不支持时明确报错。
+初始化能力 `ui.image-command.v1` 表示宿主支持以下 UI Bridge 2 扩展，首次完整公开发行版本为 v0.3.1（v0.3.0 已取消发行）。不能将 v0.2.1 或相同 API 1 视为具备此能力；原生插件应检查 `hostCapabilities`，不支持时明确报错。
 
 - `readClipboardImage()` → `{method:"clipboard.readImage"}`，须在当前视图声明 `clipboard.read`。宿主显式读取一次系统剪贴板，验证静态 PNG（最多 4 MiB、16,777,216 像素并完整解码），返回与 `launch.image` 相同的 `{url,mimeType,width,height,bytes}`，不把图片正文返回页面。非图片返回 null（快捷键可保留普通文本粘贴）；平台不可用/无效图片/超限报错。此调用不是剪贴板监听，也不承诺与浏览器 paste event 的 Blob 相同；调用者应在用户粘贴或点击识别时使用，并让预览与后台共同使用返回的快照。
 - `executeImage(commandId,url)` → `{method:"command.executeImage",commandId,input:url}`。命令须在当前视图 `commands` 白名单中，URL 必须精确指向当前会话持有的图片；不接受文件路径、其他会话、普通 bundle 资源或页面图片正文。读取主输入框显式带入的 `launch.image` 无须额外剪贴板权限。

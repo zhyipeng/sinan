@@ -82,3 +82,10 @@ GitHub 的 [runner 文档](https://docs.github.com/en/actions/reference/runners/
 ### v0.3.0 取消与 v0.3.1 发布准备
 
 发行前补充无界面传输检查发现，UI helper 客户端仍以普通包资源的 512 KiB 限制拒绝较大原图；WebView2 也需在新剪贴板图片响应和图片命令请求中转换会话地址。v0.3.0 发布流水线已主动取消，无公开 Release，保留标签。v0.3.1 将会话 PNG 的 helper 客户端上限对齐 4 MiB，并仅在专用图片字段转换 WebView2 私有 HTTPS origin，普通命令/存储值不改写，重复字段在重编码前拒绝。新增真实私有管道 4 MiB 交付及 WebView2 往返地址的无界面测试。OCR 商店最低宿主改为 0.3.1；其他平台/真实 UI 验收边界不变。
+
+
+### v0.3.1 已公开
+
+2026-11-17 核验：[v0.3.1 Release](https://github.com/zhyipeng/sinan/releases/tag/v0.3.1) 已公开，[六目标流水线](https://github.com/zhyipeng/sinan/actions/runs/43831907925) 全部通过。六个公开归档的 GitHub SHA-256 与 SHA256SUMS 已核对；发行标签对应 d7fc059，后续源码修复另行发行，不改写既有资产。
+
+配套 [OCR 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.1.0) 已公开并上架，最低宿主 0.3.1，仅提供 macOS arm64 完整包。[三平台插件 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43830703763) 通过；真实桌面、系统剪贴板和 UI 验收仍未执行。完整摘要和资产身份见[发行核验数据](research/ocr-release-validation-results.json)。

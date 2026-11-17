@@ -445,9 +445,9 @@ Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和
 
 官方仓库本地实现 `tools.ocr` 0.1.0，复用现有剪贴板和 UI Bridge 2，以异步命令及租约承接识别，业务与模型留在插件层。每任务启动独立 native worker，通过私有 stdin 管道感知父进程退出；正常取消后 Wait 回收，后台强杀时 worker 自行退出，并设独立硬超时。没有扩展宿主对任意后代进程的回收能力，没有新增公共协议、SDK 或 Wails Bridge。
 
-macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证；完整原生打包暂限 macOS 本机目标，Windows/Linux 明确未适配完成，六目标后台编译不能替代完整插件支持。首轮仅显式识别剪贴板图片；下述会话图片扩展已补充主搜索图片匹配，仍未实现截图捕获。未发布或实机 UI 验收。详细决策、权限及验证边界见 [ADR 0067](adr/0067-ocr-private-worker-lifecycle.md)。
+macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证；完整原生打包暂限 macOS 本机目标，Windows/Linux 明确未适配完成，六目标后台编译不能替代完整插件支持。首轮仅显式识别剪贴板图片；下述会话图片扩展已补充主搜索图片匹配，仍未实现截图捕获。发行状态见下述正式发行记录，实机 UI 仍未验收。详细决策、权限及验证边界见 [ADR 0067](adr/0067-ocr-private-worker-lifecycle.md)。
 
 
 ## 会话图片交付与 OCR 图片入口
 
-工作树新增 `ui.image-command.v1`：宿主将当前会话 PNG 快照交给已授权的同插件后台命令，页面只传会话图片 URL；另提供受视图权限约束的剪贴板图片快照及预览资源。OCR 注册 image matcher、带图打开后自动识别，页面图片粘贴使用同一快照完成预览和识别，复制快捷键保留选区。图片校验、替换/撤销、独立后端帧预算与跨仓库兼容见 [ADR 0068](adr/0068-session-image-commands.md)；业务与 worker 留在插件层。新增接口尚未发布，已发布 v0.2.1 不支持，真实三端 WebView/剪贴板仍未验收。
+宿主 v0.3.1 新增 `ui.image-command.v1`：宿主将当前会话 PNG 快照交给已授权的同插件后台命令，页面只传会话图片 URL；另提供受视图权限约束的剪贴板图片快照及预览资源。OCR 注册 image matcher、带图打开后自动识别，页面图片粘贴使用同一快照完成预览和识别，复制快捷键保留选区。图片校验、替换/撤销、独立后端帧预算与跨仓库兼容见 [ADR 0068](adr/0068-session-image-commands.md)；业务与 worker 留在插件层。新增接口已随 v0.3.1 公开发行，v0.2.1 不支持；OCR 0.1.0 已上架 macOS arm64，真实三端 WebView/剪贴板仍未验收。

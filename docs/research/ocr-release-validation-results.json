@@ -1,0 +1,202 @@
+{
+  "date": "2026-11-17",
+  "host": {
+    "tag": "v0.3.1",
+    "commit": "d7fc0591f04d1fce5cfd0129f0514b4a59b20866",
+    "workflow": "https://github.com/zhyipeng/sinan/actions/runs/43831907925",
+    "status": "published",
+    "releaseId": 446827448,
+    "publishedAt": "2026-11-16T09:29:16Z",
+    "assets": [
+      {
+        "id": 754236306,
+        "name": "SHA256SUMS.txt",
+        "size": 580,
+        "digest": "sha256:e3e0e4b5e5c03a2bbbb0d67b7e4e6a6e02d09fdea1173b18ce741424ace67e65"
+      },
+      {
+        "id": 754236228,
+        "name": "Sinan-0.3.1-linux-amd64.tar.gz",
+        "size": 21326204,
+        "digest": "sha256:0dfdc2045dfed3d5c3f1d73365049e0097a727c728de2b271569ace06afc33c6"
+      },
+      {
+        "id": 754236300,
+        "name": "Sinan-0.3.1-linux-arm64.tar.gz",
+        "size": 19525242,
+        "digest": "sha256:7e11945f96281aa448da4e719cf6b2be0f70b441af9470554a28d7b40bdf115a"
+      },
+      {
+        "id": 754236234,
+        "name": "Sinan-0.3.1-macos-amd64.tar.gz",
+        "size": 23953810,
+        "digest": "sha256:72e1fc0487813474f64d8b5da12d7d20fe91e0366808b1f99afc8733d604bc7e"
+      },
+      {
+        "id": 754236224,
+        "name": "Sinan-0.3.1-macos-arm64.tar.gz",
+        "size": 22014088,
+        "digest": "sha256:6b2fc894bb50c3b70d06a5c4d9fced7ea44c97856f3fbf96ad33ee11b78abf0f"
+      },
+      {
+        "id": 754236231,
+        "name": "Sinan-0.3.1-windows-amd64.zip",
+        "size": 22907645,
+        "digest": "sha256:86e5dc1baa79642882682add1bbb6465f8d945b6795bc207306827e8179bd7a3"
+      },
+      {
+        "id": 754236229,
+        "name": "Sinan-0.3.1-windows-arm64.zip",
+        "size": 20977395,
+        "digest": "sha256:d85e86532035f471887e6ca2b95531b5371d124de35080a9008667d4c3575225"
+      }
+    ]
+  },
+  "plugin": {
+    "tag": "tools.ocr-v0.1.0",
+    "commit": "20ee8077ff9e77d76618723f465812f315e49704",
+    "workflow": "https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43830703763",
+    "ci": "success",
+    "package": {
+      "id": "tools.ocr",
+      "version": "0.1.0",
+      "os": "darwin",
+      "arch": "arm64",
+      "file": "tools.ocr-0.1.0-darwin-arm64.zip",
+      "sha256": "82457315c39628673aecfa6c1ef676ba02e3c1259ee457da5aa8e5e180f33a0a",
+      "size": 29149980
+    },
+    "status": "published",
+    "releaseId": 446765683,
+    "publishedAt": "2026-11-17T01:59:45Z",
+    "assets": [
+      {
+        "id": 754044824,
+        "name": "tools.ocr-0.1.0-darwin-arm64.zip",
+        "size": 29149980,
+        "digest": "sha256:82457315c39628673aecfa6c1ef676ba02e3c1259ee457da5aa8e5e180f33a0a",
+        "downloadUrl": "https://github.com/zhyipeng/sinan-official-plugins/releases/download/tools.ocr-v0.1.0/tools.ocr-0.1.0-darwin-arm64.zip"
+      },
+      {
+        "id": 754044823,
+        "name": "tools.ocr-0.1.0-darwin-arm64.zip.sha256",
+        "size": 99,
+        "digest": "sha256:8330a3e067c8051ba911a938ed80fbb0e74939abc8b5e3be79a2e24c2f3f24f2",
+        "downloadUrl": "https://github.com/zhyipeng/sinan-official-plugins/releases/download/tools.ocr-v0.1.0/tools.ocr-0.1.0-darwin-arm64.zip.sha256"
+      }
+    ]
+  },
+  "minHostVersion": "0.3.1",
+  "local_tests": [
+    "host full headless test + race passed",
+    "4 MiB resource through real private helper pipe passed",
+    "WebView2 URL translation, duplicate fields, unmodified user data passed",
+    "official 108 JS + 3 packaging + four backend race suites passed",
+    "OCR six-target backend build/vet passed",
+    "SDK bytes match recorded source commit",
+    "remote ZIP SHA, models, licenses, manifest, Mach-O arm64 and executable modes passed"
+  ],
+  "native_stdio": {
+    "cases": [
+      {
+        "name": "light",
+        "matches_native_baseline": true,
+        "start_ms": 0.2610000083222985,
+        "text_sha256": "1431d02323cb682d85d63035c9bbef9b5d8edef182f3cfd79d368636ce8961e3"
+      },
+      {
+        "name": "dark",
+        "matches_native_baseline": true,
+        "start_ms": 0.09145797230303288,
+        "text_sha256": "bbbaa0a167b67c8cc292969dc02119a8f1b0b943894348decf47fece2e4c6615"
+      },
+      {
+        "name": "small_12px",
+        "matches_native_baseline": true,
+        "start_ms": 0.06583298090845346,
+        "text_sha256": "b3f7088aca4aa30288236110459c757decf9234a2852b33a03f3db1435d9a7a3"
+      },
+      {
+        "name": "low_contrast",
+        "matches_native_baseline": true,
+        "start_ms": 0.14104205183684826,
+        "text_sha256": "cccbd6cdeec4155526db3f0254aa0d34b73443d37eb6ef49f1ad09f446129432"
+      },
+      {
+        "name": "rotated_3deg",
+        "matches_native_baseline": true,
+        "start_ms": 0.11024996638298035,
+        "text_sha256": "bbbaa0a167b67c8cc292969dc02119a8f1b0b943894348decf47fece2e4c6615"
+      },
+      {
+        "name": "transparent",
+        "matches_native_baseline": true,
+        "start_ms": 0.08862500544637442,
+        "text_sha256": "1431d02323cb682d85d63035c9bbef9b5d8edef182f3cfd79d368636ce8961e3"
+      },
+      {
+        "name": "terminal",
+        "matches_native_baseline": true,
+        "start_ms": 0.09516708087176085,
+        "text_sha256": "f2e35c4a3243b06fa65f377e9120c28feb174857febf9f73a971f7d57b310a67"
+      },
+      {
+        "name": "dense",
+        "matches_native_baseline": true,
+        "start_ms": 0.07658300455659628,
+        "text_sha256": "9058978f130d39c6964a40b2d39b19e1fe78094177486628d23ea0e3bff2b4dc"
+      },
+      {
+        "name": "two_columns",
+        "matches_native_baseline": true,
+        "start_ms": 0.08479203097522259,
+        "text_sha256": "c8497d2a264b13c4be184232bc10f54e2dee02bd84a1bfe1f5ca16f5d8e99165"
+      },
+      {
+        "name": "table",
+        "matches_native_baseline": true,
+        "start_ms": 0.08974992670118809,
+        "text_sha256": "6684604d246fe2492e00b962298a042c748f8c9ff7be97b24f5fa8a6582ea513"
+      },
+      {
+        "name": "blank",
+        "matches_native_baseline": true,
+        "start_ms": 0.09975000284612179,
+        "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "normal_open_did_not_read_clipboard": true,
+    "single_worker_enforced": true,
+    "session_image_without_clipboard_read": true,
+    "non_image_rejected": true,
+    "explicit_cancel_reaped_worker": true,
+    "backend_kill_worker_exited": true,
+    "backend_kill_to_worker_exit_ms": 12.409958057105541,
+    "os_network_denied": true,
+    "real_clipboard_accessed": false
+  },
+  "cancelled_host_tag": {
+    "tag": "v0.3.0",
+    "workflow": "https://github.com/zhyipeng/sinan/actions/runs/43830258103",
+    "reason": "发现原有 helper 大图资源限制和 WebView2 图片转换缺口；发布前主动取消，无公开 Release，旧标签保留"
+  },
+  "not_verified": [
+    "真实桌面/WebView、系统剪贴板、权限与焦点",
+    "macOS amd64 完整 OCR 包",
+    "Windows/Linux 完整 OCR 包",
+    "macOS 12.0 实机运行；仅核对构建最低版本"
+  ],
+  "host_image_transport_sha256": {
+    "internal/plugin/uiprocess/client.go": "2dc393605437c8bf2023eca9806d086c8a473bb4362082422aab8c39e7928cc8",
+    "internal/plugin/uihost/webview_transport.go": "00bcf3f8fa062fbb8a2fe39f575df5467850991ddef4d41cb9c450a08ab78d1b"
+  },
+  "registry": {
+    "commit": "27f28015aa92c67b8f7eb709fe72988f05fd95dd",
+    "minHostVersion": "0.3.1",
+    "assetTargets": [
+      "darwin-arm64"
+    ],
+    "static_check": "passed",
+    "unit_tests": 4
+  }
+}
