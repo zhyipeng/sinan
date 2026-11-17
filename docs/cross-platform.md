@@ -237,3 +237,9 @@ Windows 把 `Alt+Space` 当作窗口系统菜单组合，`RegisterHotKey` 注册
 [Sinan v0.3.1](https://github.com/zhyipeng/sinan/releases/tag/v0.3.1) 已公开，[六目标原生发布流水线](https://github.com/zhyipeng/sinan/actions/runs/43831907925) 全部成功，六个公开归档的 GitHub SHA-256 与 SHA256SUMS 已逐项核对。首发对应源码 d7fc059；随后源码的自适应管道截止时间、迁移及开发启动修复不据此声称已进入同一发行资产。v0.3.0 未公开，旧标签保留。
 
 [OCR 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.1.0) 已公开并登记商店，最低宿主为 0.3.1；仅 macOS arm64 完整包，约 27.80 MiB。ZIP 已回下载核对摘要、大小、清单、模型摘要、原生架构、执行位、图标和许可；[插件三平台 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43830703763) 通过，但不代表 Windows/Linux 完整 OCR 支持。商店使用真实 Release/Asset ID，其余平台不登记。核验数据见[正式发行结果](research/ocr-release-validation-results.json)。以上不代替真实桌面、系统剪贴板、授权与 WebView 实机验收。
+
+### 剪贴板历史排序与图片预览
+
+官方剪贴板插件新增复制成功后前移并持久保存排序；左侧按可见项加载缩略图，右侧在可用详情区域等比放大，预览最高 1280×960 并自适应满足既有 192 KiB UI 响应预算。复制保留原始图片，写入失败不前移；索引保存失败明确提示且保留原排序。实现位于独立插件，共用 Go、Canvas/createImageBitmap 与静态 CSS，沿用既有三端引擎目标；不改变宿主协议、SDK、权限、原生系统适配或 X11/Wayland 依赖，无登记仓库格式或发行资产变更。
+
+本机通过剪贴板 Go 竞态回归、静态检查、3 项前端无界面测试和 macOS/Windows/Linux arm64、amd64 六目标交叉构建。未执行 Windows/Linux 目标运行及三端 WKWebView/WebView2/WebKitGTK、DPI、真实系统剪贴板与交互验收；插件改动尚未发布，交叉构建不代表实机通过。
