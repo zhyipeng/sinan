@@ -73,9 +73,9 @@ Linux UI 要求 WebKitGTK 引擎版本至少 2.40，使用独立 ephemeral Conte
 
 ## Windows WebView2 隔离内容承载
 
-Windows amd64/arm64 默认构建现创建独立 Environment、临时配置目录和 InPrivate Profile，要求已安装 WebView2 Runtime（目标版本 119+）。不满足必要接口或策略即关闭，不能回退到可信 Wails 页面。替代 `native_webview2loader` 标签及其他架构暂不支持此承载。
+Windows amd64/arm64 默认构建现创建独立 Environment、每视图独立配置目录（优先 `%LOCALAPPDATA%\Sinan\webview2`，不可用时回退系统临时目录）和 InPrivate Profile，要求已安装 WebView2 Runtime（目标版本 119+）。不满足必要接口或策略即关闭，不能回退到可信 Wails 页面。替代 `native_webview2loader` 标签及其他架构暂不支持此承载。
 
-每次视图使用独立虚拟 HTTPS 源，资源直接来自会话快照；不启动 HTTP 服务或映射磁盘目录。SDK 窄桥由引擎顶层消息的精确来源校验，资源、调用和撤销继续经过共有 Go 边界。保留可信页头、主题、原生快捷键和拆出流程；原生视图按 Windows DPI 布局。临时配置目录关闭后尽力清理，不能把 InPrivate 等同于内存存储或操作系统沙箱。详见 [ADR 0055](adr/0055-webview2-isolated-plugin-content.md)。
+每次视图使用独立虚拟 HTTPS 源，资源直接来自会话快照；不启动 HTTP 服务或映射磁盘目录。SDK 窄桥由引擎顶层消息的精确来源校验，资源、调用和撤销继续经过共有 Go 边界。保留可信页头、主题、原生快捷键和拆出流程；原生视图按 Windows DPI 布局。临时配置目录关闭后尽力清理，不能把 InPrivate 等同于内存存储或操作系统沙箱。首次打开需冷启动独立 WebView2（新建配置目录、创建 Environment 并加载插件资源），在启用杀毒实时扫描的 Windows 上可能耗时数秒，因此页面就绪采用较宽裕的等待上限，就绪后立即返回；避免把正常的冷启动误报为"插件页面加载超时"。详见 [ADR 0055](adr/0055-webview2-isolated-plugin-content.md)。
 
 本轮验证为 macOS 全量无界面回归、Windows amd64/arm64 全仓交叉编译及测试可执行文件编译、Windows 静态检查，以及 Linux ARM64 容器中的 GTK3 UI 边界包竞态回归。原生 COM 回调测试已纳入 Windows CI，尚未本机执行；真实窗口、引擎策略效果、层叠、焦点、输入法、拆出及多屏缩放均待明确安排的实机验收。没有运行桌面 UI 或浏览器交互回归。
 

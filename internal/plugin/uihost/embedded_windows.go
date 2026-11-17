@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -30,7 +31,18 @@ var webviewUser32 = windows.NewLazySystemDLL("user32.dll")
 var webviewGetClientRect = webviewUser32.NewProc("GetClientRect")
 var webviewGetDPI = webviewUser32.NewProc("GetDpiForWindow")
 var webviewGetKeyState = webviewUser32.NewProc("GetKeyState")
+var webviewGetWindow = webviewUser32.NewProc("GetWindow")
+var webviewSetWindowPos = webviewUser32.NewProc("SetWindowPos")
 var webviewMemStream = windows.NewLazySystemDLL("ole32.dll").NewProc("CreateStreamOnHGlobal")
+
+const (
+	webviewGWChild       = 5
+	webviewGWHwndNext    = 2
+	webviewHWNDTop       = 0
+	webviewSWPNoSize     = 0x0001
+	webviewSWPNoMove     = 0x0002
+	webviewSWPNoActivate = 0x0010
+)
 
 type webviewSubscription struct {
 	owner  *webviewCOM
@@ -51,6 +63,8 @@ type Embedded struct {
 	subscriptions                                  []webviewSubscription
 	callbacks                                      []*webviewCallback
 	folder                                         string
+	existingChildren                               map[uintptr]bool
+	pluginHost                                     uintptr
 	script                                         string
 	status                                         int
 	shown, detached, callPending, heartbeatPending bool
@@ -118,6 +132,48 @@ func (h *webviewEnvironmentHandler) EnvironmentCompleted(code webviewloader.HRES
 	return 0
 }
 
+// createWebviewProfileFolder 为本视图返回一个全新的 WebView2 用户数据目录，保持各视图
+// 存储隔离。优先放在每用户缓存目录（%LOCALAPPDATA%\Sinan\webview2）下的唯一子目录，避免
+// 共享系统临时目录被杀软扫描/组策略限制/定期清理导致创建缓慢或失败；缓存目录不可用时
+// 回退系统临时目录。关闭后由 Close 尽力删除。
+func createWebviewProfileFolder() (string, error) {
+	if base, err := os.UserCacheDir(); err == nil && base != "" {
+		root := filepath.Join(base, "Sinan", "webview2")
+		if err := os.MkdirAll(root, 0o700); err == nil {
+			if folder, err := os.MkdirTemp(root, "view-"); err == nil {
+				return folder, nil
+			}
+		}
+	}
+	return os.MkdirTemp("", "sinan-webview2-")
+}
+
+// directChildWindows 返回 parent 的直接子窗口集合，用于识别 WebView2 新建的宿主窗口。
+func directChildWindows(parent uintptr) map[uintptr]bool {
+	children := map[uintptr]bool{}
+	child, _, _ := webviewGetWindow.Call(parent, webviewGWChild)
+	for child != 0 {
+		children[child] = true
+		next, _, _ := webviewGetWindow.Call(child, webviewGWHwndNext)
+		if next == child {
+			break
+		}
+		child = next
+	}
+	return children
+}
+
+// raiseAboveSiblings 把 hwnd 提到同父窗口的最上层。同一 Wails 窗口内的隔离 WebView2
+// 建在全尺寸 Shell WebView 之后，但 Shell WebView 覆盖整个客户区；若不显式置顶，插件
+// 内容会被 Shell 完整盖住（表现为"一片空白"）。每次布局后都要重新置顶，避免窗口调整
+// 时 Shell 重新跑到上层。
+func raiseAboveSiblings(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	webviewSetWindowPos.Call(hwnd, webviewHWNDTop, 0, 0, 0, 0, webviewSWPNoMove|webviewSWPNoSize|webviewSWPNoActivate)
+}
+
 func PrepareEmbedded(ctx context.Context, session *uiview.Session, window func() unsafe.Pointer, state protocol.ThemeState, shortcut string, action func(int), invoke func(func())) (*Embedded, error) {
 	if session == nil || window == nil || invoke == nil || theme.ValidateState(state) != nil {
 		return nil, errors.New("插件视图不可用")
@@ -126,7 +182,7 @@ func PrepareEmbedded(ctx context.Context, session *uiview.Session, window func()
 	if err != nil {
 		return nil, err
 	}
-	folder, err := os.MkdirTemp("", "sinan-webview2-")
+	folder, err := createWebviewProfileFolder()
 	if err != nil {
 		return nil, errors.New("无法创建插件临时配置")
 	}
@@ -140,6 +196,8 @@ func PrepareEmbedded(ctx context.Context, session *uiview.Session, window func()
 			e.fail()
 			return
 		}
+		// 记录已有直接子窗口，创建控制器后新增的那个就是插件 WebView2 宿主。
+		e.existingChildren = directChildWindows(e.hwnd)
 		err := webviewloader.CreateCoreWebView2EnvironmentWithOptions(&webviewEnvironmentHandler{e}, webviewloader.WithUserDataFolder(folder), webviewloader.WithExclusiveUserDataFolderAccess(true), webviewloader.WithAllowSingleSignOnUsingOSPrimaryAccount(false), webviewloader.WithTargetCompatibleBrowserVersion("119.0.0.0"))
 		if err != nil {
 			e.fail()
@@ -203,6 +261,14 @@ func (e *Embedded) event(owner *webviewCOM, add, remove int, id string, run func
 func (e *Embedded) setup() error {
 	if err := e.controller.call(4, 0); err != nil {
 		return err
+	}
+	// 识别本视图 WebView2 的宿主子窗口（父窗口在创建控制器后新增的直接子窗口），
+	// 后续布局时把它置顶，避免被全尺寸的 Shell WebView 覆盖。
+	for h := range directChildWindows(e.hwnd) {
+		if !e.existingChildren[h] {
+			e.pluginHost = h
+			break
+		}
 	}
 	var err error
 	e.web, err = e.controller.object(25)
@@ -508,7 +574,12 @@ func (e *Embedded) resize() error {
 	if err := setWebviewBounds(e.controller, &bounds); err != nil {
 		return err
 	}
-	return e.controller.call(23)
+	if err := e.controller.call(23); err != nil {
+		return err
+	}
+	// 每次布局后把本视图宿主重新提到 Shell WebView 之上，防止窗口调整时被盖住。
+	raiseAboveSiblings(e.pluginHost)
+	return nil
 }
 func (e *Embedded) fail() {
 	e.status = -1
@@ -579,6 +650,8 @@ func (e *Embedded) Show() {
 			e.shown = true
 			if e.resize() != nil || e.controller.call(4, 1) != nil || e.controller.call(12, 0) != nil {
 				e.fail()
+			} else {
+				raiseAboveSiblings(e.pluginHost)
 			}
 		}
 	})

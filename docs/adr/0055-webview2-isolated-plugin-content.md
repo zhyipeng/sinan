@@ -10,9 +10,9 @@ Windows 已具备应用检索、主题与屏幕适配，HTML 插件 UI 仍报告
 
 ## 决策
 
-在已有 Wails HWND 中创建独立 WebView2 Controller，以原生内容区保留 58 DIP 可信页头。沿用宿主的隐藏准备、ready 后提交、旧视图保留、撤销和拆出流程；拆出保留原 HWND，不复制客体页面。主窗口内容下缘最多为 600 DIP，拆出后填充剩余客户区。
+在已有 Wails HWND 中创建独立 WebView2 Controller，以原生内容区保留 58 DIP 可信页头。沿用宿主的隐藏准备、ready 后提交、旧视图保留、撤销和拆出流程；拆出保留原 HWND，不复制客体页面。主窗口内容下缘最多为 600 DIP，拆出后填充剩余客户区。由于隔离 WebView2 与全尺寸 Shell WebView 同属一个父窗口，创建控制器后需把新增的宿主子窗口显式置于 Shell 之上，并在每次布局（含就绪、拆出、DPI 变化）后重新置顶，否则插件内容会被覆盖整个客户区的 Shell 完整盖住，界面表现为"一片空白"。
 
-每个视图创建独立临时 UserDataFolder、独占 Environment 和 InPrivate Profile，不复用可信 Shell 配置。要求已安装的 WebView2 Runtime，环境目标版本至少 119；创建选项、必要接口或宿主策略调用失败即关闭，禁止降级为可信 WebView。临时目录在关闭后重试删除，不承诺内存存储；异常退出及浏览器延迟释放可能留下元数据。未实现启动时残留目录清扫。
+每个视图创建独立 UserDataFolder、独占 Environment 和 InPrivate Profile，不复用可信 Shell 配置。UserDataFolder 优先放在每用户缓存目录 `%LOCALAPPDATA%\Sinan\webview2` 下的唯一子目录——共享系统临时目录在启用杀毒实时扫描或经组策略限制、定期清理的 Windows 上会让 Environment 创建变慢甚至超时；缓存目录不可用时回退系统临时目录，各视图仍是唯一目录以保持存储隔离。要求已安装的 WebView2 Runtime，环境目标版本至少 119；创建选项、必要接口或宿主策略调用失败即关闭，禁止降级为可信 WebView。首次打开需冷启动独立 Environment，等待采用较宽裕上限并在就绪后立即提交，避免把正常冷启动误报为超时；目录在关闭后重试删除，不承诺内存存储；异常退出及浏览器延迟释放可能留下元数据。未实现启动时残留目录清扫。
 
 仅复用固定版本 `github.com/wailsapp/go-webview2 v1.0.22` 的运行时加载器，不复用其高层 Chromium 宿主或生成的接口包装。加载器会清空 WebView2 环境变量中的参数、路径及调试覆盖，影响当前进程后续 WebView2 创建；不恢复这些覆盖以免客体复用可信配置。薄 COM 封装依据微软 NuGet `Microsoft.Web.WebView2 1.0.2210.55` 的 `build/native/include/WebView2.h` 实现，显式处理句柄、BOOL 值、输出指针、回调 IID、引用计数和固定地址。amd64 的 RECT 值通过指针传递，arm64 通过两个整数寄存器传递；已用离线 C 交叉编译核对该 ABI。所有实例原生操作在 Wails UI 线程执行，无嵌套消息循环，不调用 `os.Exit`。非 amd64/arm64 或启用替代 `native_webview2loader` 构建标签时继续报告不支持。
 
