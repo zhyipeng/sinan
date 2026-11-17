@@ -242,4 +242,8 @@ Windows 把 `Alt+Space` 当作窗口系统菜单组合，`RegisterHotKey` 注册
 
 官方剪贴板插件新增复制成功后前移并持久保存排序；左侧按可见项加载缩略图，右侧在可用详情区域等比放大，预览最高 1280×960 并自适应满足既有 192 KiB UI 响应预算。复制保留原始图片，写入失败不前移；索引保存失败明确提示且保留原排序。实现位于独立插件，共用 Go、Canvas/createImageBitmap 与静态 CSS，沿用既有三端引擎目标；不改变宿主协议、SDK、权限、原生系统适配或 X11/Wayland 依赖，无登记仓库格式或发行资产变更。
 
-本机通过剪贴板 Go 竞态回归、静态检查、3 项前端无界面测试和 macOS/Windows/Linux arm64、amd64 六目标交叉构建。未执行 Windows/Linux 目标运行及三端 WKWebView/WebView2/WebKitGTK、DPI、真实系统剪贴板与交互验收；插件改动尚未发布，交叉构建不代表实机通过。
+本机通过剪贴板 Go 竞态回归、静态检查、3 项前端无界面测试和 macOS/Windows/Linux arm64、amd64 六目标交叉构建。未执行 Windows/Linux 目标运行及三端 WKWebView/WebView2/WebKitGTK、DPI、真实系统剪贴板与交互验收；当时插件改动尚未发布，交叉构建不代表实机通过。
+
+### 剪贴板 0.2.1 正式发行
+
+[剪贴板 0.2.1](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.clipboard-v0.2.1) 已公开；[发布流水线](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44004573375) 在 macOS runner 通过全量无界面测试、六目标交叉构建与打包。三系统 arm64/amd64 六个 ZIP 已回下载核对清单、原生架构、入口执行位、图标、大小及 SHA-256，摘要与随包文件及 GitHub 资产摘要一致；商店以真实 Release/Asset ID 登记。最低宿主仍为 0.2.1，API 1 / UI Bridge 2 不变。未执行 Windows/Linux 目标运行、三平台真实剪贴板、WebView、焦点、自动输入和 DPI 验收，不将发行与交叉构建视为实机通过。
