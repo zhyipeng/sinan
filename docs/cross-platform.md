@@ -253,3 +253,11 @@ Windows 使用固定 LLVM-MinGW UCRT 工具链及包内对应 C++/线程运行�
 ### 剪贴板 0.2.1 正式发行
 
 [剪贴板 0.2.1](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.clipboard-v0.2.1) 已公开；[发布流水线](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44004573375) 在 macOS runner 通过全量无界面测试、六目标交叉构建与打包。三系统 arm64/amd64 六个 ZIP 已回下载核对清单、原生架构、入口执行位、图标、大小及 SHA-256，摘要与随包文件及 GitHub 资产摘要一致；商店以真实 Release/Asset ID 登记。最低宿主仍为 0.2.1，API 1 / UI Bridge 2 不变。未执行 Windows/Linux 目标运行、三平台真实剪贴板、WebView、焦点、自动输入和 DPI 验收，不将发行与交叉构建视为实机通过。
+
+### 插件商店后台下载安装任务
+
+插件中心的下载、目录复核和包应用现由宿主持有任务，不依赖可信组件挂载或窗口显示；UI 仍在内置插件中，支持读取状态、取消下载和显式重试。最多四个活动任务，同一插件去重；退出取消网络工作并等待安装和暂存清理。任务只在当前宿主进程中保留，不支持退出后恢复或断点续传。共享 Go 实现不新增三端系统依赖、权限或 WebView API；公开协议、SDK 与商店格式不变，独立官方插件和登记仓库无需改动。见 [ADR 0072](adr/0072-background-plugin-installation.md)。
+
+本机 macOS arm64 通过 `node scripts/desktop.mjs test`（前端构建、18 项 JS 无界面用例及全量 Go 竞态回归），标准入口 `node scripts/desktop.mjs build` 的本机桌面及配套程序构建通过。新增任务用例覆盖无页面参与的实际安装、去重、并发上限、校验失败、取消重试及退出收尾。catalog 测试程序的 macOS/Windows/Linux arm64、amd64 六目标交叉编译通过；Windows CI 已追加任务回归，尚未远端执行。未执行 Windows/Linux 目标运行、三端真实窗口切换、隐藏/拆出及 WebView 交互验收，不把交叉编译视为实机通过；改动尚未发行。
+
+同日后续：任务列表移至「已安装」「发现」之后的独立「下载安装」Tab，并用标准 HTML progress 显示实际下载字节、总大小与百分比。总量来自目录资产，缺失 Content-Length 不影响计算；镜像重试归零，校验和安装分别显示阶段，不模拟安装百分比。沿用三端共享 Go 下载器及 WebView 标准控件，无公开协议、SDK、权限或登记格式变化。本机重新通过完整无界面测试及标准构建；分块下载、缺失响应长度、镜像回退与任务进度快照测试通过竞态检查，distribution / catalog 两个测试程序的六目标交叉编译通过。Windows CI 增补任务与进度用例，远端尚未运行；三端真实 WebView 进度条外观、窗口和 Tab 交互未验收。

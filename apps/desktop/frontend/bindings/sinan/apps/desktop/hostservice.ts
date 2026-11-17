@@ -305,8 +305,23 @@ export function StoreCancel(ticket: string): $CancellablePromise<void> {
     return $Call.ByID(3438246222, ticket);
 }
 
+export function StoreCancelInstall(id: string): $CancellablePromise<void> {
+    return $Call.ByID(303393909, id);
+}
+
 export function StoreCatalog(refresh: boolean): $CancellablePromise<catalog$0.View> {
     return $Call.ByID(3259617907, refresh);
+}
+
+/**
+ * StoreInstall submits work owned by the host, independent of WebView requests.
+ */
+export function StoreInstall(id: string, version: string, revision: string): $CancellablePromise<catalog$0.InstallTask> {
+    return $Call.ByID(2696718263, id, version, revision);
+}
+
+export function StoreInstallTasks(): $CancellablePromise<catalog$0.InstallTask[] | null> {
+    return $Call.ByID(1885465239);
 }
 
 export function StorePreview(id: string, version: string, revision: string): $CancellablePromise<catalog$0.Preview> {

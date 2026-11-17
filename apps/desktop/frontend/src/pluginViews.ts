@@ -7,7 +7,7 @@ import type {StoreBridge} from '../../../../plugins/system-plugin-manager/fronte
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
-import { SearchPreferences, SaveSearchPreferences, LLMSettings, SaveLLMProfile, DeleteLLMProfile, SaveLLMPreferences, PluginShortcutSettings, SavePluginShortcut, PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StorePreview, StoreApply, StoreCancel } from '../bindings/sinan/apps/desktop/hostservice';
+import { SearchPreferences, SaveSearchPreferences, LLMSettings, SaveLLMProfile, DeleteLLMProfile, SaveLLMPreferences, PluginShortcutSettings, SavePluginShortcut, PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StoreInstall, StoreInstallTasks, StoreCancelInstall } from '../bindings/sinan/apps/desktop/hostservice';
 type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
@@ -81,7 +81,7 @@ const storeBridge:StoreBridge={
   const data = await StoreCatalog(refresh);
   return {...data,entries:(data.entries??[]).map(entry=>({...entry,releases:(entry.releases??[]).map(release=>({...release,assets:release.assets??[]}))}))};
  },
- async prepare(id,version,revision){return await StorePreview(id,version,revision);},
- async apply(ticket,trust){return await StoreApply(ticket,trust);},
- async cancel(ticket){await StoreCancel(ticket);},
+ async install(id,version,revision){return await StoreInstall(id,version,revision);},
+ async tasks(){return await StoreInstallTasks()??[];},
+ async cancelInstall(id){await StoreCancelInstall(id);},
 };

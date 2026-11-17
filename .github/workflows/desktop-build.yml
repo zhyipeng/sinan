@@ -69,6 +69,9 @@ jobs:
       - name: Windows catalog host version regression
         if: runner.os == 'Windows'
         run: go test ./plugins/system-plugin-manager/catalog -run '^TestPlatformCatalogHostVersion'
+      - name: Windows plugin installation tasks and download progress
+        if: runner.os == 'Windows'
+        run: go test ./plugins/system-plugin-manager/catalog ./internal/plugin/distribution -run '^TestInstallTask|^TestDownloadProgress'
       - name: Clipboard validation without desktop access
         if: runner.os == 'Windows'
         run: go test ./internal/clipboard

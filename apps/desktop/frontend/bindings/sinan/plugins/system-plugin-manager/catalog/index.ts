@@ -4,6 +4,7 @@
 export type {
     Asset,
     Compatibility,
+    InstallTask,
     Item,
     Preview,
     Publisher,

@@ -824,6 +824,7 @@ output {
 /* Plugin Center & Store */
 .center-navigation {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -1725,3 +1726,14 @@ output {
   opacity: 0.5;
   cursor: default;
 }
+
+.install-tasks { padding-top: 12px; }
+.install-task { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.install-task > span:first-child { flex: 1; }
+
+.install-task-progress { order: 1; flex-basis: 100%; display: flex; align-items: center; gap: 12px; }
+.install-task-progress progress { flex: 1; min-width: 0; height: 6px; accent-color: var(--sinan-accent, #315ed8); }
+.install-task-progress small { white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.install-task > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.install-task > .error { order: 2; flex-basis: 100%; }

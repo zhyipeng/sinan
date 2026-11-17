@@ -1,5 +1,5 @@
 import PluginIcon from '../../../packages/ui-components/PluginIcon';
-import PluginStore, {type StoreBridge} from './PluginStore';
+import PluginStore, {type StoreBridge,type InstallTask} from './PluginStore';
 import PluginDetails from './PluginDetails';
 import { useEffect, useRef, useState } from 'react';
 import CreatePlugin, {type ProjectBridge} from './CreatePlugin';
@@ -22,13 +22,14 @@ export type ManagementBridge = DataBridge & ProjectBridge & {
   openView?(id:string,viewID:string):Promise<void>;
   subscribeWindows?(failed:()=>void):()=>void;
 };
+function downloadSize(bytes:number){return bytes<1024*1024?`${(bytes/1024).toFixed(1)} KiB`:`${(bytes/1024/1024).toFixed(1)} MiB`;}
 const states: Record<string,string> = {installed:'已安装',activating:'启动中',activated:'已激活',running:'运行中',deactivated:'已停止',failed:'运行失败',disabled:'已禁用'};
 
 export default function PluginManager({bridge, onChanged, onRecover,storeBridge}: {bridge: ManagementBridge; storeBridge: StoreBridge; onChanged(): Promise<void>; onRecover(): void}) {
   const [data,setData]=useState<ManagedSnapshot>({plugins:[],diagnostics:[]});
   const [busy,setBusy]=useState(true);
   const [showCreate,setShowCreate]=useState(false);
-  const [tab,setTab]=useState<'installed'|'discover'>('installed');
+  const [tab,setTab]=useState<'installed'|'discover'|'downloads'>('installed');
   const [query,setQuery]=useState('');
   const [selectedID,setSelectedID]=useState('');
   const [storeID,setStoreID]=useState('');
@@ -36,6 +37,8 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
   const [showMore,setShowMore]=useState(false);
   const [createBusy,setCreateBusy]=useState(false);
   const [storeBusy,setStoreBusy]=useState(false);
+  const [tasks,setTasks]=useState<InstallTask[]>([]);
+  const changed=useRef(onChanged);changed.current=onChanged;
   const projectBusy=createBusy||storeBusy;
   const [directory,setDirectory]=useState('');
   const [developmentTrust,setDevelopmentTrust]=useState<Record<string,boolean>>({});
@@ -52,6 +55,28 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
   },[bridge]);
 
   useEffect(()=>bridge.subscribeWindows?.(()=>setError('插件窗口异常退出，请重试。')),[bridge]);
+
+  useEffect(()=>{
+    let current=true;
+    let timer:ReturnType<typeof setTimeout>;
+    let completed='';
+    async function poll(){
+      try {
+        const next=await storeBridge.tasks();
+        if(!current)return;
+        setTasks(next);
+        const signature=next.filter(task=>task.state==='succeeded').map(task=>task.id).join(',');
+        if(signature!==completed){
+          const snapshot=await bridge.refresh();
+          await changed.current();
+          if(current){setData(snapshot);completed=signature;}
+        }
+      } catch(reason){if(current)setError(reason instanceof Error?reason.message:'无法读取安装任务');}
+      finally {if(current)timer=setTimeout(()=>void poll(),1000);}
+    }
+    void poll();
+    return()=>{current=false;clearTimeout(timer);};
+  },[bridge,storeBridge]);
 
   async function perform(action:()=>Promise<unknown>, message:string|(()=>string)='') {
     if(pending.current||projectBusy)return;
@@ -111,6 +136,7 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
       <div className="center-tabs" role="tablist" aria-label="插件中心">
         <button id="installed-tab" role="tab" aria-selected={tab==='installed'} aria-controls="installed-panel" disabled={busy||createBusy} onClick={()=>setTab('installed')}>已安装 <small>{data.plugins.length}</small></button>
         <button id="discover-tab" role="tab" aria-selected={tab==='discover'} aria-controls="discover-panel" disabled={busy||createBusy} onClick={()=>{setStoreID('');setTab('discover');}}>发现</button>
+        <button id="downloads-tab" role="tab" aria-selected={tab==='downloads'} aria-controls="downloads-panel" disabled={busy||createBusy} onClick={()=>setTab('downloads')}>下载安装 {tasks.some(task=>['downloading','installing'].includes(task.state))&&<small>{tasks.filter(task=>['downloading','installing'].includes(task.state)).length}</small>}</button>
       </div>
       <div className="center-utilities">
         <button disabled={busy||projectBusy} aria-expanded={showInstall} onClick={()=>setShowInstall(value=>!value)}>本地安装</button>
@@ -130,7 +156,20 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
           {!selected.protected&&!selected.development&&<button className="center-browse" disabled={busy||projectBusy} onClick={()=>{setStoreID(selected.id);setTab('discover');}}>查看商店版本</button>}
         </PluginDetails>}
       </div>
-    </div>:<div id="discover-panel" role="tabpanel" aria-labelledby="discover-tab"><PluginStore bridge={storeBridge} initialID={storeID} plugins={data.plugins} disabled={busy||createBusy} renderActions={renderActions} onBusyChange={setStoreBusy} onChanged={async()=>{const next=await bridge.refresh();await onChanged();if(alive.current)setData(next);}}/></div>}
+    </div>:tab==='discover'?<div id="discover-panel" role="tabpanel" aria-labelledby="discover-tab"><PluginStore tasks={tasks} bridge={storeBridge} initialID={storeID} plugins={data.plugins} disabled={busy||createBusy} renderActions={renderActions} onBusyChange={setStoreBusy}/></div>:<section id="downloads-panel" role="tabpanel" aria-labelledby="downloads-tab" className="install-tasks">
+      {!tasks.length&&<p className="empty">暂无下载安装任务</p>}
+      {tasks.slice().reverse().map(task=><div className="install-task" key={task.id}>
+        <span>{data.plugins.find(plugin=>plugin.id===task.pluginId)?.name??task.pluginId} · {task.version}</span>
+        <span role="status">{{downloading:task.totalBytes>0?(task.downloadedBytes>=task.totalBytes?'校验中…':'下载中…'):'准备下载…',installing:'安装中…',succeeded:'已完成',failed:'失败',cancelled:'已取消'}[task.state]}</span>
+        {(task.totalBytes>0||['downloading','installing'].includes(task.state))&&<div className="install-task-progress">
+          <progress aria-label={`${task.pluginId} 下载进度`} max={task.totalBytes||1} value={task.totalBytes>0?Math.min(task.downloadedBytes,task.totalBytes):undefined}/>
+          {task.totalBytes>0&&<small>{downloadSize(task.downloadedBytes)} / {downloadSize(task.totalBytes)} · {Math.floor(Math.min(task.downloadedBytes/task.totalBytes,1)*100)}%</small>}
+        </div>}
+        {task.error&&<span className="error">{task.error}</span>}
+        {task.state==='downloading'&&<button onClick={()=>void storeBridge.cancelInstall(task.id).catch(reason=>setError(String(reason)))}>取消</button>}
+        {['failed','cancelled'].includes(task.state)&&<button disabled={tasks.some(other=>other.pluginId===task.pluginId&&['downloading','installing'].includes(other.state))} onClick={()=>void storeBridge.load(true).then(catalog=>storeBridge.install(task.pluginId,task.version,catalog.revision)).catch(reason=>setError(String(reason)))}>重试</button>}
+      </div>)}
+    </section>}
     {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage();}}>
       <label htmlFor="directory">安装 / 更新插件</label>
       <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()}>{busy?'处理中…':'安装 / 更新'}</button></div>

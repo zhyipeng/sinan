@@ -24,6 +24,9 @@ type Loader interface {
 type Stager interface {
 	Stage(context.Context, string, distribution.Artifact) (string, func(), error)
 }
+type progressStager interface {
+	StageWithProgress(context.Context, string, distribution.Artifact, func(int64, int64)) (string, func(), error)
+}
 type Item struct {
 	Entry
 	InstalledVersion string `json:"installedVersion"`
@@ -58,6 +61,7 @@ type pending struct {
 	expires   time.Time
 }
 type Service struct {
+	tasks     installTasks
 	Loader    Loader
 	Fetcher   Stager
 	Backend   Backend
@@ -124,6 +128,9 @@ func find(snapshot Snapshot, id, version string) (Entry, Release, Asset, error) 
 	return Entry{}, Release{}, Asset{}, errors.New("当前平台没有可安装版本")
 }
 func (s *Service) Prepare(ctx context.Context, id, version, revision string) (Preview, error) {
+	return s.prepare(ctx, id, version, revision, nil)
+}
+func (s *Service) prepare(ctx context.Context, id, version, revision string, progress func(int64, int64)) (Preview, error) {
 	s.mu.Lock()
 	s.expireLocked()
 	if s.closed || len(s.pending)+s.preparing >= 4 {
@@ -149,7 +156,14 @@ func (s *Service) Prepare(ctx context.Context, id, version, revision string) (Pr
 			return Preview{}, errors.New("本地插件为开发链接、存在修改或受保护，请先在插件管理中处理")
 		}
 	}
-	directory, cleanup, err := s.Fetcher.Stage(ctx, s.CacheDir, distribution.Artifact{Repository: release.Repository, ID: asset.ID, Size: asset.Size, SHA256: asset.SHA256})
+	artifact := distribution.Artifact{Repository: release.Repository, ID: asset.ID, Size: asset.Size, SHA256: asset.SHA256}
+	var directory string
+	var cleanup func()
+	if fetcher, ok := s.Fetcher.(progressStager); ok && progress != nil {
+		directory, cleanup, err = fetcher.StageWithProgress(ctx, s.CacheDir, artifact, progress)
+	} else {
+		directory, cleanup, err = s.Fetcher.Stage(ctx, s.CacheDir, artifact)
+	}
 	if err != nil {
 		return Preview{}, err
 	}
@@ -228,6 +242,7 @@ func (s *Service) expireLocked() {
 	}
 }
 func (s *Service) Close() {
+	s.closeInstallTasks()
 	s.mu.Lock()
 	s.closed = true
 	tickets := s.pending

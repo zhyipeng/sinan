@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"os"
 	"path/filepath"
 	"sinan/internal/kernel"
@@ -75,4 +76,32 @@ func (h *HostService) closePluginStore() {
 	if service != nil {
 		service.Close()
 	}
+}
+
+// StoreInstall submits work owned by the host, independent of WebView requests.
+func (h *HostService) StoreInstall(id, version, revision string) (catalog.InstallTask, error) {
+	service, err := h.pluginStore()
+	if err != nil {
+		return catalog.InstallTask{}, err
+	}
+	return service.StartInstall(id, version, revision, func(result kernel.PluginInfo) {
+		h.cancelSearch()
+		if h.launcher != nil {
+			application.InvokeAsync(func() { h.launcher.closePlugin(result.ID) })
+		}
+	})
+}
+func (h *HostService) StoreInstallTasks() ([]catalog.InstallTask, error) {
+	service, err := h.pluginStore()
+	if err != nil {
+		return nil, err
+	}
+	return service.InstallTasks(), nil
+}
+func (h *HostService) StoreCancelInstall(id string) error {
+	service, err := h.pluginStore()
+	if err != nil {
+		return err
+	}
+	return service.CancelInstall(id)
 }

@@ -82,6 +82,12 @@ func (f *Fetcher) config() ghmirror.Config {
 }
 
 func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (directory string, cleanup func(), err error) {
+	return f.StageWithProgress(ctx, cacheDir, a, nil)
+}
+
+// StageWithProgress reports bytes written for the current download attempt.
+// A mirror retry resets the count; total comes from the reviewed catalog asset.
+func (f *Fetcher) StageWithProgress(ctx context.Context, cacheDir string, a Artifact, progress func(int64, int64)) (directory string, cleanup func(), err error) {
 	if a.ID <= 0 || a.Size <= 0 || a.Size > 64<<20 || len(a.SHA256) != 64 || strings.Trim(a.SHA256, "0123456789abcdef") != "" || !repositoryPattern.MatchString(a.Repository) {
 		return "", nil, errors.New("发行资产参数无效")
 	}
@@ -92,7 +98,13 @@ func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (direc
 	}
 	var lastErr error
 	for _, address := range candidates {
-		staged, stagedCleanup, stageErr := f.stageFrom(ctx, cacheDir, a, address)
+		if ctx.Err() != nil {
+			return "", nil, ctx.Err()
+		}
+		if progress != nil {
+			progress(0, a.Size)
+		}
+		staged, stagedCleanup, stageErr := f.stageFrom(ctx, cacheDir, a, address, progress)
 		if stageErr == nil {
 			return staged, stagedCleanup, nil
 		}
@@ -106,7 +118,7 @@ func (f *Fetcher) Stage(ctx context.Context, cacheDir string, a Artifact) (direc
 
 // stageFrom downloads and validates one candidate URL. On failure it removes its
 // own temporary directory so the next candidate starts clean.
-func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, address string) (string, func(), error) {
+func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, address string, progress func(int64, int64)) (string, func(), error) {
 	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		return "", nil, errors.New("无法创建下载缓存")
 	}
@@ -141,7 +153,7 @@ func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, ad
 		return "", nil, errors.New("无法写入下载缓存")
 	}
 	hash := sha256.New()
-	n, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(response.Body, a.Size+1))
+	n, copyErr := io.Copy(io.MultiWriter(file, hash, &downloadProgress{total: a.Size, report: progress}), io.LimitReader(response.Body, a.Size+1))
 	closeErr := file.Close()
 	if copyErr != nil || closeErr != nil || n != a.Size || hex.EncodeToString(hash.Sum(nil)) != a.SHA256 {
 		return "", nil, errors.New("插件包大小或 SHA-256 校验失败")
@@ -156,6 +168,20 @@ func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, ad
 	_ = os.Remove(archive)
 	success = true
 	return directory, removeWork, nil
+}
+
+type downloadProgress struct {
+	written int64
+	total   int64
+	report  func(int64, int64)
+}
+
+func (p *downloadProgress) Write(data []byte) (int, error) {
+	p.written += int64(len(data))
+	if p.report != nil {
+		p.report(min(p.written, p.total), p.total)
+	}
+	return len(data), nil
 }
 
 // StageLocal snapshots a local ZIP before extracting it with the same limits as store assets.

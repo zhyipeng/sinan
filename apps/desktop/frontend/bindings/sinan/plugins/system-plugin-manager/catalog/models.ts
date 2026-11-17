@@ -16,6 +16,20 @@ export interface Compatibility {
     "uiBridgeVersion": string;
 }
 
+/**
+ * InstallTask is a host-owned operation. It contains no preview ticket or paths.
+ */
+export interface InstallTask {
+    "downloadedBytes": number;
+    "totalBytes": number;
+    "id": string;
+    "pluginId": string;
+    "version": string;
+    "revision": string;
+    "state": string;
+    "error": string;
+}
+
 export interface Item {
     "icon"?: string;
     "schemaVersion": number;
