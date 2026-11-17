@@ -12,7 +12,6 @@ import (
 	"sinan/internal/plugin/distribution"
 	"sinan/internal/plugin/uiwindows"
 	"sinan/internal/search"
-	"sinan/internal/startup"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
 	"sinan/plugins/system-plugin-manager/catalog"
@@ -24,9 +23,11 @@ import (
 
 // HostService is bound only to the trusted Shell, never to third-party UI.
 type HostService struct {
+	retentionMu          sync.Mutex
+	mainPresentationMu   sync.Mutex
 	opacity              *windowOpacityController
 	startupMu            sync.Mutex
-	startup              startup.Registration
+	startup              autostartService
 	startupError         string
 	updates              *settingsupdate.Service
 	updatesContext       context.Context
@@ -347,36 +348,8 @@ func (h *HostService) OpenPluginCommand(ctx context.Context, pluginID, commandID
 	return false, h.ui.OpenCommand(pluginID, commandID)
 }
 
-func (h *HostService) toggleMain() {
-	if h.embedded != nil {
-		h.launcher.mu.Lock()
-		window := h.launcher.window
-		h.launcher.mu.Unlock()
-		if !window.IsVisible() {
-			h.releaseEmbedded(window)
-		}
-	}
-	if h.ui != nil {
-		if handled, _ := h.ui.Main(true); handled {
-			return
-		}
-	}
-	h.launcher.toggle()
-}
-func (h *HostService) showMain() {
-	if h.embedded != nil {
-		h.launcher.mu.Lock()
-		window := h.launcher.window
-		h.launcher.mu.Unlock()
-		h.releaseEmbedded(window)
-	}
-	if h.ui != nil {
-		if handled, _ := h.ui.Main(false); handled {
-			return
-		}
-	}
-	h.launcher.show()
-}
+func (h *HostService) toggleMain() { h.resumeMain(true) }
+func (h *HostService) showMain()   { h.resumeMain(false) }
 
 // DetachTrustedView rotates the Shell role, preserving the original trusted WebView.
 // Identity is resolved against installed commands and the bundled component allowlist.

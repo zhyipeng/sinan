@@ -24,6 +24,7 @@ type trustedWindow struct {
 }
 
 type launcher struct {
+	retention      mainRetention
 	inputTarget    uintptr
 	window         *application.WebviewWindow
 	mu             sync.Mutex
@@ -48,13 +49,18 @@ func (l *launcher) toggle() {
 		return
 	}
 	if l.window.IsVisible() {
-		l.window.Hide()
+		l.hideLocked()
 		return
 	}
 	l.showLocked()
 }
 
 func (l *launcher) showLocked() {
+	l.retention.shown()
+	l.presentLocked(mainResume{Epoch: l.retention.epoch})
+}
+
+func (l *launcher) presentLocked(state mainResume) {
 	if l.dialogs[l.window] > 0 {
 		return
 	}
@@ -63,7 +69,9 @@ func (l *launcher) showLocked() {
 			l.inputTarget = target
 		}
 	})
-	l.window.SetSize(launcherWidth, launcherMinHeight)
+	if !state.PreserveInput && !state.PreserveView {
+		l.window.SetSize(launcherWidth, launcherMinHeight)
+	}
 	var id string
 	var ok bool
 	application.InvokeSync(func() { id, ok = platform.CursorScreenID() })
@@ -82,7 +90,7 @@ func (l *launcher) showLocked() {
 	l.window.Show()
 	l.window.Focus()
 	// EmitEvent broadcasts through the application bus; Sender is not a target.
-	l.window.DispatchWailsEvent(&application.CustomEvent{Name: "launcher:show", Sender: "kernel.launcher"})
+	l.window.DispatchWailsEvent(&application.CustomEvent{Name: "launcher:show", Data: state, Sender: "kernel.launcher"})
 }
 
 // Native directory dialogs temporarily own focus without dismissing the panel.
@@ -220,7 +228,7 @@ func (l *launcher) hide(window *application.WebviewWindow) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if window != nil && l.window == window {
-		window.Hide()
+		l.hideLocked()
 	}
 }
 func (l *launcher) detach(window *application.WebviewWindow, title, key string) error {
@@ -232,6 +240,7 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	// Keep the existing WebView and React tree. Only the search role is replaced.
 	replacement := l.newWindow()
 	l.detached[window.ID()] = trustedWindow{window: window, key: key}
+	l.retention.shown()
 	l.window = replacement
 	restoreOpacity := l.opacityPercent >= 30 && l.opacityPercent < 100
 	l.opacityPercent = 100

@@ -4,6 +4,7 @@ import PluginShortcuts,{type PluginShortcutsBridge} from './PluginShortcuts';
 import Theme,{type ThemeBridge} from './Theme';
 import LLM,{type LLMBridge} from './LLM';
 import Search, {type SearchBridge} from './Search';
+import Retention, {type RetentionBridge} from './Retention';
 import WindowOpacity, {type WindowOpacityBridge} from './WindowOpacity';
 import Startup, {type StartupBridge} from './Startup';
 import Updates,{type UpdateBridge} from './Updates';
@@ -14,6 +15,7 @@ export type SettingsSnapshot = { revision: number; values: Record<string, string
 export type SettingsBridge = {
   startup:StartupBridge;
   windowOpacity:WindowOpacityBridge;
+  retention:RetentionBridge;
   search:SearchBridge;
   llm:LLMBridge;
   updates:UpdateBridge;
@@ -138,6 +140,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
         <Theme bridge={bridge.theme} />
         <Startup bridge={bridge.startup} />
         <WindowOpacity bridge={bridge.windowOpacity} />
+        <Retention bridge={bridge.retention} />
       </section>
       <section className="settings-panel" id="settings-panel-search" hidden={category !== 'search'} aria-labelledby="settings-heading-search">
         <header className="settings-panel-heading"><h1 id="settings-heading-search">搜索</h1></header>

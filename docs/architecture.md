@@ -461,7 +461,7 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 
 ## 启动设置
 
-设置插件在通用分类追加静默启动和开机自启。内核持久化独立 `$startup` 静默偏好；宿主按该偏好在创建主输入框时设为隐藏，并通过 `internal/startup` 实现当前用户登录注册。注册操作不开放给第三方插件；公开协议、SDK、商店与权限边界不变。平台机制、开发实例限制和迁移边界见 [ADR 0073](adr/0073-startup-preferences.md)。
+设置插件在通用分类追加静默启动和开机自启。内核持久化独立 `$startup` 静默偏好；宿主按该偏好在创建主输入框时设为隐藏，并通过 Wails `app.Autostart` 管理当前用户登录注册（原 `internal/startup` 已删除）。注册操作不开放给第三方插件；公开协议、SDK、商店与权限边界不变。平台机制、开发实例限制和迁移边界见 [ADR 0073](adr/0073-startup-preferences.md)。
 
 
 ## 主窗口透明度
@@ -483,3 +483,13 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 截图输出与呈现补充：宿主新增会话限定的 window.show/window.hide、file.savePNG 权限和 ui.image-output.v1 能力；后台仅分块导出 PNG，宿主验证后通过 Wails 原生保存对话框写入用户确认的位置，不暴露路径或任意文件写入接口。window.execute 的 keepHidden 结果支持页面解码成功后再显示，取消/无图继续清理，隐藏页面超时不显示空编辑器。复制成功后的隐藏由插件调用通用窗口能力。见 [ADR 0078](adr/0078-screenshot-output-and-presentation.md)。
 
 截图后处理输入补充：新增会话级 file.openImage 权限及 ui.image-input.v1，宿主原生选图、校验并转为受限 PNG 快照，复用会话资源 URL；业务页面负责导入入口、Command/Ctrl+V 与编辑器载入。图片粘贴沿用 clipboard.readImage，路径与任意文件读取能力不进入页面桥，CSP 不变。视图权限数量上限由 4 调整为 6。见 [ADR 0079](adr/0079-image-import-and-paste.md)。
+
+
+### 主界面会话保留
+
+设置插件新增清除输入框延迟与插件 UI 保留时长，默认均为 0 秒。内核只持久化和校验独立主界面偏好，宿主统一隐藏时钟、取消、过期回调防护与主界面唤起决策；Shell 区分输入清空和视图恢复，同窗口插件继续保持隔离。没有新增公开协议、SDK 或权限；生命周期和三端边界见 [ADR 0081](adr/0081-main-window-retention.md)。
+
+
+### 自启服务复用 Wails
+
+按用户指令，开机自启改用当前锁定 Wails 3 的 `app.Autostart`，删除自行维护的三端原生注册代码。已有注册按库状态复用，写入后复核实际状态；静默启动、设置插件边界和开发实例限制保持，详见 [ADR 0082](adr/0082-wails-autostart.md)。

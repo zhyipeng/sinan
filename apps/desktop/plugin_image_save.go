@@ -29,7 +29,7 @@ func (h *HostService) callWindowVisibility(ctx context.Context, session *uiview.
 			h.hideCommandWindows(entry.window)
 		} else {
 			entry.view.Show()
-			entry.window.Show()
+			h.launcher.reveal(entry.window)
 			entry.window.Focus()
 		}
 	})

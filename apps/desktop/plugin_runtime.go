@@ -187,7 +187,7 @@ func (h *HostService) callInputHost(ctx context.Context, session *uiview.Session
 	if !valid() {
 		return nil, errors.New("输入会话已失效")
 	}
-	entry.window.Hide()
+	h.hideSessionWindow(entry.window)
 	err := platform.ActivateInputTarget(target)
 	if err == nil {
 		select {
@@ -209,7 +209,7 @@ func (h *HostService) callInputHost(ctx context.Context, session *uiview.Session
 		}
 		h.embedded.mu.Unlock()
 		if valid() {
-			entry.window.Show()
+			h.launcher.reveal(entry.window)
 			entry.window.Focus()
 		}
 		return nil, errors.New("自动粘贴失败，内容已复制，请手动粘贴")

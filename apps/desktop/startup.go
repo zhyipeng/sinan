@@ -6,6 +6,23 @@ import (
 	"sinan/internal/kernel"
 )
 
+// A narrow host-only interface allows headless tests without touching login items.
+// The desktop injects app.Autostart after creating the Wails application.
+type autostartService interface {
+	IsEnabled() (bool, error)
+	EnableWithOptions(application.AutostartOptions) error
+	Disable() error
+}
+
+const autostartIdentifier = "dev.sinan.desktop"
+
+func autostartError(err error, fallback string) string {
+	if errors.Is(err, application.ErrAutostartNotSupported) {
+		return "当前平台不支持开机自启"
+	}
+	return fallback
+}
+
 type StartupState struct {
 	kernel.StartupPreferences
 	AutoStart      bool   `json:"autoStart"`
@@ -24,9 +41,9 @@ func (h *HostService) startupState() (StartupState, error) {
 		return state, err
 	}
 	if h.startup != nil {
-		state.AutoStart, err = h.startup.Enabled()
+		state.AutoStart, err = h.startup.IsEnabled()
 		if err != nil {
-			state.AutoStartError = err.Error()
+			state.AutoStartError = autostartError(err, "无法读取开机自启配置")
 		}
 	}
 	return state, nil
@@ -45,10 +62,36 @@ func (h *HostService) SaveAutoStart(enabled bool) (StartupState, error) {
 	if h.startup == nil {
 		return StartupState{}, errors.New("当前实例无法配置开机自启")
 	}
-	if err := h.startup.SetEnabled(enabled); err != nil {
-		return StartupState{}, err
+	current, err := h.startup.IsEnabled()
+	if err != nil {
+		return StartupState{}, errors.New(autostartError(err, "无法读取开机自启配置"))
 	}
-	return h.publishStartup()
+	if enabled {
+		// Keep an existing legacy registration as-is; enabling a second macOS
+		// strategy alongside a LaunchAgent could start two app instances.
+		if !current {
+			err = h.startup.EnableWithOptions(application.AutostartOptions{Identifier: autostartIdentifier})
+		}
+	} else {
+		err = h.startup.Disable()
+	}
+	if err != nil {
+		return StartupState{}, errors.New(autostartError(err, "无法修改开机自启，请检查系统登录项设置"))
+	}
+	state, err := h.startupState()
+	if err != nil {
+		return state, err
+	}
+	if state.AutoStartError != "" {
+		return state, errors.New(state.AutoStartError)
+	}
+	if state.AutoStart != enabled {
+		return state, errors.New("开机自启尚未生效，请在系统设置中检查登录项是否需要批准")
+	}
+	if h.launcher != nil {
+		h.launcher.dispatch(&application.CustomEvent{Name: "startup:changed", Data: state, Sender: "kernel.settings"})
+	}
+	return state, nil
 }
 func (h *HostService) publishStartup() (StartupState, error) {
 	state, err := h.startupState()

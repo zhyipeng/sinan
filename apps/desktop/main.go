@@ -21,7 +21,6 @@ import (
 	"sinan/internal/platform"
 	"sinan/internal/plugin/uihost"
 	"sinan/internal/plugin/uiwindows"
-	"sinan/internal/startup"
 	"sinan/internal/theme"
 	pluginmanager "sinan/plugins/system-plugin-manager"
 	settingsupdate "sinan/plugins/system-settings/update"
@@ -102,16 +101,6 @@ func run() error {
 	}
 	host := &HostService{manager: manager, probeEnabled: *uiProbe, migrationNotice: migrationNotice}
 	host.startupError = "开发和验收实例不支持开机自启"
-	if useBundledPlugins {
-		executable, err := os.Executable()
-		if err == nil {
-			host.startup, err = startup.New(executable)
-		}
-		host.startupError = ""
-		if err != nil {
-			host.startupError = "无法初始化开机自启配置"
-		}
-	}
 	host.updatesContext, host.updatesCancel = context.WithCancel(context.Background())
 	defer host.updatesCancel()
 	appURL := "/"
@@ -143,6 +132,9 @@ func run() error {
 		Windows:     windowsOptions,
 		OnShutdown: func() {
 			host.updatesCancel()
+			if host.launcher != nil {
+				host.launcher.closeRetention()
+			}
 			if host.pluginRuntimeCancel != nil {
 				host.pluginRuntimeCancel()
 				<-host.pluginRuntimeDone
@@ -157,6 +149,10 @@ func run() error {
 			cleanupAcceptance()
 		},
 	})
+	if useBundledPlugins {
+		host.startup = app.Autostart
+		host.startupError = ""
+	}
 	host.quit = app.Quit
 	updateExecutable, _ := os.Executable()
 	if !useBundledPlugins {
@@ -169,6 +165,9 @@ func run() error {
 	})
 	manager.SetUIHostCall(host.callInputHost)
 	host.launcher = &launcher{detached: map[uint]trustedWindow{}}
+	if prefs, err := manager.RetentionPreferences(); err == nil {
+		host.launcher.retention.preferences = prefs
+	}
 	host.opacity = &windowOpacityController{manager: manager, apply: host.launcher.setOpacity}
 	var shellSequence uint
 	newShell := func(url string, hidden bool) *application.WebviewWindow {
@@ -220,7 +219,7 @@ func run() error {
 		window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 			if host.launcher.isMain(window) {
 				event.Cancel()
-				window.Hide()
+				host.launcher.hide(window)
 			} else {
 				go host.releaseEmbedded(window)
 				host.launcher.forget(window)
@@ -230,7 +229,7 @@ func run() error {
 		window.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) {
 			if host.launcher.shouldHideOnBlur(window) {
 				host.cancelSearch()
-				window.Hide()
+				host.launcher.hide(window)
 			}
 			host.stopRecording(window)
 		})

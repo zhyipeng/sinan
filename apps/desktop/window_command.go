@@ -28,13 +28,21 @@ func (h *HostService) commandStartsHidden(id, command string) bool {
 }
 func (h *HostService) hideCommandWindows(window *application.WebviewWindow) {
 	if window != nil {
-		window.Hide()
+		h.hideSessionWindow(window)
 	}
 	h.launcher.mu.Lock()
 	main := h.launcher.window
 	h.launcher.mu.Unlock()
 	if main != nil && main != window {
-		main.Hide()
+		h.launcher.hide(main)
+	}
+}
+
+func (h *HostService) hideSessionWindow(window *application.WebviewWindow) {
+	if h.launcher.isMain(window) {
+		h.launcher.hide(window)
+	} else {
+		window.Hide()
 	}
 }
 
@@ -109,7 +117,7 @@ func (h *HostService) callWindowCommand(ctx context.Context, session *uiview.Ses
 		h.finishWindowCommand(entry, func() {
 			if !keepHidden {
 				entry.view.Show()
-				entry.window.Show()
+				h.launcher.reveal(entry.window)
 				entry.window.Focus()
 			}
 		})

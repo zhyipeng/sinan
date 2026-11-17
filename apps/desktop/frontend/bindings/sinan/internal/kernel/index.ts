@@ -5,6 +5,7 @@ export type {
     PackagePreview,
     PluginDataInfo,
     PluginInfo,
+    RetentionPreferences,
     SearchPreferences,
     Snapshot,
     WindowOpacityPreferences

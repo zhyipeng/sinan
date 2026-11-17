@@ -65,7 +65,7 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 			current := state.sequence[window] == sequence
 			state.mu.Unlock()
 			if current && ctx.Err() == nil {
-				window.Show()
+				h.launcher.reveal(window)
 				window.Focus()
 			}
 		}

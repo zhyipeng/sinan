@@ -265,9 +265,9 @@ Windows 使用固定 LLVM-MinGW UCRT 工具链及包内对应 C++/线程运行�
 
 ### 静默启动与开机自启
 
-设置「通用」在外观之后追加两个独立开关，默认关闭。静默启动下次启动生效，以隐藏状态创建主输入框，仍可从托盘和快捷键呼出；开机自启按当前用户登录触发，不强制静默。macOS 使用用户 LaunchAgent，Windows 使用 HKCU Run，Linux 使用 XDG Autostart（需要对应桌面会话支持，X11/Wayland 分别待实机核验）。开发自定义插件目录及探测/验收实例禁止修改系统自启；用户移动程序后需重新开启以更新路径。详见 [ADR 0073](adr/0073-startup-preferences.md)。
+设置「通用」在外观之后追加两个独立开关，默认关闭。静默启动下次启动生效，以隐藏状态创建主输入框，仍可从托盘和快捷键呼出；开机自启按当前用户登录触发，不强制静默。当前注册已改用 Wails `app.Autostart`：macOS 13+ 有效 app bundle 使用 SMAppService，其余支持场景由库采用 LaunchAgent，Windows 使用 HKCU Run，Linux 使用 XDG Autostart（需要对应桌面会话支持，X11/Wayland 分别待实机核验）。开发自定义插件目录及探测/验收实例禁止修改系统自启；用户移动程序后需重新开启以更新路径。初始方案见 [ADR 0073](adr/0073-startup-preferences.md)，当前 Wails 替代实现见 [ADR 0082](adr/0082-wails-autostart.md)。
 
-本轮 macOS arm64 通过标准入口 `node scripts/desktop.mjs test`（前端类型检查、生产构建、18 项 JS 及全量 Go 竞态回归），新增偏好/注册文件/宿主假注册器竞态测试及相关 Go 静态检查通过；`node scripts/desktop.mjs build` 本机桌面及配套程序构建通过。自启包三系统 arm64/amd64 六目标测试程序交叉编译和静态检查通过，Windows 两架构桌面测试程序交叉编译通过；不代表目标系统测试已运行。三平台 CI 沿用原生构建矩阵，Windows 追加启动偏好与自启无界面检查，尚未远端执行。未修改当前用户真实自启项，未执行实际登录、自启进程启动、真实桌面隐藏/呼出及三端 WebView 验收；未发布或调整插件发行资产。
+首次自定义注册实现的历史验证（该自启包现已删除）：macOS arm64 通过标准入口 `node scripts/desktop.mjs test`（前端类型检查、生产构建、18 项 JS 及全量 Go 竞态回归），新增偏好/注册文件/宿主假注册器竞态测试及相关 Go 静态检查通过；`node scripts/desktop.mjs build` 本机桌面及配套程序构建通过。自启包三系统 arm64/amd64 六目标测试程序交叉编译和静态检查通过，Windows 两架构桌面测试程序交叉编译通过；不代表目标系统测试已运行。三平台 CI 沿用原生构建矩阵，Windows 追加启动偏好与自启无界面检查，尚未远端执行。未修改当前用户真实自启项，未执行实际登录、自启进程启动、真实桌面隐藏/呼出及三端 WebView 验收；未发布或调整插件发行资产。
 
 
 ### 主窗口整体透明度
@@ -323,3 +323,20 @@ macOS arm64 标准无界面回归及桌面构建通过，新增输出/权限/撤
 macOS arm64 标准宿主无界面回归及桌面构建通过；PNG/JPEG/GIF 规范化、损坏/截断、像素/字节限制、输出编码上限与权限/撤销/请求字段均有无界面覆盖。官方仓库无界面测试、截图六目标构建/通用打包、合成 PNG 的真实 stdio 分块检查及 SDK 来源补丁/摘要检查通过；最终页面用例共 13 项，覆盖直接导入、双平台快捷键、原生 paste、无图/取消/解码失败保留当前图片及迟到结果。Windows arm64/amd64 desktop/manifest/uiview/kernel 测试程序交叉编译和 vet 通过；Linux arm64/amd64 共享 manifest/uiview/kernel 交叉编译和 vet 通过，未执行目标测试程序。Windows CI 补充这些无界面用例，远端未执行。
 
 最终截图 UI 为 4 个资源、151,526 字节。Linux 桌面本轮未原生构建；三端原生文件对话框、选图格式/路径、WebView 图片解码、实际剪贴板、输入法与焦点未实机验证。未启动桌面或浏览器、未读取系统剪贴板、未安装或发布；登记仓库无变化。仍须配套本轮新宿主，旧宿主不支持新权限和能力。
+
+
+### 主界面输入与插件 UI 独立保留
+
+设置「通用」新增清除输入框延迟、插件 UI 保留时长，默认均为 0 秒，整数秒范围 0–86400。主窗口隐藏开始计时，输入到期清除；期限内唤起保留输入或原插件 UI，到期返回主输入框。两项互不影响，拆出的窗口不参与，显式导航及截图/粘贴任务生命周期继续优先。共享 Go 计时、会话序号和 React 导航，三端同窗口原生插件承载复用既有实现；未新增平台 API、公开协议或权限。历史独立进程客体不支持非零插件 UI 保留，保存时明确拒绝。见 [ADR 0081](adr/0081-main-window-retention.md)。
+
+本轮 macOS arm64 标准 `node scripts/desktop.mjs test` 通过前端类型检查、生产构建、20 项 JS 用例与全量 Go 竞态回归；标准 `node scripts/desktop.mjs build` 的桌面和配套程序构建通过，相关 Go 静态检查通过。新增配置及宿主无界面用例覆盖独立截止、过期边界、旧回调取消、隐藏期间修改时长、输入不复活、重启、损坏记录、过期修订和保存失败；计时器用例仅使用未初始化的 Wails 值，没有创建原生窗口或事件循环。Linux arm64 无显示服务器、禁网容器中的 GTK3 内核/桌面定向竞态检查、静态检查及原生桌面构建通过；Windows amd64/arm64 内核和桌面测试程序交叉编译及静态检查通过，没有在 Windows 执行。Windows CI 已增补配置用例，远端未运行。macOS amd64、Linux amd64 未构建；三端热键、失焦、输入法、同窗口插件焦点恢复、真实隐藏和拆出及 Linux X11/Wayland 交互未实机验收。
+
+同期工作区正在实施另一项跨插件交接；上述验证反映运行时的工作区快照，不将并行功能视为本项配置的协议或发行成果。保留并行改动，只修正阻断回归的导入与前端空数组兼容问题；没有发布或修改插件登记资产。
+
+### 使用 Wails 自带开机自启（ADR 0082）
+
+按用户指令删除 `internal/startup` 的自定义 LaunchAgent、Windows Run、XDG 注册及对应平台文件测试，改由桌面宿主注入锁定 Wails 3.0.0 的 `app.Autostart`。已有注册通过库实时状态识别并复用，新增注册使用固定 Identifier `dev.sinan.desktop`、无附加参数；设置动作完成后再次复核状态，系统尚待批准时明确返回未生效提示。静默开关、可信设置私有绑定和开发/探测/验收实例限制保持不变，没有公开协议、SDK、manifest 或两个插件仓库的联动。
+
+macOS 13+ 有效 bundle 由 Wails 使用 SMAppService，其他支持场景采用 LaunchAgent；库的 LaunchAgent 分支会尝试 bootstrap/bootout，不能沿用旧代码「不立即加载」的保证。Windows/Linux 继续由库提供当前用户 Run/XDG 自启；Linux 桌面会话与 X11/Wayland 运行依赖、搬迁路径及系统策略仍需实机验证。详见 [ADR 0082](adr/0082-wails-autostart.md)。
+
+本轮 macOS arm64 标准 `node scripts/desktop.mjs test`（前端类型检查、构建、JS 无界面回归与全量 Go 竞态检查）和 `node scripts/desktop.mjs build` 通过；新增 Wails 假服务定向竞态用例与桌面静态检查通过。Linux arm64 无显示服务器、禁网容器中，GTK3 桌面定向竞态测试、静态检查及原生桌面构建通过；Windows amd64/arm64 桌面测试程序交叉编译、静态检查通过，未在 Windows 执行。macOS amd64、Linux amd64 本轮未构建。CI 已移除被删除内部包的引用，远端未运行。没有调用真实 Wails 自启服务、创建 application、修改本机登录项或触发系统授权/原生 UI；三端登录、自启进程、旧注册迁移、系统批准与真实桌面行为尚未验收，未发布。

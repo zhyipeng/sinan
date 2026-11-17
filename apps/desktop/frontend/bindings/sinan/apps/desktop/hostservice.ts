@@ -234,6 +234,10 @@ export function ResizeLauncher(height: number): $CancellablePromise<void> {
     return $Call.ByID(2198789619, height);
 }
 
+export function RetentionSettings(): $CancellablePromise<kernel$0.RetentionPreferences> {
+    return $Call.ByID(3005578598);
+}
+
 export function SaveAutoStart(enabled: boolean): $CancellablePromise<$models.StartupState> {
     return $Call.ByID(2526012483, enabled);
 }
@@ -256,6 +260,10 @@ export function SavePluginSettings(pluginID: string, revision: number, values: {
 
 export function SavePluginShortcut(pluginID: string, commandID: string, value: string, revision: number): $CancellablePromise<$models.ShortcutState> {
     return $Call.ByID(67871415, pluginID, commandID, value, revision);
+}
+
+export function SaveRetentionSettings(clearInputSeconds: number, pluginUISeconds: number, revision: number): $CancellablePromise<kernel$0.RetentionPreferences> {
+    return $Call.ByID(2249654889, clearInputSeconds, pluginUISeconds, revision);
 }
 
 export function SaveSearchPreferences(spaceToOpen: boolean, revision: number): $CancellablePromise<kernel$0.SearchPreferences> {

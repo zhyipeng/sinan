@@ -49,6 +49,13 @@ export interface PluginInfo {
     "searchProviders": manifest$0.SearchProvider[] | null;
 }
 
+export interface RetentionPreferences {
+    "clearInputSeconds": number;
+    "pluginUISeconds": number;
+    "revision": number;
+    "error"?: string;
+}
+
 export interface SearchPreferences {
     "spaceToOpen": boolean;
     "revision": number;

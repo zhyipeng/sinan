@@ -42,6 +42,9 @@ export default function App() {
   const latestPlugins = useRef(data.plugins);latestPlugins.current=data.plugins;
   const pointerPosition = useRef<{ x: number; y: number }>();
   const [active, setActive] = useState<{ plugin: Plugin; command: Command }>();
+  const activeRef = useRef(active);activeRef.current=active;
+  const visibilityEpoch = useRef(0);
+  const [resumeSearch, setResumeSearch] = useState(0);
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
@@ -83,23 +86,42 @@ export default function App() {
     Snapshot().then(snapshot => { setData(normalize(snapshot)); setConnected(true); })
       .catch(() => setError('无法连接桌面宿主，请重新启动司南。'));
     LauncherStatus().then(setShortcutError).catch(() => {});
-    const reset = () => {
+    const reset = (options: {preserveInput?:boolean;preserveView?:boolean;epoch?:number} = {}) => {
       // This listener is registered once; read the current role synchronously.
       // A stale/broadcast launcher event must never reset a detached tool.
       if (detachedRef.current) return;
+      if(options.epoch!==undefined){if(options.epoch<visibilityEpoch.current)return;visibilityEpoch.current=options.epoch;}
+      if(options.preserveView && activeRef.current){
+        if(!options.preserveInput){clearPasteState();setQuery('');}
+        return;
+      }
       generation.current++;
-      pasteLoading.current++;
-      disposePaste(pastedRef.current);pastedRef.current=undefined;setPasted(undefined);setPasteReading(false);
-      void ClearPaste(pasteSearchSequence.current).catch(()=>{});
+      if(!options.preserveInput){
+        pasteLoading.current++;
+        disposePaste(pastedRef.current);pastedRef.current=undefined;setPasted(undefined);setPasteReading(false);
+        void ClearPaste(pasteSearchSequence.current).catch(()=>{});
+      }
       activeSequence.current='';setSearchItems([]);setCommands([]);setSearching(false);setSearchFailures(0);
-      setRecovery(false); setActive(undefined); setQuery(''); setSelection({ key: '', manual: false });
+      setRecovery(false); setActive(undefined); if(!options.preserveInput)setQuery(''); setResumeSearch(value=>value+1); setSelection({ key: '', manual: false });
       setInput(''); setOutput(''); setError(''); setBusy(false);
       void LauncherStatus().then(setShortcutError).catch(() => {});
       void reload().catch(() => setError('无法读取插件，请重试。'));
       requestAnimationFrame(() => searchRef.current?.focus());
     };
-    const offShow = Events.On('launcher:show', reset);
-    const offReset = Events.On('launcher:reset', reset);
+    const offShow = Events.On('launcher:show', event => reset((event.data??{}) as {preserveInput?:boolean;preserveView?:boolean;epoch?:number}));
+    const offReset = Events.On('launcher:reset', () => reset());
+    const offVisibility = Events.On('launcher:visibility', event => {
+      const data=event.data as {epoch:number;clearInput:boolean};
+      if(detachedRef.current || data.epoch<visibilityEpoch.current)return;
+      visibilityEpoch.current=data.epoch;
+      if(data.clearInput){clearPasteState();setQuery('');}
+    });
+    const offClearInput = Events.On('launcher:clear-input', event => {
+      const epoch=(event.data as {epoch:number}).epoch;
+      if(detachedRef.current || epoch<visibilityEpoch.current)return;
+      visibilityEpoch.current=epoch;
+      clearPasteState();setQuery('');setSelection({key:'',manual:false});
+    });
     const offPlugin = Events.On('plugin-view:open', event => {
       const view = event.data as {pluginId:string;viewId:string;commandId:string;title:string};
       const current=++generation.current;
@@ -141,7 +163,7 @@ export default function App() {
     const offOpacityError = Events.On('window-opacity:error', event => setError(String(event.data)));
     const offPluginShortcutError = Events.On('plugin-shortcut:error', event => setError(String(event.data)));
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
-    return () => { offShow(); offReset(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); offPluginShortcutError(); offOpacityError(); };
+    return () => { offShow(); offReset(); offClearInput(); offVisibility(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); offPluginShortcutError(); offOpacityError(); };
   }, []);
 
   useEffect(() => {
@@ -193,7 +215,7 @@ export default function App() {
       if (activeSequence.current === String(sequence)) { setSearching(false); setError(reason instanceof Error ? reason.message : '搜索请求失败，请重试。'); }
     });
     return () => { activeSequence.current = ''; void CancelSearch(sequence).catch(() => {}); };
-  }, [pasted ? 'paste' : query, pasted, connected, recovery, active, data]);
+  }, [pasted ? 'paste' : query, pasted, connected, recovery, active, data, resumeSearch]);
 
   function clearPasteState() {
     pasteLoading.current++;disposePaste(pastedRef.current);pastedRef.current=undefined;setPasted(undefined);setPasteReading(false);
