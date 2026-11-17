@@ -40,6 +40,9 @@ const (
 // Session identity is the host-held object, never a plugin ID supplied by a page.
 // Binding is descriptive metadata, not a credential for reopening a session.
 type Session struct {
+	activation     chan struct{}
+	uploadWindow   time.Time
+	uploadCalls    int
 	caller         func(context.Context, protocol.UIRequest) (json.RawMessage, error)
 	calls          chan struct{}
 	callWindow     time.Time
@@ -223,8 +226,22 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		s.callWindow = time.Now()
 		s.callCount = 0
 	}
-	s.callCount++
-	if s.callCount > 120 {
+	// Only exact, bounded image data frames use their own rate budget.
+	frame := IsImageDataFrame(data)
+	if frame {
+		if time.Since(s.uploadWindow) >= time.Minute {
+			s.uploadWindow = time.Now()
+			s.uploadCalls = 0
+		}
+		s.uploadCalls++
+		if s.uploadCalls > 228 {
+			s.mu.Unlock()
+			return nil, errors.New("图片上传过于频繁")
+		}
+	} else {
+		s.callCount++
+	}
+	if !frame && s.callCount > 120 {
 		s.mu.Unlock()
 		return nil, errors.New("UI 调用过于频繁，请稍后重试")
 	}
@@ -256,6 +273,22 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}
+	case "dependency.status", "dependency.manage":
+		if len(fields) != 1 {
+			return nil, errors.New("依赖请求字段无效")
+		}
+	case "dependency.open", "image.upload.start":
+		if len(fields) != 3 || fields["input"] == nil || fields["value"] == nil {
+			return nil, errors.New("依赖交接字段无效")
+		}
+	case "image.upload.chunk":
+		if !frame {
+			return nil, errors.New("图片数据帧无效")
+		}
+	case "image.upload.finish", "image.upload.cancel":
+		if len(fields) != 2 || len(req.Input) != 32 {
+			return nil, errors.New("图片上传标识无效")
+		}
 	case "clipboard.writeText":
 		if len(fields) != 2 || fields["input"] == nil || len(req.Input) > 32<<10 {
 			return nil, errors.New("剪贴板文本请求无效或超过 32 KiB")
@@ -282,6 +315,9 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		return nil, errors.New("已有 UI 调用正在处理")
 	}
 	budget := 500 * time.Millisecond
+	if req.Method == "dependency.open" || req.Method == "dependency.manage" || req.Method == "image.upload.finish" || req.Method == "launch.get" {
+		budget = 10 * time.Second
+	}
 	if req.Method == "window.execute" || req.Method == "file.savePNG" || req.Method == "file.openImage" {
 		budget = 125 * time.Second
 	}
@@ -289,6 +325,9 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 	defer cancel()
 	unsubscribe := s.OnRevoke(cancel)
 	defer unsubscribe()
+	if err := s.WaitActivation(ctx); err != nil {
+		return nil, err
+	}
 	result, err := s.caller(ctx, req)
 	if err != nil {
 		return nil, err

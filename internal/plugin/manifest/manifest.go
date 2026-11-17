@@ -25,15 +25,16 @@ var commandPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 type Manifest struct {
-	Icon             string        `json:"icon,omitempty"`
-	ID               string        `json:"id"`
-	Name             string        `json:"name"`
-	Version          string        `json:"version"`
-	APIVersion       string        `json:"apiVersion"`
-	Runtime          Runtime       `json:"runtime"`
-	Contributes      Contributions `json:"contributes"`
-	Permissions      []string      `json:"permissions"`
-	ActivationEvents []string      `json:"activationEvents"`
+	Dependencies     []protocol.Dependency `json:"dependencies,omitempty"`
+	Icon             string                `json:"icon,omitempty"`
+	ID               string                `json:"id"`
+	Name             string                `json:"name"`
+	Version          string                `json:"version"`
+	APIVersion       string                `json:"apiVersion"`
+	Runtime          Runtime               `json:"runtime"`
+	Contributes      Contributions         `json:"contributes"`
+	Permissions      []string              `json:"permissions"`
+	ActivationEvents []string              `json:"activationEvents"`
 }
 
 type Runtime struct {
@@ -42,10 +43,11 @@ type Runtime struct {
 }
 
 type Contributions struct {
-	Settings        []Setting         `json:"settings,omitempty"`
-	Commands        []Command         `json:"commands"`
-	SearchProviders []SearchProvider  `json:"searchProviders,omitempty"`
-	UIViews         []protocol.UIView `json:"uiViews,omitempty"`
+	EntryPoints     []protocol.EntryPoint `json:"entryPoints,omitempty"`
+	Settings        []Setting             `json:"settings,omitempty"`
+	Commands        []Command             `json:"commands"`
+	SearchProviders []SearchProvider      `json:"searchProviders,omitempty"`
+	UIViews         []protocol.UIView     `json:"uiViews,omitempty"`
 }
 
 type Setting struct {
@@ -117,6 +119,9 @@ func Load(dir string) (Manifest, error) {
 }
 
 func (m Manifest) Validate() error {
+	if err := m.validateDependencies(); err != nil {
+		return err
+	}
 	if !icon.ValidPath(m.Icon) {
 		return errors.New("插件图标必须是包内 SVG、PNG 或 JPEG 相对路径")
 	}

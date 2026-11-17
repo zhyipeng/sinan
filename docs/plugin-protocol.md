@@ -426,3 +426,19 @@ window.execute 同日补充：后台 CommandResult.dismiss=true 时，宿主撤�
 `ui.image-input.v1` 增加 `file.openImage` 视图权限和 `{method:'file.openImage'}` / SDK `openImage()`，不接受路径或其他字段。宿主通过当前会话所属窗口弹 Wails 单文件选择对话框；取消返回 null，成功返回已有 UIImage 元数据（url/mimeType/width/height/bytes）。支持 PNG/JPEG/GIF 首帧；源文件最多 8 MiB、1600 万像素，完整解码并转为最多 4 MiB PNG，附加到会话私有资源，选择路径不回传插件。图片读取或解码失败拒绝调用，页面决定保留当前编辑内容。
 
 该方法采用 125 秒预算，WebView2 等待 127 秒；会话撤销后不返回新快照。单视图权限声明上限由 4 调整为 6，所有权限仍须分别声明；普通调用时限、资源/请求/响应和并发预算、CSP 不变。粘贴图片复用已有 `clipboard.readImage`，需视图 `clipboard.read` 权限。详见 [ADR 0079](adr/0079-image-import-and-paste.md)。
+
+## 插件依赖与页面交接（未发布增量）
+
+宿主能力 `ui.plugin-handoff.v1` 对应 [ADR 0080](adr/0080-plugin-handoff-and-dependencies.md)。manifest 新增根 `dependencies:[{id,pluginId,minVersion,optional,entries:[{id,version:"1"}]}]`，目标声明 `contributes.entryPoints:[{id,version:"1",commandId,input:"image"}]`，调用视图声明 `dependencies:[alias]`。各列表最多 8 项。公开命令须关联接受图片的桥 2 普通 HTML 视图，不支持 searchOnly、隐藏启动命令或可信内置组件。字段经 Go/TS 协议与 manifest Schema 校验后才能使用。
+
+页面调用：
+
+- `{method:"dependency.status"}`：只返回本视图已声明的依赖状态，包含别名、目标 ID、版本要求、optional、state/message。依赖不足不隐式安装或启用。
+- `{method:"image.upload.start",input:alias,value:{entryId,size}}`：校验目标和输入大小，返回 `{id}`。size 为 1..4 MiB。
+- `{method:"image.upload.chunk",input:"<id>:<offset>:<base64>"}`：每块最多 36 KiB，严格固定分块和连续偏移。
+- `{method:"image.upload.finish",input:id}`：完整校验 PNG 的 4 MiB/1600 万像素上限，返回 `{imageHandle}`。结束或取消后不能继续写入。
+- `{method:"image.upload.cancel",input:id}`：只释放当前源会话的同一份上传。
+- `{method:"dependency.open",input:alias,value:{entryId,imageHandle}}`：重新验证调用者、目标公开入口与指纹，准备并在原窗口提交目标页面，目标取得新的 launch.image。成功关闭源页面，失败保留源页面；句柄一次性消费，不接受目标 ID、路径、URL 或任意后台方法。
+- `{method:"dependency.manage"}`：导航至宿主固定的可信插件中心，不接受额外字段。此操作会离开当前截图页面。
+
+SDK 提供 readDependencies、stageDependencyImage、openDependency、discardDependencyImage、openDependencyManager。图像数据帧有独立每分钟 228 次预算，每视图最多两份 4 MiB 上传；普通桥预算及资源/CSP 保持不变。10 秒请求预算及 WebView2 12 秒等待适用于 dependency.open/manage、image.upload.finish、launch.get，其余调用时限见前节。目标未激活前业务调用等待，调用者失效、目标变化或提交失败均终止准备。

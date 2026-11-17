@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -141,6 +142,9 @@ func (h *HostService) openShortcutCommand(owner string) {
 }
 
 func (h *HostService) callInputHost(ctx context.Context, session *uiview.Session, req protocol.UIRequest) (json.RawMessage, error) {
+	if req.Method == "dependency.open" || req.Method == "dependency.manage" || strings.HasPrefix(req.Method, "image.upload.") {
+		return h.callDependencyHost(ctx, session, req)
+	}
 	if req.Method == "file.openImage" {
 		return h.callOpenImage(ctx, session)
 	}

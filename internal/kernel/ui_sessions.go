@@ -76,6 +76,9 @@ func (m *Manager) openUIViewLocked(ctx context.Context, id, viewID string, launc
 	if err != nil {
 		return nil, err
 	}
+	if err := m.checkRequired(p, map[string]bool{}); err != nil {
+		return nil, err
+	}
 	p.mu.Lock()
 	if p.removed || p.disabled || p.changed {
 		p.mu.Unlock()
@@ -204,6 +207,12 @@ func uiHeaderTitle(name, title string) (string, string) {
 // OpenUICommandWithPaste rechecks the current declaration before transferring
 // an explicit paste into a view, including after plugin reload or upgrade.
 func (m *Manager) OpenUICommandWithPaste(ctx context.Context, id, commandID string, content *paste.Content) (*uiview.Session, error) {
+	return m.openImageCommand(ctx, id, commandID, content, false)
+}
+func (m *Manager) PrepareImageCommand(ctx context.Context, id, commandID string, content *paste.Content) (*uiview.Session, error) {
+	return m.openImageCommand(ctx, id, commandID, content, true)
+}
+func (m *Manager) openImageCommand(ctx context.Context, id, commandID string, content *paste.Content, suspended bool) (*uiview.Session, error) {
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -230,7 +239,11 @@ func (m *Manager) OpenUICommandWithPaste(ctx context.Context, id, commandID stri
 				return nil, errors.New("粘贴输入需要 UI 桥 2")
 			}
 		}
-		return m.openUIViewLocked(ctx, id, command.UIView, launch, content)
+		s, err := m.openUIViewLocked(ctx, id, command.UIView, launch, content)
+		if err == nil && suspended {
+			s.Suspend()
+		}
+		return s, err
 	}
 	return nil, errors.New("此插件命令不匹配当前粘贴内容")
 }

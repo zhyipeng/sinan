@@ -7,6 +7,15 @@ export interface CommandResult {
     "keepHidden"?: boolean;
 }
 
+export interface DependencyStatus {
+    "id": string;
+    "pluginId": string;
+    "state": string;
+    "message": string;
+    "optional": boolean;
+    "minVersion": string;
+}
+
 /**
  * InputMatcher declares local matching without activating a plugin process.
  * Matchers on a command are ORed. Regex uses Go/RE2 syntax and substring matching.
@@ -53,6 +62,7 @@ export interface ThemeState {
  * bridge 2 explicitly allows same-plugin backend commands and private storage.
  */
 export interface UIView {
+    "dependencies"?: string[] | null;
     "commands"?: string[] | null;
     "title"?: string;
     "id": string;

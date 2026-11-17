@@ -152,6 +152,18 @@ export default function App() {
         setRecovery(false); setActive({plugin, command}); setBusy(false); setOutput(''); setError('');
       }).catch(() => { if (current === generation.current) setError('无法读取设置插件。'); });
     });
+    const offPluginCenter = Events.On('plugin-center:open', () => {
+      const current = ++generation.current;
+      void Snapshot().then(snapshot => {
+        if (current !== generation.current) return;
+        const next = normalize(snapshot);
+        setData(next); setConnected(true);
+        const plugin = next.plugins.find(plugin => plugin.id === 'system.plugin-manager' && !plugin.disabled);
+        const command = plugin?.commands.find(command => command.id === 'open' && command.view === 'manager');
+        if (!plugin || !command) { setError('插件中心不可用。'); return; }
+        setRecovery(false); setActive({plugin, command}); setBusy(false); setOutput(''); setError('');
+      }).catch(() => { if (current === generation.current) setError('无法读取插件中心。'); });
+    });
     const applyDetachShortcut = (state: {active:string; shortcut:string; revision:number}) => {
       if (state.revision < detachRevision.current) return;
       detachRevision.current = state.revision;
@@ -163,7 +175,7 @@ export default function App() {
     const offOpacityError = Events.On('window-opacity:error', event => setError(String(event.data)));
     const offPluginShortcutError = Events.On('plugin-shortcut:error', event => setError(String(event.data)));
     const offShortcut = Events.On('shortcut:changed', event => setShortcutError((event.data as {error?: string}).error ?? ''));
-    return () => { offShow(); offReset(); offClearInput(); offVisibility(); offPlugin(); offPluginClosed(); offSettings(); offShortcut(); offDetached(); offDetachShortcut(); offPluginShortcutError(); offOpacityError(); };
+    return () => { offShow(); offReset(); offClearInput(); offVisibility(); offPlugin(); offPluginClosed(); offSettings(); offPluginCenter(); offShortcut(); offDetached(); offDetachShortcut(); offPluginShortcutError(); offOpacityError(); };
   }, []);
 
   useEffect(() => {

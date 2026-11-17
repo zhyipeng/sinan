@@ -48,6 +48,10 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		m.mutationMu.Unlock()
 		return nil, err
 	}
+	if req.Method == "dependency.status" || req.Method == "dependency.open" || req.Method == "dependency.manage" || strings.HasPrefix(req.Method, "image.upload.") {
+		m.mutationMu.Unlock()
+		return m.callDependency(ctx, p, session, view, req)
+	}
 	if req.Method == "launch.get" {
 		defer m.mutationMu.Unlock()
 		return marshalUIResult(launch)

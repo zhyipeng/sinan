@@ -156,3 +156,28 @@ func TestNativeBridgeInvalidTrafficConsumesBudget(t *testing.T) {
 		t.Fatal("invalid request flood bypassed budget")
 	}
 }
+
+func TestNativeBridgeImageFramesKeepIndependentBudget(t *testing.T) {
+	bridge, s := bridgeFixture(t)
+	s.Message([]byte(`{"kind":"ready","version":2}`))
+	s.ConfigureCaller(func(context.Context, protocol.UIRequest) (json.RawMessage, error) {
+		return json.RawMessage(`null`), nil
+	})
+	frame := []byte(`{"method":"image.upload.chunk","input":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:0:YQ=="}`)
+	for range 228 {
+		if _, err := bridge.Call(bridge.entry, true, frame); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range 120 {
+		if _, err := bridge.Call(bridge.entry, true, []byte(`{"method":"dependency.status"}`)); err != nil {
+			t.Fatal("image frames exhausted control calls", err)
+		}
+	}
+	if _, err := bridge.Call(bridge.entry, true, frame); err == nil {
+		t.Fatal("image frame quota ignored")
+	}
+	if !s.Active() {
+		t.Fatal("ordinary native request budget consumed by data frames")
+	}
+}

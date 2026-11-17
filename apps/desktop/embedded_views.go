@@ -23,14 +23,17 @@ type embeddedSurface interface {
 	Done() <-chan struct{}
 }
 type embeddedEntry struct {
-	inputTarget  uintptr
-	pasting      bool
-	executing    bool
-	awaitingTask bool
-	hiddenLaunch bool
-	view         embeddedSurface
-	session      *uiview.Session
-	window       *application.WebviewWindow
+	imageUpload       *dependencyImage
+	imageUploadWindow time.Time
+	imageUploads      int
+	inputTarget       uintptr
+	pasting           bool
+	executing         bool
+	awaitingTask      bool
+	hiddenLaunch      bool
+	view              embeddedSurface
+	session           *uiview.Session
+	window            *application.WebviewWindow
 }
 type embeddedViews struct {
 	mu       sync.Mutex
@@ -44,7 +47,7 @@ func (h *HostService) openEmbedded(ctx context.Context, id, viewID, commandID st
 func (h *HostService) openEmbeddedWithInput(ctx context.Context, id, viewID, commandID string, input *string) error {
 	return h.openEmbeddedPrepared(ctx, id, viewID, commandID, input, nil, nil)
 }
-func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, commandID string, input *string, content *paste.Content, check func() bool) error {
+func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, commandID string, input *string, content *paste.Content, check func() bool, handoffs ...*handoffOpen) error {
 	window := h.launcher.caller(ctx)
 	if window == nil {
 		return errors.New("窗口不可用")
@@ -72,7 +75,19 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	}()
 	var session *uiview.Session
 	var err error
-	if content != nil {
+	if len(handoffs) > 0 {
+		plan := handoffs[0]
+		session, err = h.manager.PrepareDependencyImage(ctx, plan.source, plan.alias, plan.entry, plan.fingerprint, content)
+		if err == nil {
+			id = session.Binding().PluginID
+			resolved, e := h.manager.ResolveDependency(plan.source, plan.alias, plan.entry)
+			if e != nil {
+				session.Revoke()
+				return e
+			}
+			commandID = resolved.CommandID
+		}
+	} else if content != nil {
 		session, err = h.manager.OpenUICommandWithPaste(ctx, id, commandID, content)
 	} else if commandID != "" {
 		if input == nil {
@@ -131,15 +146,31 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	target := h.launcher.inputTarget
 	h.launcher.mu.Unlock()
 	entry = &embeddedEntry{inputTarget: target, view: nativeView, session: session, window: window, awaitingTask: hidden, hiddenLaunch: hidden}
-	state.mu.Lock()
-	if state.sequence[window] != sequence || !session.Active() || check != nil && !check() {
-		state.mu.Unlock()
-		nativeView.Close()
-		return errors.New("插件页面打开已取消")
+	var previous *embeddedEntry
+	swap := func() error {
+		if check != nil && !check() {
+			return errors.New("插件页面打开已取消")
+		}
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		if state.sequence[window] != sequence || !session.Active() {
+			return errors.New("插件页面打开已取消")
+		}
+		previous = state.entries[window]
+		state.entries[window] = entry
+		return nil
 	}
-	previous := state.entries[window]
-	state.entries[window] = entry
-	state.mu.Unlock()
+	if len(handoffs) > 0 {
+		plan := handoffs[0]
+		err = h.manager.CommitDependency(ctx, plan.source, session, plan.alias, plan.entry, swap)
+	} else {
+		err = swap()
+	}
+	if err != nil {
+		nativeView.Close()
+		return err
+	}
+
 	if previous != nil {
 		previous.view.Close()
 	}

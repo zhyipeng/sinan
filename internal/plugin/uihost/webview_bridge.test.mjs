@@ -84,3 +84,8 @@ test('window execution and native PNG save receive bounded long deadlines',async
 test('file.openImage receives the dialog deadline',async()=>{
  const f=fixture();const opened=f.page.webkit.messageHandlers.sinanCall.postMessage({method:'file.openImage'});assert.equal(f.delays.at(-1),127000);f.reply({channel:'sinan:reply',id:1,result:null});assert.equal(await opened,null);
 });
+
+test('handoff and deferred launch have bounded preparation deadlines',async()=>{
+ const f=fixture();let id=0;for(const method of ['dependency.open','dependency.manage','image.upload.finish','launch.get']){const pending=f.page.webkit.messageHandlers.sinanCall.postMessage({method});assert.equal(f.delays.at(-1),12000);f.reply({channel:'sinan:reply',id:++id,result:null});await pending;}
+ const pending=f.page.webkit.messageHandlers.sinanCall.postMessage({method:'dependency.status'});assert.equal(f.delays.at(-1),2000);f.reply({channel:'sinan:reply',id:++id,result:[]});await pending;
+});

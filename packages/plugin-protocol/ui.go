@@ -11,6 +11,7 @@ func SupportedUIBridge(v string) bool { return v == UIBridgeVersion || v == UIRe
 // UIView declares a fixed resource entry. Bridge 1 accepts no capabilities;
 // bridge 2 explicitly allows same-plugin backend commands and private storage.
 type UIView struct {
+	Dependencies  []string `json:"dependencies,omitempty"`
 	Commands      []string `json:"commands,omitempty"`
 	Title         string   `json:"title,omitempty"`
 	ID            string   `json:"id"`

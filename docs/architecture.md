@@ -484,6 +484,10 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 
 截图后处理输入补充：新增会话级 file.openImage 权限及 ui.image-input.v1，宿主原生选图、校验并转为受限 PNG 快照，复用会话资源 URL；业务页面负责导入入口、Command/Ctrl+V 与编辑器载入。图片粘贴沿用 clipboard.readImage，路径与任意文件读取能力不进入页面桥，CSP 不变。视图权限数量上限由 4 调整为 6。见 [ADR 0079](adr/0079-image-import-and-paste.md)。
 
+### 插件间页面交接与依赖检查
+
+用户已选择截图后处理通过跳转 OCR 插件完成识别。已按确认的[交接设计](design/plugin-handoff-and-dependencies.md)实现 ui.plugin-handoff.v1：可选依赖、公开图片入口、会话绑定的图片暂存及准备/提交/激活事务；OCR 识别业务留在独立插件，宿主只协调数据与导航。硬依赖不足时阻止激活，插件中心显示依赖状态；实际权限、兼容与验证边界见 [ADR 0080](adr/0080-plugin-handoff-and-dependencies.md)。尚未提供后台跨插件 RPC，未发布。
+
 
 ### 主界面会话保留
 

@@ -22,7 +22,7 @@ const managementBridge: ManagementBridge = {
   async createProject(options){return await CreatePluginProject(options);},
   async listData(){return await PluginData()??[];},
   async clearData(id,token){await ClearPluginData(id,token);},
-  async refresh(){const [data,uiEnabled]=await Promise.all([Refresh(),PluginUIEnabled()]);return {plugins:data.plugins??[],diagnostics:data.diagnostics??[],uiEnabled};},
+  async refresh(){const [data,uiEnabled]=await Promise.all([Refresh(),PluginUIEnabled()]);return {plugins:(data.plugins??[]).map(plugin=>({...plugin,dependencies:plugin.dependencies??[],requiredBy:plugin.requiredBy??[]})),diagnostics:data.diagnostics??[],uiEnabled};},
   async stop(id){await Stop(id);},
   async uninstall(id){await Uninstall(id);},
   async reload(id){return await Reload(id);},

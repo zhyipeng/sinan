@@ -30,6 +30,8 @@ export interface PluginDataInfo {
 }
 
 export interface PluginInfo {
+    "dependencies"?: protocol$0.DependencyStatus[] | null;
+    "requiredBy"?: string[] | null;
     "activationEvents"?: string[] | null;
     "icon"?: string;
     "development"?: boolean;

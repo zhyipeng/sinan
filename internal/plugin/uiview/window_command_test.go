@@ -96,3 +96,20 @@ func TestImageOutputBridgeRejectsExtraFields(t *testing.T) {
 		}
 	}
 }
+
+func TestDependencyBridgeStrictFields(t *testing.T) {
+	s := windowSession(t)
+	calls := 0
+	s.ConfigureCaller(func(context.Context, protocol.UIRequest) (json.RawMessage, error) {
+		calls++
+		return json.RawMessage(`null`), nil
+	})
+	for _, raw := range []string{`{"method":"dependency.status","input":"other"}`, `{"method":"dependency.open","input":"ocr","value":{},"pluginId":"other.plugin"}`, `{"method":"image.upload.start","input":"ocr"}`, `{"method":"image.upload.chunk","input":"invalid"}`, `{"method":"image.upload.finish","input":"short"}`, `{"method":"dependency.manage","value":null}`} {
+		if _, err := s.Call(context.Background(), []byte(raw)); err == nil {
+			t.Fatal("malformed dependency request accepted", raw)
+		}
+	}
+	if calls != 0 {
+		t.Fatal("malformed request reached host")
+	}
+}

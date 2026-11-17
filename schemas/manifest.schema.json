@@ -515,6 +515,14 @@
                   "pattern": "^[a-z][a-z0-9-]*$"
                 },
                 "description": "桥 2 的同插件后端命令白名单；须引用已声明的非视图命令。"
+              },
+              "dependencies": {
+                "type": "array",
+                "maxItems": 8,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "allOf": [
@@ -538,6 +546,34 @@
                 }
               }
             ]
+          }
+        },
+        "entryPoints": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "version",
+              "commandId",
+              "input"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "const": "1"
+              },
+              "commandId": {
+                "type": "string"
+              },
+              "input": {
+                "const": "image"
+              }
+            }
           }
         }
       }
@@ -566,6 +602,13 @@
       "type": "string",
       "maxLength": 256,
       "description": "可选包内相对路径，支持 SVG、PNG、JPEG；无效资源回退插件名首字。"
+    },
+    "dependencies": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/dependency"
+      }
     }
   },
   "allOf": [
@@ -654,5 +697,59 @@
         }
       }
     }
-  ]
+  ],
+  "$defs": {
+    "entryRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "version": {
+          "const": "1"
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "pluginId",
+        "minVersion",
+        "entries"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "minVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/entryRequirement"
+          }
+        }
+      }
+    }
+  }
 }

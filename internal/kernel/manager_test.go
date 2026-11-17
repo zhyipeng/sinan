@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -19,16 +20,20 @@ import (
 var helper []byte
 
 func TestMain(m *testing.M) {
+	helperName := "plugin"
+	if runtime.GOOS == "windows" {
+		helperName += ".exe"
+	}
 	dir, err := os.MkdirTemp("", "sinan-native-test-")
 	if err != nil {
 		os.Exit(1)
 	}
-	cmd := exec.Command("go", "build", "-o", filepath.Join(dir, "plugin"), "./testdata/plugin")
+	cmd := exec.Command("go", "build", "-o", filepath.Join(dir, helperName), "./testdata/plugin")
 	if err := cmd.Run(); err != nil {
 		os.RemoveAll(dir)
 		os.Exit(1)
 	}
-	helper, err = os.ReadFile(filepath.Join(dir, "plugin"))
+	helper, err = os.ReadFile(filepath.Join(dir, helperName))
 	if err != nil {
 		os.RemoveAll(dir)
 		os.Exit(1)
@@ -43,11 +48,15 @@ func source(t *testing.T, native bool) string {
 	dir := t.TempDir()
 	mf := manifest.Manifest{ID: "example.hello", Name: "Hello", Version: "0.1.0", APIVersion: "1", Runtime: manifest.Runtime{Kind: "declarative"}, Contributes: manifest.Contributions{Commands: []manifest.Command{{ID: "hello", Title: "Hello", Message: "你好"}}}}
 	if native {
+		name := "plugin"
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
 		mf.ID = "example.native"
 		mf.Contributes.SearchProviders = []manifest.SearchProvider{{ID: "demo"}}
-		mf.Runtime = manifest.Runtime{Kind: "process", Entry: "plugin"}
+		mf.Runtime = manifest.Runtime{Kind: "process", Entry: name}
 		mf.Contributes.Commands = []manifest.Command{{ID: "echo", Title: "Echo"}, {ID: "hang", Title: "Hang"}, {ID: "crash", Title: "Crash"}, {ID: "invalid", Title: "Invalid"}}
-		if err := os.WriteFile(filepath.Join(dir, "plugin"), helper, 0700); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, name), helper, 0700); err != nil {
 			t.Fatal(err)
 		}
 	}

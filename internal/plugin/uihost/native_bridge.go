@@ -86,7 +86,8 @@ func (b *nativeBridge) Message(source string, mainFrame bool, data []byte) (uivi
 }
 
 func (b *nativeBridge) Call(source string, mainFrame bool, data []byte) (json.RawMessage, error) {
-	if !b.consume(0) || !mainFrame || source != b.entry || len(data) > uiview.MaxCallBytes {
+	frame := uiview.IsImageDataFrame(data)
+	if (!frame && !b.consume(0)) || !b.session.Active() || !mainFrame || source != b.entry || len(data) > uiview.MaxCallBytes {
 		return nil, errors.New("原生插件调用来源或预算无效")
 	}
 	var value json.RawMessage

@@ -40,12 +40,16 @@ func (m *Manager) Upgrade(source string, trustNative bool) (PluginInfo, error) {
 func (m *Manager) applyPackage(source string, trustNative bool, expected string, requireExisting bool, expectedInstalled *string) (PluginInfo, error) {
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
+	defer m.invalidateDependents()
 	abs, err := m.packageSource(source)
 	if err != nil {
 		return PluginInfo{}, err
 	}
 	mf, err := manifest.Load(abs)
 	if err != nil {
+		return PluginInfo{}, err
+	}
+	if err = m.validateDependencyGraph(mf); err != nil {
 		return PluginInfo{}, err
 	}
 	if m.packageChangesBlocked(mf.ID) {
@@ -185,7 +189,7 @@ func (m *Manager) applyPackage(source string, trustNative bool, expected string,
 }
 func (m *Manager) packageInstance(mf manifest.Manifest, digest, dir string) *plugin {
 	development := dir != filepath.Join(m.root, mf.ID)
-	return &plugin{development: development, nativeTrusted: developmentApproved(m.root, mf.ID, dir), disabled: m.enablementErr != nil || m.disabled[mf.ID], manifest: mf, fingerprint: digest, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
+	return &plugin{manager: m, development: development, nativeTrusted: developmentApproved(m.root, mf.ID, dir), disabled: m.enablementErr != nil || m.disabled[mf.ID], manifest: mf, fingerprint: digest, dir: dir, state: "installed", settings: settingsValues(mf, m.settings.Get(mf.ID).Values)}
 }
 func (m *Manager) publishReplacement(p *plugin) {
 	m.mu.Lock()

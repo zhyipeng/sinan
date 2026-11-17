@@ -26,23 +26,25 @@ import (
 )
 
 type PluginInfo struct {
-	ActivationEvents       []string                  `json:"activationEvents,omitempty"`
-	Icon                   string                    `json:"icon,omitempty"`
-	Development            bool                      `json:"development,omitempty"`
-	DevelopmentFingerprint string                    `json:"developmentFingerprint,omitempty"`
-	NeedsTrust             bool                      `json:"needsTrust,omitempty"`
-	Protected              bool                      `json:"protected"`
-	UIViews                []protocol.UIView         `json:"uiViews,omitempty"`
-	Disabled               bool                      `json:"disabled"`
-	Changed                bool                      `json:"changed"`
-	Settings               []manifest.Setting        `json:"settings,omitempty"`
-	ID                     string                    `json:"id"`
-	Name                   string                    `json:"name"`
-	Version                string                    `json:"version"`
-	Kind                   string                    `json:"kind"`
-	State                  string                    `json:"state"`
-	Commands               []manifest.Command        `json:"commands"`
-	SearchProviders        []manifest.SearchProvider `json:"searchProviders"`
+	Dependencies           []protocol.DependencyStatus `json:"dependencies,omitempty"`
+	RequiredBy             []string                    `json:"requiredBy,omitempty"`
+	ActivationEvents       []string                    `json:"activationEvents,omitempty"`
+	Icon                   string                      `json:"icon,omitempty"`
+	Development            bool                        `json:"development,omitempty"`
+	DevelopmentFingerprint string                      `json:"developmentFingerprint,omitempty"`
+	NeedsTrust             bool                        `json:"needsTrust,omitempty"`
+	Protected              bool                        `json:"protected"`
+	UIViews                []protocol.UIView           `json:"uiViews,omitempty"`
+	Disabled               bool                        `json:"disabled"`
+	Changed                bool                        `json:"changed"`
+	Settings               []manifest.Setting          `json:"settings,omitempty"`
+	ID                     string                      `json:"id"`
+	Name                   string                      `json:"name"`
+	Version                string                      `json:"version"`
+	Kind                   string                      `json:"kind"`
+	State                  string                      `json:"state"`
+	Commands               []manifest.Command          `json:"commands"`
+	SearchProviders        []manifest.SearchProvider   `json:"searchProviders"`
 }
 
 type Snapshot struct {
@@ -51,6 +53,7 @@ type Snapshot struct {
 }
 
 type plugin struct {
+	manager       *Manager
 	development   bool
 	nativeTrusted bool
 	views         map[*uiview.Session]struct{}
@@ -219,6 +222,23 @@ func (m *Manager) Snapshot() Snapshot {
 		}
 		p.mu.Unlock()
 	}
+	for i := range result.Plugins {
+		p, _ := m.lookup(result.Plugins[i].ID)
+		if p != nil {
+			result.Plugins[i].Dependencies = m.dependencyStatuses(p, nil)
+			if !result.Plugins[i].Disabled && m.checkRequired(p, map[string]bool{}) != nil {
+				result.Plugins[i].State = "blocked"
+			}
+		}
+		for _, other := range entries {
+			for _, d := range other.manifest.Dependencies {
+				if d.PluginID == result.Plugins[i].ID {
+					result.Plugins[i].RequiredBy = append(result.Plugins[i].RequiredBy, other.manifest.ID)
+				}
+			}
+		}
+		sort.Strings(result.Plugins[i].RequiredBy)
+	}
 	sort.Slice(result.Plugins, func(i, j int) bool { return result.Plugins[i].ID < result.Plugins[j].ID })
 	return result
 }
@@ -256,6 +276,9 @@ func (m *Manager) installLocked(source string, trustNative bool, expected string
 	}
 	mf, err := manifest.Load(abs)
 	if err != nil {
+		return PluginInfo{}, err
+	}
+	if err = m.validateDependencyGraph(mf); err != nil {
 		return PluginInfo{}, err
 	}
 	if m.packageChangesBlocked(mf.ID) {
@@ -381,12 +404,22 @@ func (m *Manager) current(id string, p *plugin) bool {
 }
 
 func (p *plugin) ensureProcess(ctx context.Context, root string) (*transport.Process, error) {
+	if p.manager != nil {
+		if err := p.manager.checkRequired(p, map[string]bool{}); err != nil {
+			return nil, err
+		}
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.ensureProcessLocked(ctx, root)
 }
 
 func (p *plugin) ensureUIProcess(ctx context.Context, root string) (*transport.Process, error) {
+	if p.manager != nil {
+		if err := p.manager.checkRequired(p, map[string]bool{}); err != nil {
+			return nil, err
+		}
+	}
 	if !p.mu.TryLock() {
 		return nil, errors.New("插件正在切换，请稍后重试")
 	}
@@ -446,7 +479,7 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 		p.state = "failed"
 		return nil, errors.New("无法创建插件持久数据目录")
 	}
-	err = process.Call(ctx, "initialize", protocol.InitializeParams{HostCapabilities: []string{protocol.ClipboardCapability, protocol.ImageCommandCapability, protocol.WindowExecuteCapability, protocol.ImageOutputCapability, protocol.ImageInputCapability}, APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{HostCapabilities: []string{protocol.ClipboardCapability, protocol.ImageCommandCapability, protocol.WindowExecuteCapability, protocol.ImageOutputCapability, protocol.ImageInputCapability, protocol.PluginHandoffCapability}, APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
 	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
 		process.Stop()
 		p.state = "failed"
@@ -490,6 +523,9 @@ func (m *Manager) Execute(ctx context.Context, pluginID, commandID, input string
 	}
 	p, err := m.lookup(pluginID)
 	if err != nil {
+		return protocol.CommandResult{}, err
+	}
+	if err = m.checkRequired(p, map[string]bool{}); err != nil {
 		return protocol.CommandResult{}, err
 	}
 	p.mu.Lock()
@@ -635,6 +671,7 @@ func (m *Manager) uninstall(id, expected string) error {
 	}
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
+	defer m.invalidateDependents()
 	if m.packageChangesBlocked(id) {
 		return errors.New("存在未恢复的升级事务，请修复后重启")
 	}

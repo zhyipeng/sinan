@@ -3,6 +3,7 @@
 
 export type {
     CommandResult,
+    DependencyStatus,
     InputMatcher,
     PasteContent,
     PasteImage,

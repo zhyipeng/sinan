@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import CreatePlugin, {type ProjectBridge} from './CreatePlugin';
 import PluginData,{type DataBridge} from './PluginData';
 
-export type ManagedPlugin = {icon?: string;development?: boolean; developmentFingerprint?: string; needsTrust?: boolean; protected?: boolean; id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string;title?:string}[] | null};
+export type ManagedPlugin = {dependencies?:{id:string;pluginId:string;state:string;message:string;optional:boolean;minVersion:string}[]|null;requiredBy?:string[]|null;icon?: string;development?: boolean; developmentFingerprint?: string; needsTrust?: boolean; protected?: boolean; id: string; name: string; version: string; kind: string; state: string; changed?: boolean; disabled?: boolean; uiViews?: {id:string;title?:string}[] | null};
 export type ManagedSnapshot = {plugins: ManagedPlugin[]; diagnostics: string[]; uiEnabled?: boolean};
 export type PackagePreview = {id: string; name: string; version: string; kind: string; installedVersion: string; fingerprint: string; installedFingerprint: string; changed: boolean};
 export type ManagementBridge = DataBridge & ProjectBridge & {
@@ -23,7 +23,7 @@ export type ManagementBridge = DataBridge & ProjectBridge & {
   subscribeWindows?(failed:()=>void):()=>void;
 };
 function downloadSize(bytes:number){return bytes<1024*1024?`${(bytes/1024).toFixed(1)} KiB`:`${(bytes/1024/1024).toFixed(1)} MiB`;}
-const states: Record<string,string> = {installed:'已安装',activating:'启动中',activated:'已激活',running:'运行中',deactivated:'已停止',failed:'运行失败',disabled:'已禁用'};
+const states: Record<string,string> = {installed:'已安装',activating:'启动中',activated:'已激活',running:'运行中',deactivated:'已停止',failed:'运行失败',disabled:'已禁用',blocked:'依赖不可用'};
 
 export default function PluginManager({bridge, onChanged, onRecover,storeBridge}: {bridge: ManagementBridge; storeBridge: StoreBridge; onChanged(): Promise<void>; onRecover(): void}) {
   const [data,setData]=useState<ManagedSnapshot>({plugins:[],diagnostics:[]});
@@ -156,6 +156,8 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
         </div>
         {selected&&<PluginDetails plugin={selected}>
           <p className="store-note">{selected.version} · {states[selected.state]??selected.state}{selected.development?' · 开发链接':''}{selected.changed?' · 文件有变更':''}</p>
+          {!!selected.dependencies?.length&&<div className="store-note">{selected.dependencies.map(dep=><p key={dep.id}>{dep.pluginId} ≥ {dep.minVersion} · {dep.optional?'可选':'必需'} · {dep.state==='available'?'可用':dep.message}<button disabled={busy||projectBusy} onClick={()=>{if(data.plugins.some(p=>p.id===dep.pluginId)){setSelectedID(dep.pluginId);}else{setStoreID(dep.pluginId);setTab('discover');}}}>查看</button></p>)}</div>}
+          {!!selected.requiredBy?.length&&<p className="store-note">被依赖：{selected.requiredBy.join('、')}</p>}
           {renderActions(selected.id)}
           {!selected.protected&&!selected.development&&<button className="center-browse" disabled={busy||projectBusy} onClick={()=>{setStoreID(selected.id);setTab('discover');}}>查看商店版本</button>}
         </PluginDetails>}

@@ -58,6 +58,7 @@ func (m *Manager) SetPluginEnabled(id string, enabled bool) (PluginInfo, error) 
 	}
 	m.mutationMu.Lock()
 	defer m.mutationMu.Unlock()
+	defer m.invalidateDependents()
 	p, err := m.lookup(id)
 	if err != nil {
 		return PluginInfo{}, err
