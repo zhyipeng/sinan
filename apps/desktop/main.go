@@ -141,6 +141,9 @@ func run() error {
 			}
 			host.cancelSearch()
 			host.closePluginStore()
+			if host.embedded != nil {
+				uihost.CloseWarmEmbedded(application.InvokeSync)
+			}
 			go host.closeEmbeddedAll()
 			if host.ui != nil {
 				host.ui.Close()
@@ -215,6 +218,13 @@ func run() error {
 		})
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(_ *application.WindowEvent) {
 			go host.restoreWindowOpacity(window)
+			if host.embedded != nil && runtime.GOOS == "windows" {
+				go func() {
+					if host.launcher.isMain(window) {
+						uihost.WarmEmbedded(window.NativeWindow, application.InvokeSync)
+					}
+				}()
+			}
 		})
 		window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 			if host.launcher.isMain(window) {

@@ -395,6 +395,8 @@ Linux GTK3 现实现独立 ephemeral WebKitContext、独立用户脚本与命名
 
 Windows amd64/arm64 现接入独立 WebView2 Environment、InPrivate Profile 和原生 Controller，保留可信页头及现有准备/提交/撤销/拆出路径。资源通过每次视图独立的虚拟 HTTPS 源映射到绑定快照，全部资源事件由宿主处理，不映射磁盘目录或启动 HTTP 服务；消息来源取自引擎顶层事件。仅兼容 SDK 窄桥，不注册 Wails Bridge、Host Object 或通用 CDP 接口。临时配置目录可写且可能残留，不将 InPrivate 描述为内存存储或 OS 沙箱。交叉编译、静态检查与无窗口边界测试已通过，Windows 原生 COM 测试仅编译，实际引擎、焦点和缩放仍待实机验收。见 [ADR 0055](adr/0055-webview2-isolated-plugin-content.md)。
 
+Windows 主窗口可接管一个预热的空 WebView2 Controller。每个控制器和随附的独立 Environment、InPrivate Profile 只绑定一次插件会话，并随会话回收。宿主先建立专用子 HWND，通过它管理内容区的层叠及显示。见 [ADR 0083](adr/0083-webview2-warm-controller.md)。
+
 ### 官方剪贴板与插件系统输入（2026-11-14）
 
 官方插件仓库新增 `tools.clipboard` 0.1.0，以经信任的原生后台进程提供文本/图片监听、去重、有界本机持久化与隔离选择界面。宿主新增声明式视图热键、原生 `onStartup` 激活、可选 `initialize.dataDir` 和按会话/清单限定的无参数 `input.paste`；页面不能指定输入目标或任意按键。默认 Command/Ctrl + Shift + V 直接打开，选择后恢复原应用并粘贴。剪贴板业务和数据格式留在插件，不自动安装或加入内置保护集合。macOS 自动粘贴需辅助功能权限，缺少时由宿主原生弹窗提供辅助功能设置跳转；Linux 自动输入仅支持 X11 + xdotool，Wayland 可复制。原生目录未纳入现有 UI 文档清理，数据未加密，原生用途声明仍不是 OS 沙箱。无界面测试通过，真实 UI 未验收，见 [ADR 0056](adr/0056-clipboard-plugin-and-system-input.md)。

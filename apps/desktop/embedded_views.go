@@ -111,10 +111,7 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	if err != nil {
 		config = theme.Builtins("system", 0)
 	}
-	// 冷启动一次隔离 WebView2 需要新建独立配置目录、创建 Environment 并加载插件
-	// 资源，在启用杀毒实时扫描的 Windows 上首次打开常会超过数秒；3 秒过于激进，
-	// 会让正常加载误报"插件页面加载超时"。就绪后会立即返回，这里给足冷启动预算。
-	deadline, cancel := context.WithTimeout(ctx, 20*time.Second)
+	deadline, cancel := context.WithTimeout(ctx, uihost.EmbeddedLoadTimeout)
 	defer cancel()
 	// Resolve native window identity on Wails' own UI thread.
 	var entry *embeddedEntry

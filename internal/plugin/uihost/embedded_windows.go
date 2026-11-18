@@ -26,22 +26,23 @@ import (
 var webviewPageBridge string
 
 const EmbeddedSupported = true
+const EmbeddedLoadTimeout = 20 * time.Second
 
 var webviewUser32 = windows.NewLazySystemDLL("user32.dll")
 var webviewGetClientRect = webviewUser32.NewProc("GetClientRect")
 var webviewGetDPI = webviewUser32.NewProc("GetDpiForWindow")
 var webviewGetKeyState = webviewUser32.NewProc("GetKeyState")
-var webviewGetWindow = webviewUser32.NewProc("GetWindow")
+var webviewCreateWindow = webviewUser32.NewProc("CreateWindowExW")
+var webviewDestroyWindow = webviewUser32.NewProc("DestroyWindow")
 var webviewSetWindowPos = webviewUser32.NewProc("SetWindowPos")
 var webviewMemStream = windows.NewLazySystemDLL("ole32.dll").NewProc("CreateStreamOnHGlobal")
 
 const (
-	webviewGWChild       = 5
-	webviewGWHwndNext    = 2
+	webviewChildWindow   = 0x40000000 // WS_CHILD
+	webviewClipChildren  = 0x02000000 // WS_CLIPCHILDREN
 	webviewHWNDTop       = 0
-	webviewSWPNoSize     = 0x0001
-	webviewSWPNoMove     = 0x0002
 	webviewSWPNoActivate = 0x0010
+	webviewSWPShowWindow = 0x0040
 )
 
 type webviewSubscription struct {
@@ -56,6 +57,7 @@ type Embedded struct {
 	invoke    func(func())
 	action    func(int)
 	done      chan struct{}
+	ready     chan error
 	closed    atomic.Bool
 	// Everything below is accessed only on the Wails UI thread.
 	hwnd                                           uintptr
@@ -63,7 +65,7 @@ type Embedded struct {
 	subscriptions                                  []webviewSubscription
 	callbacks                                      []*webviewCallback
 	folder                                         string
-	existingChildren                               map[uintptr]bool
+	creating                                       bool
 	pluginHost                                     uintptr
 	script                                         string
 	status                                         int
@@ -77,7 +79,7 @@ type webviewEnvironmentHandler struct{ e *Embedded }
 
 func (h *webviewEnvironmentHandler) EnvironmentCompleted(code webviewloader.HRESULT, env *webviewloader.ICoreWebView2Environment) webviewloader.HRESULT {
 	e := h.e
-	if e.closed.Load() {
+	if e.finishCreation() {
 		return 0
 	}
 	if code < 0 || env == nil {
@@ -113,29 +115,32 @@ func (h *webviewEnvironmentHandler) EnvironmentCompleted(code webviewloader.HRES
 			if controller != nil {
 				_ = controller.call(24)
 			}
+			e.finishCreation()
 			return 0
 		}
+		e.finishCreation()
 		if int32(code) < 0 || controller == nil {
 			e.fail()
 			return 0
 		}
 		_ = controller.call(1)
 		e.controller = controller
-		if e.setup() != nil {
+		if e.initializeController() != nil {
 			e.fail()
+		} else {
+			e.loadBoundPage()
 		}
 		return 0
 	})
-	if e.env.call(21, e.hwnd, uintptr(unsafe.Pointer(options)), callback.pointer()) != nil {
+	e.creating = true
+	if e.env.call(21, e.pluginHost, uintptr(unsafe.Pointer(options)), callback.pointer()) != nil {
+		e.finishCreation()
 		e.fail()
 	}
 	return 0
 }
 
-// createWebviewProfileFolder 为本视图返回一个全新的 WebView2 用户数据目录，保持各视图
-// 存储隔离。优先放在每用户缓存目录（%LOCALAPPDATA%\Sinan\webview2）下的唯一子目录，避免
-// 共享系统临时目录被杀软扫描/组策略限制/定期清理导致创建缓慢或失败；缓存目录不可用时
-// 回退系统临时目录。关闭后由 Close 尽力删除。
+// createWebviewProfileFolder 为每个控制器创建唯一目录。用户缓存不可用时使用系统临时目录。
 func createWebviewProfileFolder() (string, error) {
 	if base, err := os.UserCacheDir(); err == nil && base != "" {
 		root := filepath.Join(base, "Sinan", "webview2")
@@ -148,30 +153,51 @@ func createWebviewProfileFolder() (string, error) {
 	return os.MkdirTemp("", "sinan-webview2-")
 }
 
-// directChildWindows 返回 parent 的直接子窗口集合，用于识别 WebView2 新建的宿主窗口。
-func directChildWindows(parent uintptr) map[uintptr]bool {
-	children := map[uintptr]bool{}
-	child, _, _ := webviewGetWindow.Call(parent, webviewGWChild)
-	for child != 0 {
-		children[child] = true
-		next, _, _ := webviewGetWindow.Call(child, webviewGWHwndNext)
-		if next == child {
-			break
-		}
-		child = next
+// startWebview runs on the UI thread. The hidden child is the controller's
+// explicit parent, so z-order never depends on which HWND Chromium creates.
+func startWebview(hwnd uintptr, invoke func(func())) *Embedded {
+	e := &Embedded{hwnd: hwnd, invoke: invoke, done: make(chan struct{}), ready: make(chan error, 1)}
+	e.pluginHost, _, _ = webviewCreateWindow.Call(0, uintptr(unsafe.Pointer(webviewString("STATIC"))), 0,
+		webviewChildWindow|webviewClipChildren, 0, 0, 0, 0, hwnd, 0, 0, 0)
+	if e.pluginHost == 0 {
+		e.fail()
+		return e
 	}
-	return children
+	folder, err := createWebviewProfileFolder()
+	if err != nil {
+		e.fail()
+		return e
+	}
+	e.folder = folder
+	e.creating = true
+	err = webviewloader.CreateCoreWebView2EnvironmentWithOptions(&webviewEnvironmentHandler{e},
+		webviewloader.WithUserDataFolder(folder),
+		webviewloader.WithExclusiveUserDataFolderAccess(true),
+		webviewloader.WithAllowSingleSignOnUsingOSPrimaryAccount(false),
+		webviewloader.WithTargetCompatibleBrowserVersion("119.0.0.0"))
+	if err != nil {
+		e.finishCreation()
+		e.fail()
+	}
+	return e
 }
 
-// raiseAboveSiblings 把 hwnd 提到同父窗口的最上层。同一 Wails 窗口内的隔离 WebView2
-// 建在全尺寸 Shell WebView 之后，但 Shell WebView 覆盖整个客户区；若不显式置顶，插件
-// 内容会被 Shell 完整盖住（表现为"一片空白"）。每次布局后都要重新置顶，避免窗口调整
-// 时 Shell 重新跑到上层。
-func raiseAboveSiblings(hwnd uintptr) {
-	if hwnd == 0 {
+func (e *Embedded) finishCreation() bool {
+	e.creating = false
+	if e.closed.Load() {
+		e.removeProfile()
+		return true
+	}
+	return false
+}
+
+func (e *Embedded) loadBoundPage() {
+	if e.session == nil || e.controller == nil {
 		return
 	}
-	webviewSetWindowPos.Call(hwnd, webviewHWNDTop, 0, 0, 0, 0, webviewSWPNoMove|webviewSWPNoSize|webviewSWPNoActivate)
+	if !e.session.Active() || e.setup() != nil {
+		e.fail()
+	}
 }
 
 func PrepareEmbedded(ctx context.Context, session *uiview.Session, window func() unsafe.Pointer, state protocol.ThemeState, shortcut string, action func(int), invoke func(func())) (*Embedded, error) {
@@ -182,50 +208,56 @@ func PrepareEmbedded(ctx context.Context, session *uiview.Session, window func()
 	if err != nil {
 		return nil, err
 	}
-	folder, err := createWebviewProfileFolder()
-	if err != nil {
-		return nil, errors.New("无法创建插件临时配置")
-	}
-	e := &Embedded{session: session, transport: newWebviewTransport(bridge), invoke: invoke, action: action, done: make(chan struct{}), folder: folder, themeRevision: state.Revision, shortcut: shortcut}
-	entryJSON, _ := json.Marshal(e.transport.entry)
-	stateJSON, _ := json.Marshal(state)
-	e.script = strings.ReplaceAll(webviewPageBridge, "__SINAN_ENTRY__", string(entryJSON)) + ";" + themesdk.Runtime + ";window.__sinanApplyTheme(" + string(stateJSON) + ");"
+	var e *Embedded
 	invoke(func() {
-		e.hwnd = uintptr(window())
-		if e.hwnd == 0 || !session.Active() {
-			e.fail()
+		hwnd := uintptr(window())
+		if hwnd == 0 || warmWebviews.stopped || ctx.Err() != nil || !session.Active() {
 			return
 		}
-		// 记录已有直接子窗口，创建控制器后新增的那个就是插件 WebView2 宿主。
-		e.existingChildren = directChildWindows(e.hwnd)
-		err := webviewloader.CreateCoreWebView2EnvironmentWithOptions(&webviewEnvironmentHandler{e}, webviewloader.WithUserDataFolder(folder), webviewloader.WithExclusiveUserDataFolderAccess(true), webviewloader.WithAllowSingleSignOnUsingOSPrimaryAccount(false), webviewloader.WithTargetCompatibleBrowserVersion("119.0.0.0"))
-		if err != nil {
-			e.fail()
+		e = warmWebviews.take(hwnd)
+		if e == nil {
+			e = startWebview(hwnd, invoke)
 		}
+		if e.status < 0 {
+			return
+		}
+		e.session = session
+		e.transport = newWebviewTransport(bridge)
+		e.action = action
+		e.themeRevision = state.Revision
+		e.shortcut = shortcut
+		entryJSON, _ := json.Marshal(e.transport.entry)
+		stateJSON, _ := json.Marshal(state)
+		e.script = strings.ReplaceAll(webviewPageBridge, "__SINAN_ENTRY__", string(entryJSON)) + ";" + themesdk.Runtime + ";window.__sinanApplyTheme(" + string(stateJSON) + ");"
+		e.loadBoundPage()
 	})
+	if e == nil {
+		return nil, errors.New("插件页面已取消或窗口不可用")
+	}
 	unsubscribe := session.OnRevoke(func() { go e.Close() })
 	go func() { <-e.done; unsubscribe() }()
-	ticker := time.NewTicker(20 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		status := 0
-		invoke(func() { status = e.status })
-		if status < 0 {
-			e.Close()
-			return nil, errors.New("无法准备隔离 WebView2，请检查运行时版本")
-		}
-		if status == 1 && session.Active() {
+	select {
+	case err := <-e.ready:
+		if err == nil && ctx.Err() == nil && session.Active() && !e.closed.Load() {
 			go e.monitor()
+			// Refill after the requested page is ready, so cold starts do not compete.
+			go invoke(func() {
+				if warmWebviews.hwnd == e.hwnd {
+					warmWebviews.fill(invoke)
+				}
+			})
 			return e, nil
 		}
-		select {
-		case <-ctx.Done():
-			e.Close()
-			return nil, errors.New("插件页面加载超时或已取消")
-		case <-e.done:
-			return nil, errors.New("插件页面已关闭")
-		case <-ticker.C:
+		e.Close()
+		if err != nil {
+			return nil, err
 		}
+		return nil, errors.New("插件页面已关闭或已取消")
+	case <-ctx.Done():
+		e.Close()
+		return nil, errors.New("插件页面加载超时或已取消")
+	case <-e.done:
+		return nil, errors.New("插件页面已关闭")
 	}
 }
 
@@ -258,23 +290,22 @@ func (e *Embedded) event(owner *webviewCOM, add, remove int, id string, run func
 	e.subscriptions = append(e.subscriptions, webviewSubscription{owner, remove, token})
 	return nil
 }
-func (e *Embedded) setup() error {
+func (e *Embedded) initializeController() error {
 	if err := e.controller.call(4, 0); err != nil {
 		return err
-	}
-	// 识别本视图 WebView2 的宿主子窗口（父窗口在创建控制器后新增的直接子窗口），
-	// 后续布局时把它置顶，避免被全尺寸的 Shell WebView 覆盖。
-	for h := range directChildWindows(e.hwnd) {
-		if !e.existingChildren[h] {
-			e.pluginHost = h
-			break
-		}
 	}
 	var err error
 	e.web, err = e.controller.object(25)
 	if err != nil {
 		return err
 	}
+	// Watch idle controllers as well, so a failed renderer cannot be handed out.
+	return e.event(e.web, 25, 26, "79e0aea4-990b-42d9-aa1d-0fcc2e5bc7f1", func(*webviewCOM) error {
+		return errors.New("渲染进程已终止")
+	})
+}
+
+func (e *Embedded) setup() error {
 	settings, err := e.web.object(3)
 	if err != nil {
 		return err
@@ -323,9 +354,6 @@ func (e *Embedded) setup() error {
 	}
 	// No Accept call: with default dialogs disabled, this leaves dialogs canceled.
 	if err = e.event(e.web, 21, 22, "ef381bf9-afa8-4e37-91c4-8ac48524bdfb", func(*webviewCOM) error { return nil }); err != nil {
-		return err
-	}
-	if err = e.event(e.web, 25, 26, "79e0aea4-990b-42d9-aa1d-0fcc2e5bc7f1", func(*webviewCOM) error { return errors.New("渲染进程已终止") }); err != nil {
 		return err
 	}
 	if err = e.event(e.web, 59, 60, "5c19e9e0-092f-486b-affa-ca8231913039", func(*webviewCOM) error { go e.Close(); return nil }); err != nil {
@@ -462,9 +490,10 @@ func (e *Embedded) message(args *webviewCOM) error {
 		if err != nil {
 			return nil
 		}
-		if action == uiview.Ready {
+		if action == uiview.Ready && e.status == 0 {
 			e.status = 1
 			e.heartbeat = time.Now()
+			e.ready <- nil
 		}
 		if action == uiview.Close {
 			go e.Close()
@@ -571,17 +600,28 @@ func (e *Embedded) resize() error {
 		dpi = uint32(value)
 	}
 	bounds := webviewBodyBounds(rect.Right, rect.Bottom, dpi, e.detached)
-	if err := setWebviewBounds(e.controller, &bounds); err != nil {
+	width, height := bounds.Right-bounds.Left, bounds.Bottom-bounds.Top
+	flags := uintptr(webviewSWPNoActivate)
+	if e.shown {
+		flags |= webviewSWPShowWindow
+	}
+	result, _, _ = webviewSetWindowPos.Call(e.pluginHost, webviewHWNDTop, uintptr(bounds.Left),
+		uintptr(bounds.Top), uintptr(width), uintptr(height), flags)
+	if result == 0 {
+		return errors.New("无法调整插件子窗口")
+	}
+	if err := setWebviewBounds(e.controller, &webviewRect{Right: width, Bottom: height}); err != nil {
 		return err
 	}
-	if err := e.controller.call(23); err != nil {
-		return err
-	}
-	// 每次布局后把本视图宿主重新提到 Shell WebView 之上，防止窗口调整时被盖住。
-	raiseAboveSiblings(e.pluginHost)
-	return nil
+	return e.controller.call(23)
 }
 func (e *Embedded) fail() {
+	if e.status < 0 {
+		return
+	}
+	if e.status == 0 {
+		e.ready <- errors.New("无法准备隔离 WebView2，请检查运行时版本")
+	}
 	e.status = -1
 	// Close synchronously before returning a resource failure, so an unset
 	// Response can never fall through to network handling.
@@ -591,7 +631,9 @@ func (e *Embedded) fail() {
 	if e.controller != nil {
 		_ = e.controller.call(24)
 	}
-	e.session.Revoke()
+	if e.session != nil {
+		e.session.Revoke()
+	}
 	go e.Close()
 }
 func (e *Embedded) monitor() {
@@ -647,46 +689,68 @@ func (e *Embedded) Done() <-chan struct{} { return e.done }
 func (e *Embedded) Show() {
 	e.invoke(func() {
 		if !e.closed.Load() && e.status == 1 {
-			e.shown = true
-			if e.resize() != nil || e.controller.call(4, 1) != nil || e.controller.call(12, 0) != nil {
+			if e.controller.call(4, 1) != nil {
 				e.fail()
-			} else {
-				raiseAboveSiblings(e.pluginHost)
+				return
+			}
+			e.shown = true
+			if e.resize() != nil || e.controller.call(12, 0) != nil {
+				e.fail()
 			}
 		}
 	})
 }
 func (e *Embedded) Close() {
+	if !e.closed.Load() {
+		e.invoke(e.closeOnUIThread)
+	}
+}
+
+func (e *Embedded) closeOnUIThread() {
 	if !e.closed.CompareAndSwap(false, true) {
 		return
 	}
-	e.session.Revoke()
-	e.invoke(func() {
-		for _, s := range e.subscriptions {
-			_ = s.owner.call(s.remove, uintptr(s.token))
-			s.owner.release()
-		}
-		e.subscriptions = nil
-		if e.controller != nil {
-			_ = e.controller.call(24)
-		}
-		e.web.release()
-		e.controller.release()
-		e.env.release()
-		e.web = nil
-		e.controller = nil
-		e.env = nil
-		for _, callback := range e.callbacks {
-			callback.release()
-		}
-		e.callbacks = nil
-		close(e.done)
-	})
-	// WebView2 may retain files briefly after Close. This folder is never reused.
-	// Crash leftovers are possible; InPrivate is not a promise of diskless storage.
+	if e.session != nil {
+		e.session.Revoke()
+	}
+	for _, s := range e.subscriptions {
+		_ = s.owner.call(s.remove, uintptr(s.token))
+		s.owner.release()
+	}
+	e.subscriptions = nil
+	if e.controller != nil {
+		_ = e.controller.call(24)
+	}
+	e.web.release()
+	e.controller.release()
+	e.env.release()
+	e.web = nil
+	e.controller = nil
+	e.env = nil
+	for _, callback := range e.callbacks {
+		callback.release()
+	}
+	e.callbacks = nil
+	if e.pluginHost != 0 {
+		webviewDestroyWindow.Call(e.pluginHost)
+		e.pluginHost = 0
+	}
+	if !e.creating {
+		e.removeProfile()
+	}
+	close(e.done)
+}
+
+func (e *Embedded) removeProfile() {
+	folder := e.folder
+	e.folder = ""
+	if folder == "" {
+		return
+	}
+	// WebView2 may retain files briefly after Close.
 	go func() {
 		for range 40 {
-			if os.RemoveAll(e.folder) == nil {
+			if os.RemoveAll(folder) == nil {
 				return
 			}
 			time.Sleep(250 * time.Millisecond)
