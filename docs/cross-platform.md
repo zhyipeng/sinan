@@ -376,7 +376,7 @@ macOS 13+ 有效 bundle 由 Wails 使用 SMAppService，其他支持场景采用
 
 ### macOS 截图自定义选区（ADR 0084）
 
-官方截图插件开发版 0.2.0 在 macOS 14+ 使用 ScreenCaptureKit 分别截取各显示器、AppKit 显示选区遮罩，按所选显示器的快照像素裁剪。可在遮罩直接完成箭头、矩形、文字、马赛克、撤销、复制、保存和 OCR 交接，Esc 或右键取消。快捷键呼出后可在任一显示器开始框选，可用选区工具拖动已有标注，拖出该显示器时选区停在屏幕边缘。旧版 macOS 延用系统选区。macOS 两架构辅助程序由装有 macOS 14+ SDK 的 Mac 构建，包内需包含匹配架构的 Mach-O；Windows WinForms/GDI 和 Linux X11、受支持 Wayland 合成器原有路径保持。授权归属、安装升级、全屏 Space、焦点、多屏、Retina、文字输入、剪贴板、保存面板和 OCR 跳转待实际桌面验收，尚未发行或登记商店。见 [ADR 0084](adr/0084-macos-screenshot-selection-overlay.md)。
+官方截图插件开发版 0.2.0 在 macOS 14+ 使用 ScreenCaptureKit 分别截取各显示器、AppKit 显示选区遮罩，按所选显示器的快照像素裁剪。可在遮罩直接完成箭头、矩形、文字、马赛克、撤销、复制、保存和 OCR 交接。箭头、矩形和文字共用预设色及十六进制颜色输入，可改色和撤销。Esc 或右键取消。快捷键呼出后可在任一显示器开始框选，可用选区工具拖动已有标注，拖出该显示器时选区停在屏幕边缘。旧版 macOS 延用系统选区。macOS 两架构辅助程序由装有 macOS 14+ SDK 的 Mac 构建，包内需包含匹配架构的 Mach-O；Windows WinForms/GDI 和 Linux X11、受支持 Wayland 合成器原有路径保持。授权归属、安装升级、全屏 Space、焦点、多屏、Retina、文字输入、剪贴板、保存面板和 OCR 跳转待实际桌面验收，尚未发行或登记商店。见 [ADR 0084](adr/0084-macos-screenshot-selection-overlay.md)。
 
 macOS arm64 无界面回归、双屏选区坐标、合成 Retina PNG 标注、OCR 分流和宿主包预览通过；六目标构建与打包通过，核对 macOS 两架构辅助程序的执行权限和临时签名。Windows 和 Linux 本轮仅交叉构建与打包。
 
