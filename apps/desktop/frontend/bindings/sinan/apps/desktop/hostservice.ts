@@ -133,6 +133,10 @@ export function LLMSettings(): $CancellablePromise<llm$0.Snapshot> {
     return $Call.ByID(1104903135);
 }
 
+export function LauncherPositionSettings(): $CancellablePromise<kernel$0.LauncherPositionPreferences> {
+    return $Call.ByID(916262133);
+}
+
 export function LauncherStatus(): $CancellablePromise<string> {
     return $Call.ByID(1864886877);
 }
@@ -252,6 +256,10 @@ export function SaveLLMPreferences(p: llm$0.Preferences): $CancellablePromise<ll
 
 export function SaveLLMProfile(edit: llm$0.Edit): $CancellablePromise<llm$0.Snapshot> {
     return $Call.ByID(614461370, edit);
+}
+
+export function SaveLauncherPosition(percent: number, revision: number): $CancellablePromise<kernel$0.LauncherPositionPreferences> {
+    return $Call.ByID(3689612669, percent, revision);
 }
 
 export function SavePluginSettings(pluginID: string, revision: number, values: { [_ in string]?: string[] | null } | null): $CancellablePromise<storage$0.SettingsSnapshot> {

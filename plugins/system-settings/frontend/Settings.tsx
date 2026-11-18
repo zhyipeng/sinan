@@ -8,6 +8,7 @@ import Retention, {type RetentionBridge} from './Retention';
 import WindowOpacity, {type WindowOpacityBridge} from './WindowOpacity';
 import Startup, {type StartupBridge} from './Startup';
 import Updates,{type UpdateBridge} from './Updates';
+import LauncherPosition, {type LauncherPositionBridge} from './LauncherPosition';
 
 export type SettingsSchema = { id: string; title: string; type: string; options?: { value: string; label: string }[] | null; placeholder?: string | null };
 export type ConfigurablePlugin = { id: string; name: string; uiViews?: {permissions?:string[]|null}[]|null;settings?: SettingsSchema[] | null };
@@ -16,6 +17,7 @@ export type SettingsBridge = {
   startup:StartupBridge;
   windowOpacity:WindowOpacityBridge;
   retention:RetentionBridge;
+  launcherPosition:LauncherPositionBridge;
   search:SearchBridge;
   llm:LLMBridge;
   updates:UpdateBridge;
@@ -141,6 +143,7 @@ export default function Settings({ plugins, bridge }: { plugins: ConfigurablePlu
         <Startup bridge={bridge.startup} />
         <WindowOpacity bridge={bridge.windowOpacity} />
         <Retention bridge={bridge.retention} />
+        <LauncherPosition bridge={bridge.launcherPosition} />
       </section>
       <section className="settings-panel" id="settings-panel-search" hidden={category !== 'search'} aria-labelledby="settings-heading-search">
         <header className="settings-panel-heading"><h1 id="settings-heading-search">搜索</h1></header>

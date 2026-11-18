@@ -8,6 +8,12 @@ import * as manifest$0 from "../plugin/manifest/models.js";
 // @ts-ignore: Unused imports
 import * as protocol$0 from "../../packages/plugin-protocol/models.js";
 
+export interface LauncherPositionPreferences {
+    "topOffsetPercent": number;
+    "revision": number;
+    "error"?: string;
+}
+
 export interface PackagePreview {
     "installedFingerprint": string;
     "id": string;

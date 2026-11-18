@@ -1,7 +1,7 @@
 // Only repository-bundled trusted components can appear in the Shell.
 // A manifest view key never becomes an import URL or installed JavaScript path.
 import { Events } from '@wailsio/runtime';
-import {UpdateStatus,CheckHostUpdate,InstallHostUpdate} from '../bindings/sinan/apps/desktop/hostservice';
+import { UpdateStatus, CheckHostUpdate, InstallHostUpdate, LauncherPositionSettings, SaveLauncherPosition } from '../bindings/sinan/apps/desktop/hostservice';
 import { createElement, type ComponentType } from 'react';
 import type {StoreBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginStore';
 import PluginManager, {type ManagementBridge} from '../../../../plugins/system-plugin-manager/frontend/PluginManager';
@@ -77,6 +77,15 @@ export const settingsBridge: SettingsBridge = {
   async load(pluginID) { return normalize(await PluginSettings(pluginID)); },
   async save(pluginID, revision, values) { return normalize(await SavePluginSettings(pluginID, revision, values)); },
   async clearHistory() { await ClearHistory(); },
+  launcherPosition: {
+    load: LauncherPositionSettings,
+    save: SaveLauncherPosition,
+    subscribe(changed) {
+      return Events.On('launcher-position:changed', event => {
+        changed(event.data as import('../../../../plugins/system-settings/frontend/LauncherPosition').LauncherPositionState);
+      });
+    },
+  },
 };
 
 const storeBridge:StoreBridge={

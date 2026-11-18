@@ -167,7 +167,13 @@ func run() error {
 		}
 	})
 	manager.SetUIHostCall(host.callInputHost)
-	host.launcher = &launcher{detached: map[uint]trustedWindow{}}
+	host.launcher = &launcher{
+		detached: map[uint]trustedWindow{},
+		topOffset: func() int {
+			prefs, _ := manager.LauncherPositionPreferences()
+			return prefs.TopOffsetPercent
+		},
+	}
 	if prefs, err := manager.RetentionPreferences(); err == nil {
 		host.launcher.retention.preferences = prefs
 	}
@@ -247,9 +253,15 @@ func run() error {
 		return window
 	}
 	startupPrefs, startupErr := manager.StartupPreferences()
-	// Start hidden rather than showing then hiding, to avoid a focus flash.
-	window := newShell(appURL, startupErr == nil && startupPrefs.Silent && !*uiProbe && !*acceptance)
+	// Keep the search panel hidden until the launcher can position it.
+	window := newShell(appURL, !*uiProbe)
 	host.launcher.window = window
+	silent := startupErr == nil && startupPrefs.Silent && !*acceptance
+	if !*uiProbe && !silent {
+		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(_ *application.WindowEvent) {
+			host.launcher.showAtStartup(window)
+		})
+	}
 	host.launcher.newWindow = func() *application.WebviewWindow { return newShell("/", true) }
 	if *pluginUI && !*uiProbe && uihost.EmbeddedSupported {
 		host.embedded = &embeddedViews{entries: map[*application.WebviewWindow]*embeddedEntry{}, sequence: map[*application.WebviewWindow]uint64{}}

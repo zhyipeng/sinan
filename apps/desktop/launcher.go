@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"sinan/internal/kernel"
 	"sinan/internal/platform"
 )
 
@@ -15,6 +16,7 @@ const (
 	launcherWidth     = 800
 	launcherMinHeight = 50
 	launcherMaxHeight = 600
+	launcherBottomGap = 16
 )
 
 // launcher owns only native Shell behavior. Plugin business remains in the runtime.
@@ -24,16 +26,19 @@ type trustedWindow struct {
 }
 
 type launcher struct {
-	retention      mainRetention
-	inputTarget    uintptr
-	window         *application.WebviewWindow
-	mu             sync.Mutex
-	shortcutError  string
-	opacityPercent int
-	screenID       string
-	detached       map[uint]trustedWindow
-	newWindow      func() *application.WebviewWindow
-	dialogs        map[*application.WebviewWindow]int
+	retention       mainRetention
+	inputTarget     uintptr
+	window          *application.WebviewWindow
+	mu              sync.Mutex
+	shortcutError   string
+	opacityPercent  int
+	screenID        string
+	topOffset       func() int
+	positionPercent int
+	requestedHeight int
+	detached        map[uint]trustedWindow
+	newWindow       func() *application.WebviewWindow
+	dialogs         map[*application.WebviewWindow]int
 }
 
 func (l *launcher) show() {
@@ -60,6 +65,15 @@ func (l *launcher) showLocked() {
 	l.presentLocked(mainResume{Epoch: l.retention.epoch})
 }
 
+func (l *launcher) showAtStartup(window *application.WebviewWindow) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	// A shortcut or tray action may have already started a visibility session.
+	if l.window == window && l.retention.epoch == 0 {
+		l.showLocked()
+	}
+}
+
 func (l *launcher) presentLocked(state mainResume) {
 	if l.dialogs[l.window] > 0 {
 		return
@@ -70,7 +84,7 @@ func (l *launcher) presentLocked(state mainResume) {
 		}
 	})
 	if !state.PreserveInput && !state.PreserveView {
-		l.window.SetSize(launcherWidth, launcherMinHeight)
+		l.requestedHeight = launcherMinHeight
 	}
 	var id string
 	var ok bool
@@ -81,10 +95,11 @@ func (l *launcher) presentLocked(state mainResume) {
 		}
 	}
 	l.screenID = id
-	if area, ok := screenWorkArea(id); ok {
-		x, y := launcherPosition(area)
-		l.window.SetPosition(x, y)
-	} else {
+	l.positionPercent = kernel.DefaultLauncherTopOffset
+	if l.topOffset != nil {
+		l.positionPercent = l.topOffset()
+	}
+	if !l.layoutLocked() {
 		l.window.Center()
 	}
 	l.window.Show()
@@ -123,18 +138,34 @@ func (l *launcher) resize(window *application.WebviewWindow, height int) {
 	if window == nil || l.window != window {
 		return
 	}
-	height = max(launcherMinHeight, min(launcherMaxHeight, height))
-	x, y := l.window.Position()
-	if area, ok := screenWorkArea(l.screenID); ok {
-		height = min(height, max(launcherMinHeight, area.Y+area.Height-y-16))
-	}
-	// macOS changes the origin when resizing; restore the top-left anchor.
-	l.window.SetSize(launcherWidth, height)
-	l.window.SetPosition(x, y)
+	l.requestedHeight = height
+	l.layoutLocked()
 }
 
-func launcherPosition(area application.Rect) (int, int) {
-	return area.X + (area.Width-launcherWidth)/2, area.Y + area.Height/5
+func (l *launcher) layoutLocked() bool {
+	height := max(launcherMinHeight, min(launcherMaxHeight, l.requestedHeight))
+	var x, y int
+	area, ok := screenWorkArea(l.screenID)
+	if ok {
+		x, y = launcherPosition(area, l.positionPercent)
+		y, height = fitLauncherVertically(area, y, height)
+	} else {
+		x, y = l.window.Position()
+	}
+	// macOS changes the origin when resizing; apply the fitted origin last.
+	l.window.SetSize(launcherWidth, height)
+	l.window.SetPosition(x, y)
+	return ok
+}
+
+func launcherPosition(area application.Rect, topOffsetPercent int) (int, int) {
+	return area.X + (area.Width-launcherWidth)/2, area.Y + area.Height*topOffsetPercent/100
+}
+
+func fitLauncherVertically(area application.Rect, preferredY, height int) (int, int) {
+	usableHeight := max(launcherMinHeight, area.Height-launcherBottomGap)
+	height = min(height, usableHeight)
+	return min(max(preferredY, area.Y), area.Y+usableHeight-height), height
 }
 
 func screenWorkArea(id string) (application.Rect, bool) {
@@ -144,7 +175,7 @@ func screenWorkArea(id string) (application.Rect, bool) {
 	if ok {
 		return application.Rect{X: native.X, Y: native.Y, Width: native.Width, Height: native.Height}, true
 	}
-	if screen := application.GetScreenByID(id); screen != nil {
+	if screen := application.GetScreenByID(id); screen != nil && screen.WorkArea.Width > 0 && screen.WorkArea.Height > 0 {
 		return screen.WorkArea, true
 	}
 	return application.Rect{}, false
@@ -242,6 +273,9 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	l.detached[window.ID()] = trustedWindow{window: window, key: key}
 	l.retention.shown()
 	l.window = replacement
+	screenID := l.screenID
+	l.screenID = ""
+	l.requestedHeight = launcherMinHeight
 	restoreOpacity := l.opacityPercent >= 30 && l.opacityPercent < 100
 	l.opacityPercent = 100
 	l.mu.Unlock()
@@ -251,7 +285,11 @@ func (l *launcher) detach(window *application.WebviewWindow, title, key string) 
 	window.SetAlwaysOnTop(false)
 	window.SetResizable(true)
 	x, y := window.Position()
-	window.SetSize(launcherWidth, launcherMaxHeight)
+	height := launcherMaxHeight
+	if area, ok := screenWorkArea(screenID); ok {
+		y, height = fitLauncherVertically(area, y, height)
+	}
+	window.SetSize(launcherWidth, height)
 	window.SetPosition(x, y)
 	application.InvokeSync(func() {
 		platform.DetachPanel(window.NativeWindow())

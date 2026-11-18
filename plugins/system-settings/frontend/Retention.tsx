@@ -34,8 +34,8 @@ export default function Retention({bridge}:{bridge:RetentionBridge}){
   }
   return <form className="settings-section" onSubmit={event=>{event.preventDefault();void save();}} aria-label="主界面保留">
     <h2>主界面保留</h2>
-    <div className="retention-setting"><label htmlFor="clear-input-delay">清除输入框延迟</label><div><input id="clear-input-delay" type="number" min="0" max="86400" step="1" required value={clear} disabled={!state||pending||!!state.error} onChange={event=>setClear(event.target.value)}/><span>秒</span></div></div>
-    <div className="retention-setting"><label htmlFor="plugin-ui-retention">插件 UI 保留时长</label><div><input id="plugin-ui-retention" type="number" min="0" max="86400" step="1" required value={plugin} disabled={!state||pending||!!state.error} onChange={event=>setPlugin(event.target.value)}/><span>秒</span></div></div>
+    <div className="settings-number-row"><label htmlFor="clear-input-delay">清除输入框延迟</label><div><input id="clear-input-delay" type="number" min="0" max="86400" step="1" required value={clear} disabled={!state||pending||!!state.error} onChange={event=>setClear(event.target.value)}/><span>秒</span></div></div>
+    <div className="settings-number-row"><label htmlFor="plugin-ui-retention">插件 UI 保留时长</label><div><input id="plugin-ui-retention" type="number" min="0" max="86400" step="1" required value={plugin} disabled={!state||pending||!!state.error} onChange={event=>setPlugin(event.target.value)}/><span>秒</span></div></div>
     <div className="settings-save"><span className="settings-note">从主界面隐藏时计时，0 表示不保留</span><button className="primary" disabled={!state||pending||!!state.error||(clear===String(state.clearInputSeconds)&&plugin===String(state.pluginUISeconds))}>{pending?'保存中…':'保存'}</button></div>
     {(error||state?.error)&&<p className="error" role="alert">{error||state?.error}</p>}
   </form>;

@@ -62,7 +62,7 @@ jobs:
           node --experimental-strip-types --test apps/desktop/frontend/tests/paste.test.mjs apps/desktop/frontend/tests/searchKeyboard.test.mjs
       - name: Windows host preferences and clipboard authority regression
         if: runner.os == 'Windows'
-        run: go test ./internal/kernel -run '^TestSearchPreferences|^TestStartupPreferences|^TestWindowOpacityPreferences|^TestRetentionPreferences|^TestClipboardAuthority|^TestImageOutput|^TestWindowCommands|^TestDependency|^TestRequiredDependency'
+        run: go test ./internal/kernel -run '^TestSearchPreferences|^TestStartupPreferences|^TestWindowOpacityPreferences|^TestRetentionPreferences|^TestLauncherPositionPreferences|^TestClipboardAuthority|^TestImageOutput|^TestWindowCommands|^TestDependency|^TestRequiredDependency'
       - name: Windows session image validation
         if: runner.os == 'Windows'
         run: go test ./internal/plugin/uiview -run '^TestImageSnapshot|^TestClipboardCall|^TestWindowExecution|^TestImageOutputBridge|^TestDependencyBridge'
