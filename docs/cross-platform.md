@@ -411,3 +411,9 @@ macOS arm64 宿主和插件的无界面回归、桌面构建与临时签名应�
 [Sinan v0.6.0](https://github.com/zhyipeng/sinan/releases/tag/v0.6.0) 与[脚本 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.script-v0.2.0) 已公开，均提供 macOS、Windows、Linux 的 arm64/amd64 六目标包。脚本最低宿主为 0.6.0。macOS 需要通过发行包内的 Sinan.app 启动并授权系统通知。
 
 [宿主六目标原生发行](https://github.com/zhyipeng/sinan/actions/runs/44277444340)与[官方脚本发行](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44277506650)通过。核对宿主公开摘要与实际 GitHub 资产，回下载核验插件包的摘要、清单、图标和原生架构。本节记录正式发行结果，真实桌面、原生文件选择和系统通知实际投递仍待实机验收。
+
+### 编码助手
+
+`tools.encoding-assistant` 是独立官方插件，复用声明式关键词、文本/图片匹配、UI Bridge 2 的会话输入、存储、剪贴板及 `file.openImage`，不变更宿主协议、隔离或权限模型。转换、哈希和二维码处理均在隔离页面离线完成，仅持久化自选时区。兼容基线为具备上述能力的司南 0.4.0。
+
+macOS arm64 上通过插件无界面回归、生产构建与宿主临时目录中的清单安装、五入口搜索、文本和图片会话联调；同一前端产物生成 macOS、Windows、Linux 的 arm64/amd64 六个本地 ZIP 并核对内容和摘要。三端实际 WebView、图片选取、剪贴板、主题、键盘和输入法未验收；Linux X11 与 Wayland 仍需分别验证。未发布或登记商店。
