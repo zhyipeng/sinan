@@ -90,6 +90,8 @@ GitHub 的 [runner 文档](https://docs.github.com/en/actions/reference/runners/
 
 配套 [OCR 0.1.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.ocr-v0.1.0) 已公开并上架，最低宿主 0.3.1，仅提供 macOS arm64 完整包。[三平台插件 CI](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/43830703763) 通过；真实桌面、系统剪贴板和 UI 验收仍未执行。完整摘要和资产身份见[发行核验数据](research/ocr-release-validation-results.json)。
 
-## v0.5.0 发布准备
+## v0.5.0 已公开
 
 本版为 Windows 插件视图预热 WebView2，增加主搜索框顶边距设置，调整插件中心安装反馈的位置，并让隐藏窗口任务复用已经经过的合成器等待时间。宿主继续构建 macOS、Windows、Linux 各两种架构。截图插件 0.3.0 独立发行，详见 [ADR 0086](adr/0086-windows-screenshot-overlay.md)。真实桌面交互仍待实机验收。
+
+[Sinan v0.5.0](https://github.com/zhyipeng/sinan/releases/tag/v0.5.0) 已公开。[六目标发行流水线](https://github.com/zhyipeng/sinan/actions/runs/44267198636) 通过，六份归档的 GitHub SHA-256 已与发布校验清单核对。Linux x64 依赖安装在首次尝试中停滞，重试单个目标后通过。配套 [截图 0.3.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.screenshot-v0.3.0) 已独立发行。

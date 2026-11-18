@@ -1,6 +1,6 @@
 # ADR 0086：Windows 原生截图遮罩与平台范围
 
-日期：2026-11-18。状态：已实现并打包，Windows 实机验收与发行待完成。
+日期：2026-11-18。状态：已发行，Windows 实机验收待完成。
 
 截图 0.3.0 延续 macOS 遮罩并移植到 Windows x64 和 ARM64。辅助程序使用 Win32 和 GDI/GDI+，位于独立官方插件包内，取代 Windows PowerShell 启动及现场编译。使用 Per-Monitor DPI v2、物理坐标及每显示器一层遮罩，可在任一屏开始截图，单次选区限制于该显示器。光标下默认优先匹配可访问元素，Tab 切换整窗，滚轮切换候选。窗口命中使用可见顶层窗口，元素查询在后台从目标窗口的 UI Automation 树中有限遍历，只读几何信息。查询超时、不可访问或无可用边界时回退整窗。未提升进程权限。
 
@@ -8,6 +8,8 @@ Windows 在遮罩内支持箭头、矩形、文字、马赛克、选区调整、
 
 移除独立「截图后处理」搜索入口以及 Painterro、图片导入和粘贴流程。隔离页面只启动隐藏任务及处理 OCR 交接。OCR 失败时显示提示并允许复制本次截图。macOS 12–13 采用系统框选并直接复制。宿主最低版本 0.4.0，沿用现有宿主协议、剪贴板和插件交接，取消旧图片导入和保存声明。宿主无需新增截图业务。
 
-Linux 截图实现和新版目标已移除，官方目录仅列出当前仍支持的平台；既有 Release 文件保留。变更范围为截图插件，宿主与其他插件的 Linux 目标照旧。0.3.0 仅在本地构建，商店不得登记未发布资产。
+Linux 截图实现和新版目标已移除，官方目录仅列出当前仍支持的平台；既有 Release 文件保留。变更范围为截图插件，宿主与其他插件的 Linux 目标照旧。0.3.0 已公开发行，商店仅登记经核对的四份公开资产。
 
 Windows 辅助程序通过固定并校验摘要的 LLVM-MinGW 在 macOS 交叉构建和打包。macOS arm64 无界面回归及模拟 OCR PNG 交接通过。四目标包的发布预检查通过。Windows 无界面程序已配置到手动 CI，尚未在目标系统执行。
+
+[截图 0.3.0 Release](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.screenshot-v0.3.0) 已公开。[平台检查](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44267851903) 和[发布流水线](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44268523942) 已通过，Windows x64 运行原生无界面绘制检查和合成 stdio 验证，Windows ARM64 辅助程序已交叉构建。四份 ZIP 已回下载核对 SHA-256、清单与二进制架构。
