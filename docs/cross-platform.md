@@ -405,3 +405,9 @@ macOS arm64 的标准无界面回归、桌面构建及相关静态检查通过�
 脚本 0.2.0 增加每脚本搜索和输出页开关。后台运行通过宿主 Wails Notifications 发送短输出或临时日志位置。macOS 使用打包签名应用和通知授权，Windows 使用系统 Toast，Linux 使用会话 D-Bus 和桌面通知守护程序。配套协议见 [ADR 0089](adr/0089-script-results-and-notifications.md)。
 
 macOS arm64 宿主和插件的无界面回归、桌面构建与临时签名应用包校验通过。真实插件进程配合宿主模拟通知接收器，验证默认静默、搜索开关、隔离输出命令、退出码、短通知和完整临时日志。Linux arm64 插件竞态测试、宿主内核与传输测试、GTK3 桌面静态检查及构建通过。Windows arm64/amd64 通过交叉编译和宿主静态检查；六个插件 ZIP 已核对原生入口和摘要。三端系统通知实际投递、macOS 首次授权、Windows Toast 注册和 Linux X11/Wayland 桌面交互尚未实机验收。配套宿主和插件尚未发布。
+
+### 司南 v0.6.0 与脚本 0.2.0 正式发行
+
+[Sinan v0.6.0](https://github.com/zhyipeng/sinan/releases/tag/v0.6.0) 与[脚本 0.2.0](https://github.com/zhyipeng/sinan-official-plugins/releases/tag/tools.script-v0.2.0) 已公开，均提供 macOS、Windows、Linux 的 arm64/amd64 六目标包。脚本最低宿主为 0.6.0。macOS 需要通过发行包内的 Sinan.app 启动并授权系统通知。
+
+[宿主六目标原生发行](https://github.com/zhyipeng/sinan/actions/runs/44277444340)与[官方脚本发行](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44277506650)通过。核对宿主公开摘要与实际 GitHub 资产，回下载核验插件包的摘要、清单、图标和原生架构。本节记录正式发行结果，真实桌面、原生文件选择和系统通知实际投递仍待实机验收。
