@@ -99,6 +99,12 @@ Windows 主窗口运行时就绪后后台预热一个隐藏的空控制器。一
 
 无界面目录替换与模拟回执不等同于真实应用重启验收。macOS 的 Gatekeeper、Windows 的文件占用和安全软件、Linux 的系统库兼容，以及真实 UI 重启均待实机验证；备份暂不自动清理，强制中止助手或断电可能需要手动恢复。详见[自动更新](auto-update.md)及 [ADR 0060](adr/0060-host-auto-update.md)。
 
+### 后台下载与进度
+
+macOS、Windows、Linux 共用应用级后台任务和设置进度条。主窗口隐藏或设置视图卸载时，Go 下载继续写入缓存；窗口恢复后，可信设置页从宿主快照读取当前进度。各平台沿用原有更新助手和系统依赖。见 [ADR 0090](adr/0090-background-host-update.md)。
+
+macOS arm64 通过标准无界面回归、桌面及助手构建。Linux arm64 在禁网、无显示服务器的容器中通过 GTK3 桌面与更新包定向竞态测试、静态检查和桌面构建。macOS amd64、Windows arm64/amd64 完成桌面及助手交叉构建，Windows 另完成相关测试程序交叉编译。Linux amd64 完成更新包测试程序与助手交叉编译，桌面构建未验证。三端真实窗口隐藏与恢复、WebView 进度显示以及从后台更新重启仍待实机验收。
+
 ## 独立官方翻译插件
 
 `sinan-official-plugins/plugins/translate` 新增 `tools.translate`，业务留在独立插件层；复用既有 `select` 设置、声明式输入匹配、UI Bridge 2 打开参数与命令，不改变宿主协议、权限或隔离边界。Google 免费网页接口与 MyMemory 请求由纯 Go 后端执行，页面不放宽 CSP。后台任务/轮询适配现有 500 毫秒页面调用预算。

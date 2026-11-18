@@ -27,16 +27,11 @@ func (h *HostService) InstallHostUpdate(ctx context.Context) error {
 	if h.updates == nil || h.quit == nil || h.launcher == nil || h.launcher.caller(ctx) == nil {
 		return errors.New("窗口不可用")
 	}
-	// Download belongs to application lifetime, not the short-lived Wails request.
-	plan, err := h.updates.DownloadAndStage(h.updatesContext)
-	if err != nil {
-		return err
-	}
-	if err = hostupdate.Handoff(plan); err != nil {
-		plan.Cleanup()
-		h.updates.InstallationFailed()
-		return errors.New("更新助手未就绪，应用未退出，请重试")
-	}
-	h.quit()
-	return nil
+	return h.updates.StartInstall(h.updatesContext, func(plan hostupdate.Plan) error {
+		if err := hostupdate.Handoff(plan); err != nil {
+			return err
+		}
+		h.quit()
+		return nil
+	})
 }

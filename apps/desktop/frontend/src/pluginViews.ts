@@ -42,7 +42,11 @@ export const settingsBridge: SettingsBridge = {
  startup:{load:StartupSettings,silent:SaveSilentStartup,autoStart:SaveAutoStart,subscribe(changed){return Events.On('startup:changed',event=>changed(event.data as import('../../../../plugins/system-settings/frontend/Startup').StartupState));}},
  search:{load:SearchPreferences,save:SaveSearchPreferences,subscribe(changed){return Events.On('search-preferences:changed',event=>changed(event.data as import('../../../../plugins/system-settings/frontend/Search').SearchPreferences));}},
  llm:{async load(){const v=await LLMSettings();return {...v,profiles:v.profiles??[],overrides:Object.fromEntries(Object.entries(v.overrides??{}).map(([k,value])=>[k,value??""]))};},async save(edit){const v=await SaveLLMProfile(edit);return {...v,profiles:v.profiles??[],overrides:Object.fromEntries(Object.entries(v.overrides??{}).map(([k,value])=>[k,value??""]))};},async remove(id,revision){const v=await DeleteLLMProfile(id,revision);return {...v,profiles:v.profiles??[],overrides:Object.fromEntries(Object.entries(v.overrides??{}).map(([k,value])=>[k,value??""]))};},async preferences(p){const v=await SaveLLMPreferences(p);return {...v,profiles:v.profiles??[],overrides:Object.fromEntries(Object.entries(v.overrides??{}).map(([k,value])=>[k,value??""]))};}},
- updates:{load:UpdateStatus,check:CheckHostUpdate,install:InstallHostUpdate,subscribe(changed){return Events.On('host-update:changed',event=>changed(event.data as import('../../../../plugins/system-settings/frontend/Updates').UpdateState));}},
+ updates:{load:UpdateStatus,check:CheckHostUpdate,install:InstallHostUpdate,subscribe(changed){
+  const offUpdate=Events.On('host-update:changed',changed);
+  const offShow=Events.On('launcher:show',changed);
+  return ()=>{offUpdate();offShow();};
+ }},
  pluginShortcuts:{
   async list(){return await PluginShortcutSettings()??[];},
   subscribe(changed){return Events.On('plugin-shortcuts:changed',changed);},

@@ -28,6 +28,8 @@ type State struct {
 	Available          bool   `json:"available"`
 	Supported          bool   `json:"supported"`
 	InstallationResult string `json:"installationResult"`
+	DownloadedBytes    int64  `json:"downloadedBytes"`
+	TotalBytes         int64  `json:"totalBytes"`
 }
 type candidate struct {
 	version, url, checksum string
@@ -40,10 +42,10 @@ type Service struct {
 	target    string
 	client    *http.Client
 	endpoint  string
-	changed   func(State)
+	changed   func()
 }
 
-func New(executable, current string, changed func(State)) *Service {
+func New(executable, current string, changed func()) *Service {
 	s := &Service{state: State{CurrentVersion: current, Phase: "idle"}, changed: changed, endpoint: "https://api.github.com/repos/" + buildinfo.Repository + "/releases/latest", client: &http.Client{Timeout: 10 * time.Minute, CheckRedirect: redirect}}
 	target, err := hostupdate.Installation(executable, current)
 	if err != nil {
@@ -74,20 +76,23 @@ func (s *Service) State() State {
 }
 func (s *Service) emit() {
 	if s.changed != nil {
-		s.changed(s.State())
+		s.changed()
 	}
 }
+
+// start is called with mu held.
 func (s *Service) start(phase string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if !s.state.Supported {
 		return errors.New("此运行模式不支持自动更新")
 	}
-	if s.state.Phase == "checking" || s.state.Phase == "downloading" || s.state.Phase == "installing" {
+	switch s.state.Phase {
+	case "checking", "downloading", "preparing", "installing":
 		return errors.New("更新操作正在进行")
 	}
 	s.state.Phase = phase
 	s.state.Message = ""
+	s.state.DownloadedBytes = 0
+	s.state.TotalBytes = 0
 	return nil
 }
 func (s *Service) fail(message string) {
@@ -158,11 +163,14 @@ func checksumFor(data []byte, name string) (string, error) {
 	return found, nil
 }
 func (s *Service) Check(ctx context.Context) (State, error) {
-	if err := s.start("checking"); err != nil {
+	s.mu.Lock()
+	err := s.start("checking")
+	s.mu.Unlock()
+	if err != nil {
 		return s.State(), err
 	}
 	s.emit()
-	err := s.check(ctx)
+	err = s.check(ctx)
 	if err != nil {
 		s.fail(err.Error())
 	}
@@ -245,35 +253,67 @@ func (s *Service) check(ctx context.Context) error {
 	s.emit()
 	return nil
 }
-func (s *Service) DownloadAndStage(ctx context.Context) (hostupdate.Plan, error) {
-	if err := s.start("downloading"); err != nil {
-		return hostupdate.Plan{}, err
+
+// StartInstall reserves the single update task before returning. ctx belongs
+// to the application, and handoff takes ownership of the plan on success.
+func (s *Service) StartInstall(ctx context.Context, handoff func(hostupdate.Plan) error) error {
+	if ctx.Err() != nil {
+		return errors.New("更新已取消")
 	}
-	s.emit()
 	s.mu.Lock()
+	if s.candidate == nil && s.state.Supported {
+		s.mu.Unlock()
+		return errors.New("请先检查更新")
+	}
+	if err := s.start("downloading"); err != nil {
+		s.mu.Unlock()
+		return err
+	}
 	candidate := s.candidate
 	current := s.state.CurrentVersion
+	s.state.TotalBytes = candidate.size
 	s.mu.Unlock()
-	if candidate == nil {
-		s.fail("请先检查更新")
-		return hostupdate.Plan{}, errors.New("请先检查更新")
-	}
-	plan, err := s.download(ctx, *candidate, current)
-	if err != nil {
-		s.fail(err.Error())
-		return plan, err
-	}
+	go s.runInstall(ctx, *candidate, current, handoff)
+	return nil
+}
+
+func (s *Service) runInstall(ctx context.Context, candidate candidate, current string, handoff func(hostupdate.Plan) error) {
+	s.emit()
+	plan, err := s.download(ctx, candidate, current)
 	if ctx.Err() != nil {
 		plan.Cleanup()
 		s.fail("更新已取消")
-		return hostupdate.Plan{}, errors.New("更新已取消")
+		return
 	}
+	if err != nil {
+		s.fail(err.Error())
+		return
+	}
+	s.setPhase("installing")
+	if err := handoff(plan); err != nil {
+		plan.Cleanup()
+		s.fail("更新助手未就绪，应用未退出，请重试")
+	}
+}
+
+func (s *Service) setPhase(phase string) {
 	s.mu.Lock()
-	s.state.Phase = "installing"
+	s.state.Phase = phase
 	s.mu.Unlock()
 	s.emit()
-	return plan, nil
 }
+
+type progressWriter struct {
+	io.Writer
+	advance func(int64)
+}
+
+func (w progressWriter) Write(data []byte) (int, error) {
+	n, err := w.Writer.Write(data)
+	w.advance(int64(n))
+	return n, err
+}
+
 func (s *Service) download(ctx context.Context, candidate candidate, current string) (hostupdate.Plan, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -296,13 +336,22 @@ func (s *Service) download(ctx context.Context, candidate candidate, current str
 	}
 	defer response.Body.Close()
 	hasher := sha256.New()
-	n, err := io.Copy(io.MultiWriter(file, hasher), io.LimitReader(response.Body, candidate.size+1))
+	writer := progressWriter{Writer: io.MultiWriter(file, hasher), advance: func(n int64) {
+		s.mu.Lock()
+		s.state.DownloadedBytes = min(s.state.DownloadedBytes+n, candidate.size)
+		s.mu.Unlock()
+	}}
+	n, err := io.Copy(writer, io.LimitReader(response.Body, candidate.size+1))
 	if err != nil || n != candidate.size || hex.EncodeToString(hasher.Sum(nil)) != candidate.checksum {
 		return hostupdate.Plan{}, errors.New("下载不完整或 SHA-256 校验失败，未安装")
 	}
 	if file.Close() != nil {
 		return hostupdate.Plan{}, errors.New("无法保存下载文件")
 	}
+	if ctx.Err() != nil {
+		return hostupdate.Plan{}, errors.New("更新已取消或超时，请重试")
+	}
+	s.setPhase("preparing")
 	plan, err := hostupdate.StageArchive(file.Name(), s.target, candidate.version, current)
 	if err != nil {
 		return hostupdate.Plan{}, errors.New("更新准备失败：" + safeStageError(err))
@@ -316,7 +365,4 @@ func safeStageError(err error) string {
 		return "无法读写应用目录，请检查权限和磁盘空间"
 	}
 	return err.Error()
-}
-func (s *Service) InstallationFailed() {
-	s.fail("无法启动更新助手，应用尚未退出，请重试")
 }

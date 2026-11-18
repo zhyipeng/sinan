@@ -9,4 +9,6 @@ export interface State {
     "available": boolean;
     "supported": boolean;
     "installationResult": string;
+    "downloadedBytes": number;
+    "totalBytes": number;
 }

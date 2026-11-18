@@ -167,10 +167,14 @@ func run() error {
 	if !useBundledPlugins {
 		updateExecutable = ""
 	}
-	host.updates = settingsupdate.New(updateExecutable, buildinfo.Version, func(state settingsupdate.State) {
-		if host.updatesContext.Err() == nil && host.launcher != nil {
-			host.launcher.dispatch(&application.CustomEvent{Name: "host-update:changed", Data: state, Sender: "system.settings"})
-		}
+	host.updates = settingsupdate.New(updateExecutable, buildinfo.Version, func() {
+		// WebView event delivery may block. The update task only publishes state
+		// and must be able to proceed without any window consuming events.
+		go func() {
+			if host.updatesContext.Err() == nil && host.launcher != nil {
+				host.launcher.dispatch(&application.CustomEvent{Name: "host-update:changed", Sender: "system.settings"})
+			}
+		}()
 	})
 	manager.SetUIHostCall(host.callInputHost)
 	host.launcher = &launcher{
