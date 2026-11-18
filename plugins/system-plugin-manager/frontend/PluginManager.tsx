@@ -1,7 +1,7 @@
 import PluginIcon from '../../../packages/ui-components/PluginIcon';
 import PluginStore, {type StoreBridge,type InstallTask} from './PluginStore';
 import PluginDetails from './PluginDetails';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import CreatePlugin, {type ProjectBridge} from './CreatePlugin';
 import PluginData,{type DataBridge} from './PluginData';
 
@@ -25,7 +25,7 @@ export type ManagementBridge = DataBridge & ProjectBridge & {
 function downloadSize(bytes:number){return bytes<1024*1024?`${(bytes/1024).toFixed(1)} KiB`:`${(bytes/1024/1024).toFixed(1)} MiB`;}
 const states: Record<string,string> = {installed:'已安装',activating:'启动中',activated:'已激活',running:'运行中',deactivated:'已停止',failed:'运行失败',disabled:'已禁用',blocked:'依赖不可用'};
 
-export default function PluginManager({bridge, onChanged, onRecover,storeBridge}: {bridge: ManagementBridge; storeBridge: StoreBridge; onChanged(): Promise<void>; onRecover(): void}) {
+export default function PluginManager({bridge, onChanged, onRecover,storeBridge,localArchive}: {bridge: ManagementBridge; storeBridge: StoreBridge; onChanged(): Promise<void>; onRecover(): void; localArchive?:string}) {
   const [data,setData]=useState<ManagedSnapshot>({plugins:[],diagnostics:[]});
   const [busy,setBusy]=useState(true);
   const [showCreate,setShowCreate]=useState(false);
@@ -33,14 +33,15 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
   const [query,setQuery]=useState('');
   const [selectedID,setSelectedID]=useState('');
   const [storeID,setStoreID]=useState('');
-  const [showInstall,setShowInstall]=useState(false);
+  const [showInstall,setShowInstall]=useState(!!localArchive);
   const [showMore,setShowMore]=useState(false);
   const [createBusy,setCreateBusy]=useState(false);
   const [storeBusy,setStoreBusy]=useState(false);
   const [tasks,setTasks]=useState<InstallTask[]>([]);
   const changed=useRef(onChanged);changed.current=onChanged;
   const projectBusy=createBusy||storeBusy;
-  const [directory,setDirectory]=useState('');
+  const [directory,setDirectory]=useState(localArchive??'');
+  const pendingArchive=useRef(localArchive);
   const [developmentTrust,setDevelopmentTrust]=useState<Record<string,boolean>>({});
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -78,21 +79,20 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
     return()=>{current=false;clearTimeout(timer);};
   },[bridge,storeBridge]);
 
-  async function perform(action:()=>Promise<unknown>, message:string|(()=>string)='') {
+  const perform=useCallback(async (action:()=>Promise<unknown>, message:string|(()=>string)='')=>{
     if(pending.current||projectBusy)return;
     pending.current=true;setBusy(true);setError('');setNotice('');
     try {
       await action();
       const next=await bridge.refresh();
       // Keep the Shell's command registry current even if this view was closed.
-      await onChanged();
+      await changed.current();
       if(alive.current){setData(next);setNotice(typeof message==='function'?message():message);}
     } catch(error) {if(alive.current)setError(error instanceof Error?error.message:'操作失败，请重试。');}
     finally {pending.current=false;if(alive.current)setBusy(false);}
-  }
-  function installPackage() {
-    if(busy||projectBusy||!directory.trim())return;
-    const source=directory;
+  },[bridge,projectBusy]);
+  const installPackage=useCallback((source:string)=>{
+    if(busy||projectBusy||!source.trim())return;
     let message='';
     void perform(async()=>{
       const candidate=await bridge.inspect(source);
@@ -102,7 +102,13 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
       message=candidate.installedVersion?'插件已更新。':'插件已安装。';
       if(alive.current)setDirectory('');
     },()=>message);
-  }
+  },[bridge,busy,projectBusy,perform]);
+  useEffect(()=>{
+    if(busy||projectBusy||!pendingArchive.current)return;
+    const source=pendingArchive.current;
+    pendingArchive.current=undefined;
+    installPackage(source);
+  },[busy,projectBusy,installPackage]);
   function changeDirectory(value: string) {
     setDirectory(value);setError('');setNotice('');
   }
@@ -143,7 +149,7 @@ export default function PluginManager({bridge, onChanged, onRecover,storeBridge}
         <button disabled={busy||projectBusy} aria-expanded={showMore} onClick={()=>setShowMore(value=>!value)}>更多</button>
       </div>
     </div>
-    {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage();}}>
+    {showInstall&&<form className="install" onSubmit={event=>{event.preventDefault();installPackage(directory);}}>
       <label htmlFor="directory">安装 / 更新插件</label>
       <div className="install-row"><input id="directory" spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off" value={directory} disabled={busy||projectBusy} onChange={event=>changeDirectory(event.target.value)} placeholder="插件目录或 ZIP 的绝对路径" required/><button type="button" disabled={busy||projectBusy} aria-label="选择插件包目录" onClick={()=>void chooseInstallSource()}>选择目录</button><button type="button" disabled={busy||projectBusy} aria-label="选择 ZIP 插件包" onClick={()=>void chooseInstallSource(true)}>选择 ZIP</button><button className="primary" disabled={busy||projectBusy||!directory.trim()}>{busy?'处理中…':'安装 / 更新'}</button></div>
     </form>}

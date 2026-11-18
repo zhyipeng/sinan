@@ -14,6 +14,7 @@ import (
 	"sinan/internal/search"
 	"sinan/internal/storage"
 	protocol "sinan/packages/plugin-protocol"
+	pluginmanager "sinan/plugins/system-plugin-manager"
 	"sinan/plugins/system-plugin-manager/catalog"
 	settingsupdate "sinan/plugins/system-settings/update"
 	"strconv"
@@ -115,9 +116,13 @@ func (h *HostService) LauncherStatus() string {
 // StartSearch belongs to the trusted Shell. Sequence numbers also reject
 // out-of-order Wails invocations before they can supersede a newer query.
 func queryID(sequence uint64) string { return strconv.FormatUint(sequence, 10) }
+func (h *HostService) searchCoordinator() search.Coordinator {
+	return search.Coordinator{Backend: h.manager, MatchTrustedText: pluginmanager.MatchLocalArchive}
+}
 func (h *HostService) StartSearch(ctx context.Context, sequence uint64, query string) {
 	h.startQuery(ctx, sequence, nil, func(ctx context.Context, emit func(search.Update)) {
-		(&search.Coordinator{Backend: h.manager}).Query(ctx, queryID(sequence), query, emit)
+		coordinator := h.searchCoordinator()
+		coordinator.Query(ctx, queryID(sequence), query, emit)
 	})
 }
 func (h *HostService) startQuery(ctx context.Context, sequence uint64, selection *stagedPaste, run func(context.Context, func(search.Update))) {

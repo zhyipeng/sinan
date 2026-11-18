@@ -47,7 +47,11 @@ type Update struct {
 	Done     bool     `json:"done"`
 }
 
-type Coordinator struct{ Backend Backend }
+type Coordinator struct {
+	Backend Backend
+	// MatchTrustedText is supplied by the host for bundled components.
+	MatchTrustedText func(kernel.PluginInfo, string) (Item, bool)
+}
 type usageRanker interface {
 	UsageBoost(pluginID, commandID, input string) float64
 }
@@ -80,6 +84,11 @@ func (c *Coordinator) Query(ctx context.Context, queryID, query string, emit fun
 		}
 		if plugin.Disabled {
 			continue
+		}
+		if c.MatchTrustedText != nil {
+			if item, ok := c.MatchTrustedText(plugin, rawInput); ok {
+				results[item.Key] = item
+			}
 		}
 		for _, command := range plugin.Commands {
 			if command.SearchOnly {
@@ -238,6 +247,11 @@ func (c *Coordinator) QueryPaste(ctx context.Context, queryID, pasteID string, c
 	for _, plugin := range c.Backend.Snapshot().Plugins {
 		if plugin.Disabled {
 			continue
+		}
+		if isText && c.MatchTrustedText != nil {
+			if item, ok := c.MatchTrustedText(plugin, text); ok {
+				items = append(items, item)
+			}
 		}
 		for _, command := range plugin.Commands {
 			if ctx.Err() != nil {

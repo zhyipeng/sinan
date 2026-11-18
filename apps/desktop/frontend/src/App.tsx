@@ -41,7 +41,7 @@ export default function App() {
   const [selection, setSelection] = useState({ key: '', manual: false });
   const latestPlugins = useRef(data.plugins);latestPlugins.current=data.plugins;
   const pointerPosition = useRef<{ x: number; y: number }>();
-  const [active, setActive] = useState<{ plugin: Plugin; command: Command }>();
+  const [active, setActive] = useState<{ plugin: Plugin; command: Command; localArchive?: string }>();
   const activeRef = useRef(active);activeRef.current=active;
   const visibilityEpoch = useRef(0);
   const [resumeSearch, setResumeSearch] = useState(0);
@@ -383,7 +383,10 @@ export default function App() {
       });
       return;
     }
-    if (plugin && command) { setActive({ plugin, command }); setInput(pasted?.kind==='text' ? pasted.text : item.input); setOutput(''); setError(''); }
+    if (plugin && command) {
+      setActive({ plugin, command, localArchive: item.providerId === '$local-package' ? item.input : undefined });
+      setInput(pasted?.kind==='text' ? pasted.text : item.input); setOutput(''); setError('');
+    }
   }
 
   return <main ref={shellRef} className={`shell${active || recovery ? " plugin-view" : ""}${detached ? " detached" : ""}`}
@@ -403,7 +406,7 @@ export default function App() {
       <Recovery available={!!managerCommand} disabled={!!installedManager?.disabled} diagnostics={data.diagnostics} shortcutError={shortcutError} onRefresh={reload} onOpen={openManager}/>
     </section> : active ? <section className="tool">
       <div className="view-header"><button className="back" aria-label={detached ? "关闭窗口" : "返回搜索"} onClick={() => { if (detached) { void CloseTrustedView(); return; } void (async()=>{if(active.command.uiView)await ClosePluginView();generation.current++;setBusy(false);setActive(undefined);setOutput('');setError('');requestAnimationFrame(()=>searchRef.current?.focus());})(); }}>{detached ? '×' : '←'}</button><PluginIcon name={active.plugin.name} icon={active.plugin.icon} className="header-plugin-icon"/><h1>{active.command.title}</h1>{active.plugin.name !== active.command.title && <span className="source">{active.plugin.name}</span>}{(ActiveView || active.command.uiView) && !detached && <button className="detach-button" aria-label="独立窗口" title={`独立窗口（${formatShortcut(detachShortcut)}）`} onClick={() => void detachView()}>↗</button>}</div>
-      <>{active.command.uiView ? <div className="embedded-plugin-slot" aria-label="插件内容"/> : ActiveView ? <PluginViewBoundary key={`${active.plugin.id}/${active.command.id}`} onRecover={openRecovery}><ActiveView plugins={data.plugins} onChanged={syncPlugins} onRecover={openRecovery} /></PluginViewBoundary> : <div className="tool-body">
+      <>{active.command.uiView ? <div className="embedded-plugin-slot" aria-label="插件内容"/> : ActiveView ? <PluginViewBoundary key={`${active.plugin.id}/${active.command.id}`} onRecover={openRecovery}><ActiveView plugins={data.plugins} onChanged={syncPlugins} onRecover={openRecovery} localArchive={active.localArchive} /></PluginViewBoundary> : <div className="tool-body">
         <form onSubmit={event => {
           event.preventDefault();
           const current = generation.current;

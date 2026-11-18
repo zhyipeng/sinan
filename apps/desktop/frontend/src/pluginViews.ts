@@ -8,10 +8,10 @@ import PluginManager, {type ManagementBridge} from '../../../../plugins/system-p
 import type { ShortcutState } from '../../../../plugins/system-settings/frontend/Shortcut';
 import Settings, { type ConfigurablePlugin, type SettingsBridge, type SettingsSnapshot } from '../../../../plugins/system-settings/frontend/Settings';
 import { RetentionSettings, SaveRetentionSettings, WindowOpacitySettings, SaveWindowOpacity, StartupSettings, SaveSilentStartup, SaveAutoStart, SearchPreferences, SaveSearchPreferences, LLMSettings, SaveLLMProfile, DeleteLLMProfile, SaveLLMPreferences, PluginShortcutSettings, SavePluginShortcut, PluginSettings, SavePluginSettings, ClearHistory, ShortcutSettings, SaveShortcut, RecordShortcut, Refresh, Stop, Uninstall, Reload, PreviewPackage, ApplyPackage, SetPluginEnabled, OpenPluginView, PluginUIEnabled, DetachShortcutSettings, SaveDetachShortcut, PluginData, ClearPluginData, ThemeSettings, SaveTheme, ChoosePluginDirectory, CreatePluginProject, ChooseInstallDirectory, ChooseInstallArchive, TrustDevelopmentPlugin, StoreCatalog, StoreInstall, StoreInstallTasks, StoreCancelInstall } from '../bindings/sinan/apps/desktop/hostservice';
-type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void};
+type ViewProps = {plugins: ConfigurablePlugin[]; onChanged():Promise<void>; onRecover():void; localArchive?:string};
 export const pluginViews: Record<string, ComponentType<ViewProps> | undefined> = {
   'system.settings/settings': ({plugins}) => createElement(Settings,{plugins,bridge:settingsBridge}),
-  'system.plugin-manager/manager': ({onChanged,onRecover}) => createElement(PluginManager,{bridge:managementBridge,storeBridge,onChanged,onRecover}),
+  'system.plugin-manager/manager': ({onChanged,onRecover,localArchive}) => createElement(PluginManager,{bridge:managementBridge,storeBridge,onChanged,onRecover,localArchive}),
 };
 // These adapters are private to bundled trusted views, never passed to installed JS.
 const managementBridge: ManagementBridge = {

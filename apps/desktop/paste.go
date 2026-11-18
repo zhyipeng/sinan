@@ -42,7 +42,8 @@ func (h *HostService) StartPasteSearch(ctx context.Context, sequence uint64, val
 	}
 	selection := &stagedPaste{id: rand.Text(), sequence: sequence, owner: window, content: content}
 	h.startQuery(ctx, sequence, selection, func(ctx context.Context, emit func(search.Update)) {
-		(&search.Coordinator{Backend: h.manager}).QueryPaste(ctx, queryID(sequence), selection.id, content, emit)
+		coordinator := h.searchCoordinator()
+		coordinator.QueryPaste(ctx, queryID(sequence), selection.id, content, emit)
 	})
 	return nil
 }
