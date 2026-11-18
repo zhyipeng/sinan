@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/iotest"
 )
 
 type roundTripper func(*http.Request) (*http.Response, error)
@@ -100,6 +101,35 @@ func TestDigestMismatchAndInflationAreRejected(t *testing.T) {
 		t.Fatal("oversized inflation accepted")
 	}
 }
+func TestPartialDownloadReportsTransferErrorAndCleansUp(t *testing.T) {
+	data := archive(t, []string{"manifest.json"}, false)
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"timeout", context.DeadlineExceeded, "插件包下载超时，请重试"},
+		{"interrupted", io.ErrUnexpectedEOF, "插件包下载中断"},
+		{"wrong-size", io.EOF, "插件包大小或 SHA-256 校验失败"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cache := t.TempDir()
+			f := New()
+			f.Client.Transport = roundTripper(func(*http.Request) (*http.Response, error) {
+				body := io.MultiReader(bytes.NewReader(data[:len(data)/2]), iotest.ErrReader(tc.err))
+				return &http.Response{StatusCode: http.StatusOK, ContentLength: -1, Body: io.NopCloser(body)}, nil
+			})
+			if _, _, err := f.Stage(context.Background(), cache, artifact(data)); err == nil || err.Error() != tc.want {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+			entries, err := os.ReadDir(cache)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("failed staging left cache entries: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
 func TestRedirectCannotEscapeApprovedGitHubHosts(t *testing.T) {
 	f := New()
 	calls := 0

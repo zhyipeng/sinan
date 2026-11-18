@@ -65,7 +65,7 @@ func downloadRedirect(req *http.Request, via []*http.Request) error {
 }
 
 func New() *Fetcher {
-	return &Fetcher{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: downloadRedirect}, cfg: ghmirror.Config{Mode: "official"}}
+	return &Fetcher{Client: &http.Client{Timeout: 5 * time.Minute, CheckRedirect: downloadRedirect}, cfg: ghmirror.Config{Mode: "official"}}
 }
 
 // SetConfig applies the mirror preference to asset downloads.
@@ -141,7 +141,7 @@ func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, ad
 	req.Header.Set("User-Agent", "Sinan-Plugin-Store")
 	response, err := f.Client.Do(req)
 	if err != nil {
-		return "", nil, errors.New("插件包下载失败")
+		return "", nil, downloadError(ctx, err, "插件包下载失败")
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 || response.ContentLength > a.Size {
@@ -155,7 +155,14 @@ func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, ad
 	hash := sha256.New()
 	n, copyErr := io.Copy(io.MultiWriter(file, hash, &downloadProgress{total: a.Size, report: progress}), io.LimitReader(response.Body, a.Size+1))
 	closeErr := file.Close()
-	if copyErr != nil || closeErr != nil || n != a.Size || hex.EncodeToString(hash.Sum(nil)) != a.SHA256 {
+	var writeErr *os.PathError
+	if closeErr != nil || errors.As(copyErr, &writeErr) {
+		return "", nil, errors.New("无法写入下载缓存")
+	}
+	if copyErr != nil {
+		return "", nil, downloadError(ctx, copyErr, "插件包下载中断")
+	}
+	if n != a.Size || hex.EncodeToString(hash.Sum(nil)) != a.SHA256 {
 		return "", nil, errors.New("插件包大小或 SHA-256 校验失败")
 	}
 	directory := filepath.Join(work, "plugin")
@@ -168,6 +175,16 @@ func (f *Fetcher) stageFrom(ctx context.Context, cacheDir string, a Artifact, ad
 	_ = os.Remove(archive)
 	success = true
 	return directory, removeWork, nil
+}
+
+func downloadError(ctx context.Context, err error, message string) error {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+		return errors.New("插件包下载超时，请重试")
+	}
+	return errors.New(message)
 }
 
 type downloadProgress struct {
