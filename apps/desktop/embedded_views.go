@@ -31,6 +31,7 @@ type embeddedEntry struct {
 	executing         bool
 	awaitingTask      bool
 	hiddenLaunch      bool
+	commandHiddenAt   time.Time
 	view              embeddedSurface
 	session           *uiview.Session
 	window            *application.WebviewWindow
@@ -53,8 +54,9 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 		return errors.New("窗口不可用")
 	}
 	hidden := h.commandStartsHidden(id, commandID)
+	var hiddenAt time.Time
 	if hidden {
-		h.hideCommandWindows(window)
+		hiddenAt = h.hideCommandWindows(window)
 	}
 	state := h.embedded
 	state.mu.Lock()
@@ -145,7 +147,7 @@ func (h *HostService) openEmbeddedPrepared(ctx context.Context, id, viewID, comm
 	h.launcher.mu.Lock()
 	target := h.launcher.inputTarget
 	h.launcher.mu.Unlock()
-	entry = &embeddedEntry{inputTarget: target, view: nativeView, session: session, window: window, awaitingTask: hidden, hiddenLaunch: hidden}
+	entry = &embeddedEntry{inputTarget: target, view: nativeView, session: session, window: window, awaitingTask: hidden, hiddenLaunch: hidden, commandHiddenAt: hiddenAt}
 	var previous *embeddedEntry
 	swap := func() error {
 		if check != nil && !check() {

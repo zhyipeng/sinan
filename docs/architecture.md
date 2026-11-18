@@ -507,3 +507,7 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 宿主[六目标原生构建与无界面回归](https://github.com/zhyipeng/sinan/actions/runs/44070459519)、截图[构建与发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44070601312)、OCR[六目标原生验证](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44071389046)及[正式发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44072351423)均成功。OCR 首轮 Windows amd64 的测试观测竞态已修复：worker 在 is_running/status 两次查询间退出时按已退出处理，保留存活超时与其他错误的失败判断，新增三项确定性单元用例；修复后的六目标验证全部通过。
 
 宿主包含依赖与页面交接、窗口保留及 Wails 自启迁移，截图包含编辑器、导入/粘贴、原生保存与 OCR 跳转。以上为原生构建、无界面测试和发行完成，尚未执行真实桌面/WebView、截图授权、焦点、多屏、登录自启和实际安装升级验收；独立进程不构成 OS 沙箱。旧版本资产保持不可变。
+
+### macOS 截图自定义选区
+
+官方截图插件开发版 0.2.0 在 macOS 14+ 用包内原生辅助程序捕获各显示器的单帧并显示 AppKit 遮罩，可在任一显示器框选、移动、调整、确认或取消，单次选区限定在开始拖动的显示器。截图与遮罩留在插件层，支持就地标注、移动已有标注、撤销、复制和保存，并复用现有交接机制直接跳转 OCR。独立编辑入口仍走隔离页面，沿用宿主隐藏执行及现有协议和权限。旧版 macOS 延用系统选区，详见 [ADR 0084](adr/0084-macos-screenshot-selection-overlay.md)。

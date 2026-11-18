@@ -26,16 +26,21 @@ func (h *HostService) commandStartsHidden(id, command string) bool {
 	}
 	return false
 }
-func (h *HostService) hideCommandWindows(window *application.WebviewWindow) {
-	if window != nil {
-		h.hideSessionWindow(window)
-	}
+func (h *HostService) hideCommandWindows(window *application.WebviewWindow) time.Time {
 	h.launcher.mu.Lock()
 	main := h.launcher.window
 	h.launcher.mu.Unlock()
-	if main != nil && main != window {
-		h.launcher.hide(main)
+
+	var hiddenAt time.Time
+	if window != nil && window.IsVisible() {
+		h.hideSessionWindow(window)
+		hiddenAt = time.Now()
 	}
+	if main != nil && main != window && main.IsVisible() {
+		h.launcher.hide(main)
+		hiddenAt = time.Now()
+	}
+	return hiddenAt
 }
 
 func (h *HostService) hideSessionWindow(window *application.WebviewWindow) {
@@ -94,7 +99,13 @@ func (h *HostService) callWindowCommand(ctx context.Context, session *uiview.Ses
 	}
 	dismiss := entry.hiddenLaunch
 	keepHidden := false
-	return runWindowCommand(ctx, valid, func() { h.hideCommandWindows(entry.window) }, func() (json.RawMessage, error) {
+	return runWindowCommand(ctx, valid, func() time.Time {
+		hiddenAt := h.hideCommandWindows(entry.window)
+		if hiddenAt.IsZero() {
+			return entry.commandHiddenAt
+		}
+		return hiddenAt
+	}, func() (json.RawMessage, error) {
 		value, err := h.manager.ExecuteViewCommand(ctx, session, req.CommandID, req.Input)
 		dismiss = windowCommandDismissed(value, err, entry.hiddenLaunch)
 		var result protocol.CommandResult
@@ -126,16 +137,24 @@ func (h *HostService) callWindowCommand(ctx context.Context, session *uiview.Ses
 
 // The native compositor needs a brief settling interval after Hide, before a
 // plugin freezes desktop pixels. Cancellation and replacement are checked again.
-func runWindowCommand(ctx context.Context, valid func() bool, hide func(), execute func() (json.RawMessage, error), finish func()) (json.RawMessage, error) {
+func runWindowCommand(ctx context.Context, valid func() bool, hide func() time.Time, execute func() (json.RawMessage, error), finish func()) (json.RawMessage, error) {
 	defer finish()
 	if !valid() {
 		return nil, errors.New("插件会话已撤销")
 	}
-	hide()
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-time.After(180 * time.Millisecond):
+	if hiddenAt := hide(); !hiddenAt.IsZero() {
+		if remaining := time.Until(hiddenAt.Add(180 * time.Millisecond)); remaining > 0 {
+			timer := time.NewTimer(remaining)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if !valid() {
 		return nil, errors.New("插件会话已撤销")

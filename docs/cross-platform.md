@@ -373,3 +373,11 @@ macOS 13+ 有效 bundle 由 Wails 使用 SMAppService，其他支持场景采用
 宿主[六目标原生构建与无界面回归](https://github.com/zhyipeng/sinan/actions/runs/44070459519)、截图[构建与发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44070601312)、OCR[六目标原生验证](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44071389046)及[正式发布](https://github.com/zhyipeng/sinan-official-plugins/actions/runs/44072351423)均成功。OCR 首轮 Windows amd64 的测试观测竞态已修复：worker 在 is_running/status 两次查询间退出时按已退出处理，保留存活超时与其他错误的失败判断，新增三项确定性单元用例；修复后的六目标验证全部通过。
 
 宿主包含依赖与页面交接、窗口保留及 Wails 自启迁移，截图包含编辑器、导入/粘贴、原生保存与 OCR 跳转。以上为原生构建、无界面测试和发行完成，尚未执行真实桌面/WebView、截图授权、焦点、多屏、登录自启和实际安装升级验收；独立进程不构成 OS 沙箱。旧版本资产保持不可变。
+
+### macOS 截图自定义选区（ADR 0084）
+
+官方截图插件开发版 0.2.0 在 macOS 14+ 使用 ScreenCaptureKit 分别截取各显示器、AppKit 显示选区遮罩，按所选显示器的快照像素裁剪。可在遮罩直接完成箭头、矩形、文字、马赛克、撤销、复制、保存和 OCR 交接，Esc 或右键取消。快捷键呼出后可在任一显示器开始框选，可用选区工具拖动已有标注，拖出该显示器时选区停在屏幕边缘。旧版 macOS 延用系统选区。macOS 两架构辅助程序由装有 macOS 14+ SDK 的 Mac 构建，包内需包含匹配架构的 Mach-O；Windows WinForms/GDI 和 Linux X11、受支持 Wayland 合成器原有路径保持。授权归属、安装升级、全屏 Space、焦点、多屏、Retina、文字输入、剪贴板、保存面板和 OCR 跳转待实际桌面验收，尚未发行或登记商店。见 [ADR 0084](adr/0084-macos-screenshot-selection-overlay.md)。
+
+macOS arm64 无界面回归、双屏选区坐标、合成 Retina PNG 标注、OCR 分流和宿主包预览通过；六目标构建与打包通过，核对 macOS 两架构辅助程序的执行权限和临时签名。Windows 和 Linux 本轮仅交叉构建与打包。
+
+隐藏命令的合成器等待由实际隐藏时刻计算，跨平台沿用相同的取消与会话校验。macOS 15.2+ 优先使用直接屏幕矩形截图，尺寸不符或接口失败时回退。遮罩使用非激活面板请求键盘焦点，OCR 交接前恢复宿主窗口并显示跳转状态。初始 Esc、真实双屏、OCR 跳转及响应耗时仍待实机测量。

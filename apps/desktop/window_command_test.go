@@ -14,7 +14,7 @@ import (
 
 func TestWindowCommandHidesBeforeExecutionAndRejectsReplacement(t *testing.T) {
 	var order []string
-	result, err := runWindowCommand(context.Background(), func() bool { return true }, func() { order = append(order, "hide") }, func() (json.RawMessage, error) {
+	result, err := runWindowCommand(context.Background(), func() bool { return true }, func() time.Time { order = append(order, "hide"); return time.Time{} }, func() (json.RawMessage, error) {
 		order = append(order, "capture")
 		return json.RawMessage(`{"done":true}`), nil
 	}, func() { order = append(order, "restore") })
@@ -23,7 +23,7 @@ func TestWindowCommandHidesBeforeExecutionAndRejectsReplacement(t *testing.T) {
 	}
 	active := true
 	executed := false
-	_, err = runWindowCommand(context.Background(), func() bool { return active }, func() { active = false }, func() (json.RawMessage, error) { executed = true; return nil, nil }, func() {})
+	_, err = runWindowCommand(context.Background(), func() bool { return active }, func() time.Time { active = false; return time.Time{} }, func() (json.RawMessage, error) { executed = true; return nil, nil }, func() {})
 	if err == nil || executed {
 		t.Fatal("replaced view still executed native command")
 	}
@@ -32,12 +32,12 @@ func TestWindowCommandCancelAndNativeFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	executed := false
 	started := time.Now()
-	_, err := runWindowCommand(ctx, func() bool { return true }, cancel, func() (json.RawMessage, error) { executed = true; return nil, nil }, func() {})
+	_, err := runWindowCommand(ctx, func() bool { return true }, func() time.Time { cancel(); return time.Time{} }, func() (json.RawMessage, error) { executed = true; return nil, nil }, func() {})
 	if !errors.Is(err, context.Canceled) || executed || time.Since(started) > time.Second {
 		t.Fatal("cancellation did not stop command", err)
 	}
 	expected := errors.New("native unavailable")
-	_, err = runWindowCommand(context.Background(), func() bool { return true }, func() {}, func() (json.RawMessage, error) { return nil, expected }, func() {})
+	_, err = runWindowCommand(context.Background(), func() bool { return true }, func() time.Time { return time.Time{} }, func() (json.RawMessage, error) { return nil, expected }, func() {})
 	if !errors.Is(err, expected) {
 		t.Fatal("native error swallowed")
 	}
@@ -115,6 +115,24 @@ func TestWindowCommandDismissReleasesOnlyOriginalHiddenView(t *testing.T) {
 			}
 		} else if !discarded || view.closed != 1 || session.Active() || host.embedded.entries[window] != nil || host.embedded.sequence[window] != 3 {
 			t.Fatal("dismiss left hidden editor active")
+		}
+	}
+}
+
+func TestWindowCommandSettlingUsesOriginalHideTime(t *testing.T) {
+	for _, age := range []time.Duration{0, time.Second} {
+		start := time.Now()
+		hiddenAt := start.Add(-age)
+		_, err := runWindowCommand(context.Background(), func() bool { return true }, func() time.Time {
+			return hiddenAt
+		}, func() (json.RawMessage, error) {
+			if age == 0 && time.Since(hiddenAt) < 180*time.Millisecond {
+				t.Fatal("命令在新隐藏窗口稳定前执行")
+			}
+			return nil, nil
+		}, func() {})
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
