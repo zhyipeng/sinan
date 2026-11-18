@@ -129,6 +129,10 @@ func (p *Process) finish() { p.once.Do(func() { p.hostCancel(); close(p.done); _
 // the clipboard contract allows. A flat two-second budget proved too tight for
 // image snapshots on slow machines.
 func hostCallBudget(req protocol.Request) time.Duration {
+	if req.Method == "notifications.send" {
+		// macOS may ask for authorization on the first explicit notification.
+		return 190 * time.Second
+	}
 	bytes := len(req.Params)
 	if req.Method == "clipboard.read" || req.Method == "clipboard.write" {
 		if bytes < protocol.MaxClipboardMessageBytes {

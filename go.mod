@@ -4,6 +4,8 @@ go 1.26.0
 
 require github.com/wailsapp/wails/v3 v3.0.0
 
+require git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
+
 require (
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/wailsapp/go-webview2 v1.0.22

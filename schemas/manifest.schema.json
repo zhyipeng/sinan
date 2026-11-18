@@ -489,7 +489,8 @@
                     "window.show",
                     "window.hide",
                     "file.savePNG",
-                    "file.openImage"
+                    "file.openImage",
+                    "file.pickPath"
                   ]
                 },
                 "description": "仅桥 2 可显式声明 storage；按插件隔离，默认不开放。"
@@ -586,7 +587,8 @@
           "applications.read",
           "applications.launch",
           "clipboard.read",
-          "clipboard.write"
+          "clipboard.write",
+          "notifications.send"
         ]
       },
       "description": "可信原生插件的用途声明；不是操作系统权限隔离或 Host API 授权。"

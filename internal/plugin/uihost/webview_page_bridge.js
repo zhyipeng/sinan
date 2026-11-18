@@ -39,7 +39,7 @@
       const timer = setTimeout(() => {
         pending.delete(id);
         reject(new Error('UI 调用失败或会话已关闭'));
-      }, ['window.execute','file.savePNG','file.openImage'].includes(request?.method) ? 127000 : ['dependency.open','dependency.manage','image.upload.finish','launch.get'].includes(request?.method) ? 12000 : 2000);
+      }, ['window.execute','file.savePNG','file.openImage','file.pickPath'].includes(request?.method) ? 127000 : ['dependency.open','dependency.manage','image.upload.finish','launch.get'].includes(request?.method) ? 12000 : 2000);
       pending.set(id, {resolve, reject, timer});
       try { send({channel:'sinan:request', kind:'call', id, request}); }
       catch (_) {

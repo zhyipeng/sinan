@@ -137,7 +137,7 @@ func (m *Manager) callUIView(ctx context.Context, p *plugin, session *uiview.Ses
 		}
 		return marshalUIResult(string(value.Content.Data))
 	}
-	if req.Method == "input.paste" || req.Method == "window.execute" || req.Method == "window.show" || req.Method == "window.hide" || req.Method == "file.savePNG" || req.Method == "file.openImage" {
+	if req.Method == "input.paste" || req.Method == "window.execute" || req.Method == "window.show" || req.Method == "window.hide" || req.Method == "file.savePNG" || req.Method == "file.openImage" || req.Method == "file.pickPath" {
 		handler := m.uiHostCall
 		allowed := slices.Contains(view.Permissions, req.Method)
 		if (req.Method == "window.execute" || req.Method == "file.savePNG") && !slices.Contains(view.Commands, req.CommandID) {

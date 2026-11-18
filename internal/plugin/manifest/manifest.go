@@ -133,8 +133,8 @@ func (m Manifest) Validate() error {
 	}
 	permissions := map[string]bool{}
 	for _, permission := range m.Permissions {
-		if m.Runtime.Kind != "process" || (permission != "applications.read" && permission != "applications.launch" && permission != "clipboard.read" && permission != "clipboard.write") || permissions[permission] {
-			return errors.New("权限用途无效或重复；当前仅支持可信原生插件的应用与剪贴板用途声明")
+		if m.Runtime.Kind != "process" || (permission != "applications.read" && permission != "applications.launch" && permission != "clipboard.read" && permission != "clipboard.write" && permission != "notifications.send") || permissions[permission] {
+			return errors.New("权限用途无效或重复；当前仅支持可信原生插件的应用、剪贴板和通知用途声明")
 		}
 		permissions[permission] = true
 	}
@@ -318,7 +318,7 @@ func validUICapabilities(view protocol.UIView, mf Manifest) bool {
 	}
 	permissions := map[string]bool{}
 	for _, permission := range view.Permissions {
-		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm" && permission != "clipboard.read" && permission != "clipboard.write" && permission != "window.execute" && permission != "window.show" && permission != "window.hide" && permission != "file.savePNG" && permission != "file.openImage") {
+		if permissions[permission] || (permission != "storage" && permission != "input.paste" && permission != "storage.encrypted" && permission != "llm" && permission != "clipboard.read" && permission != "clipboard.write" && permission != "window.execute" && permission != "window.show" && permission != "window.hide" && permission != "file.savePNG" && permission != "file.openImage" && permission != "file.pickPath") {
 			return false
 		}
 		permissions[permission] = true

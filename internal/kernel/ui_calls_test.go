@@ -300,7 +300,7 @@ func TestWindowCommandsRequireDeclarationAndOriginalSession(t *testing.T) {
 }
 
 func TestImageOutputRequiresViewPermissionAndDeclaredExporter(t *testing.T) {
-	for _, method := range []string{"file.savePNG", "file.openImage", "window.show", "window.hide"} {
+	for _, method := range []string{"file.savePNG", "file.openImage", "file.pickPath", "window.show", "window.hide"} {
 		t.Run(method, func(t *testing.T) {
 			m := manager(t)
 			s, src := callableUI(t, m)
@@ -310,6 +310,9 @@ func TestImageOutputRequiresViewPermissionAndDeclaredExporter(t *testing.T) {
 				return json.RawMessage(`null`), nil
 			})
 			request := protocol.UIRequest{Method: method}
+			if method == "file.pickPath" {
+				request.Input = "directory"
+			}
 			if method == "file.savePNG" {
 				request.CommandID = "echo"
 				request.Input = strings.Repeat("a", 32)

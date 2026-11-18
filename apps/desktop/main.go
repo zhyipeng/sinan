@@ -122,11 +122,17 @@ func run() error {
 		}
 		windowsOptions.WebviewUserDataPath = absolute
 	}
+	services := []application.Service{application.NewService(host)}
+	if !*uiProbe && !*acceptance {
+		notifier := &desktopNotifications{}
+		services = append(services, application.NewService(notifier))
+		manager.SetNotificationSender(notifier.send)
+	}
 	app := application.New(application.Options{
 		Name:        name,
 		Description: "插件驱动的桌面效率工具",
 		Icon:        appIcon,
-		Services:    []application.Service{application.NewService(host)},
+		Services:    services,
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: false},
 		Windows:     windowsOptions,

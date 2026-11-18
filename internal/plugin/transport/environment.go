@@ -3,6 +3,8 @@ package transport
 func processEnvironment(platform string, getenv func(string) string) []string {
 	keys := []string{"LANG", "LC_ALL", "LC_MESSAGES"}
 	switch platform {
+	case "darwin":
+		keys = append(keys, "PATH")
 	case "windows":
 		keys = append(keys, "SystemRoot", "WINDIR", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "TEMP", "TMP", "PATH")
 	case "linux":

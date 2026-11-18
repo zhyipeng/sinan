@@ -517,3 +517,7 @@ macOS arm64 已构建并完成模拟 Host API 的无界面识别与回收验证�
 ### Windows 截图遮罩与平台范围
 
 官方截图插件 0.3.0 将原生遮罩能力扩展至 Windows x64 和 ARM64，在插件层使用 Win32、GDI/GDI+ 和 Windows UI Automation。独立后处理入口已移除，隔离网页仅用于隐藏执行和 OCR 交接。新版截图仅支持 macOS 和 Windows，详见 [ADR 0086](adr/0086-windows-screenshot-overlay.md)。
+
+官方「脚本」插件在独立进程内保存配置、索引与运行脚本，并复用全局搜索和隔离 HTML 视图。宿主新增需单独声明的原生路径选择能力，同时将 macOS 进程环境的 PATH 纳入白名单。会话授权与跨平台边界见 [ADR 0088](adr/0088-script-plugin-path-picker.md)。
+
+脚本输出、退出状态和临时日志继续由官方脚本插件管理。宿主通过 Wails Notifications 提供授权进程可调用的纯文本通知接口。见 [ADR 0089](adr/0089-script-results-and-notifications.md)。

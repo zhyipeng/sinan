@@ -273,6 +273,10 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 		if len(fields) != 1 {
 			return nil, errors.New("数据读取请求无效")
 		}
+	case "file.pickPath":
+		if len(fields) != 2 || (req.Input != "file" && req.Input != "directory") {
+			return nil, errors.New("路径选择请求无效")
+		}
 	case "dependency.status", "dependency.manage":
 		if len(fields) != 1 {
 			return nil, errors.New("依赖请求字段无效")
@@ -318,7 +322,7 @@ func (s *Session) Call(ctx context.Context, data []byte) (json.RawMessage, error
 	if req.Method == "dependency.open" || req.Method == "dependency.manage" || req.Method == "image.upload.finish" || req.Method == "launch.get" {
 		budget = 10 * time.Second
 	}
-	if req.Method == "window.execute" || req.Method == "file.savePNG" || req.Method == "file.openImage" {
+	if req.Method == "window.execute" || req.Method == "file.savePNG" || req.Method == "file.openImage" || req.Method == "file.pickPath" {
 		budget = 125 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(ctx, budget)

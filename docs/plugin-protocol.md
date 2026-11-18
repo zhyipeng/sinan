@@ -18,7 +18,7 @@
 
 `runtime.entry` 指向插件目录内的可执行文件，例如 Unix 的 `backend/plugin` 或 Windows 的 `backend/plugin.exe`；Unix 要求执行位，Windows 要求 `.exe` 后缀。不支持 shell 命令、参数拼接、平台变量或符号链接。跨平台需单独构建。安装来源不能包含安装目录，总大小上限 64 MiB，最多 2048 个条目。
 
-原生插件以当前用户权限运行，安装时必须确认信任。宿主只传入显式语言及平台桌面环境白名单，不整表继承环境变量，stderr 当前丢弃；这些措施不构成安全沙箱。信任记录不防御同一用户改写插件文件。环境白名单包含 Windows 系统/用户应用目录、PATH/TEMP，或 Linux HOME/PATH、XDG、显示服务及会话总线信息；详见 [ADR 0051](adr/0051-cross-platform-foundation.md)。
+原生插件以当前用户权限运行，安装时必须确认信任。宿主只传入显式语言及平台桌面环境白名单，不整表继承环境变量，stderr 当前丢弃；这些措施不构成安全沙箱。信任记录不防御同一用户改写插件文件。环境白名单包含 macOS PATH、Windows 系统/用户应用目录和 PATH/TEMP，或 Linux HOME/PATH、XDG、显示服务及会话总线信息；详见 [ADR 0051](adr/0051-cross-platform-foundation.md)。
 
 ## JSON-RPC
 
@@ -442,3 +442,13 @@ window.execute 同日补充：后台 CommandResult.dismiss=true 时，宿主撤�
 - `{method:"dependency.manage"}`：导航至宿主固定的可信插件中心，不接受额外字段。此操作会离开当前截图页面。
 
 SDK 提供 readDependencies、stageDependencyImage、openDependency、discardDependencyImage、openDependencyManager。图像数据帧有独立每分钟 228 次预算，每视图最多两份 4 MiB 上传；普通桥预算及资源/CSP 保持不变。10 秒请求预算及 WebView2 12 秒等待适用于 dependency.open/manage、image.upload.finish、launch.get，其余调用时限见前节。目标未激活前业务调用等待，调用者失效、目标变化或提交失败均终止准备。
+
+## 原生文件或目录选择
+
+隔离视图声明 `file.pickPath` 权限后，可发送 `{method:'file.pickPath',input:'file'|'directory'}`，对应 UI SDK 的 `pickPath(kind)`。请求只接受这两个字段。Wails 在当前会话窗口打开原生单选对话框，取消返回 null，确认返回不超过 16 KiB 的绝对路径。接口不接收初始路径、不读取文件内容。会话撤销或超时后丢弃结果。宿主调用预算为 125 秒，页面等待为 127 秒，继承已有并发、频率和请求/响应大小限制。旧宿主拒绝包含此权限的清单。见 [ADR 0088](adr/0088-script-plugin-path-picker.md)。
+
+macOS、Windows 和 Linux 的独立原生进程可读取宿主环境白名单中的 PATH。macOS 从桌面启动时，该值可能与交互式终端不同。
+
+## 桌面通知
+
+原生进程声明清单权限 `notifications.send` 后可调用同名反向 RPC，`params` 为 `{title:string,body:string}`，Go SDK 对应 `HostClient.Notify`。标题最多 160 UTF-8 字节、正文最多 512 UTF-8 字节，成功响应为 `{}`。接口不接受通知附带文件、交互动作或插件身份字段。每个活动进程每分钟最多 24 次。配置了桌面适配器的宿主在握手中公布 `notifications.v1`；通知权限或桌面守护程序不可用时调用返回错误。macOS 首次授权允许最长 190 秒的反向 RPC 预算。见 [ADR 0089](adr/0089-script-results-and-notifications.md)。

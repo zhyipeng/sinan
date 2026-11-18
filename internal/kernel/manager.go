@@ -72,6 +72,7 @@ type plugin struct {
 }
 
 type Manager struct {
+	notificationSender notificationSender
 	uiHostCall         func(context.Context, *uiview.Session, protocol.UIRequest) (json.RawMessage, error)
 	llm                *llm.Service
 	llmTasks           llmTasks
@@ -462,7 +463,18 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 		return nil, err
 	}
 	p.state = "activating"
-	process, err := transport.StartWithHost(path, p.dir, clipboardHandler(p.manifest.Permissions, clipboard.Call))
+	clipboardCall := clipboardHandler(p.manifest.Permissions, clipboard.Call)
+	var sender notificationSender
+	if p.manager != nil {
+		sender = p.manager.notificationSender
+	}
+	notify := notificationHandler(p.manifest.Permissions, sender)
+	process, err := transport.StartWithHost(path, p.dir, func(ctx context.Context, method string, raw json.RawMessage) (any, error) {
+		if method == "notifications.send" {
+			return notify(ctx, method, raw)
+		}
+		return clipboardCall(ctx, method, raw)
+	})
 	if err != nil {
 		p.state = "failed"
 		return nil, err
@@ -479,7 +491,11 @@ func (p *plugin) ensureProcessLocked(ctx context.Context, root string) (*transpo
 		p.state = "failed"
 		return nil, errors.New("无法创建插件持久数据目录")
 	}
-	err = process.Call(ctx, "initialize", protocol.InitializeParams{HostCapabilities: []string{protocol.ClipboardCapability, protocol.ImageCommandCapability, protocol.WindowExecuteCapability, protocol.ImageOutputCapability, protocol.ImageInputCapability, protocol.PluginHandoffCapability}, APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
+	capabilities := []string{protocol.ClipboardCapability, protocol.ImageCommandCapability, protocol.WindowExecuteCapability, protocol.ImageOutputCapability, protocol.ImageInputCapability, protocol.PluginHandoffCapability}
+	if sender != nil {
+		capabilities = append(capabilities, protocol.NotificationsCapability)
+	}
+	err = process.Call(ctx, "initialize", protocol.InitializeParams{HostCapabilities: capabilities, APIVersion: protocol.APIVersion, PluginID: p.manifest.ID, Settings: p.settings, CacheDir: cacheDir, DataDir: dataDir}, &init)
 	if err != nil || init.APIVersion != protocol.APIVersion || init.PluginID != p.manifest.ID {
 		process.Stop()
 		p.state = "failed"

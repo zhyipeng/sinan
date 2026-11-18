@@ -77,12 +77,12 @@ func TestImageOutputBridgeRejectsExtraFields(t *testing.T) {
 	s.ConfigureCaller(func(ctx context.Context, req protocol.UIRequest) (json.RawMessage, error) {
 		calls++
 		deadline, _ := ctx.Deadline()
-		if (req.Method == "file.savePNG" || req.Method == "file.openImage") && time.Until(deadline) < 120*time.Second {
+		if (req.Method == "file.savePNG" || req.Method == "file.openImage" || req.Method == "file.pickPath") && time.Until(deadline) < 120*time.Second {
 			t.Fatal("native dialog has ordinary short timeout")
 		}
 		return json.RawMessage(`null`), nil
 	})
-	for _, raw := range []string{`{"method":"window.show","input":"other"}`, `{"method":"window.hide","windowId":"other"}`, `{"method":"file.openImage","input":"/arbitrary/path"}`, `{"method":"file.savePNG"}`, `{"method":"file.savePNG","commandId":"save","value":null}`, `{"method":"file.savePNG","commandId":"save","path":"/tmp/other.png"}`} {
+	for _, raw := range []string{`{"method":"window.show","input":"other"}`, `{"method":"window.hide","windowId":"other"}`, `{"method":"file.openImage","input":"/arbitrary/path"}`, `{"method":"file.pickPath"}`, `{"method":"file.pickPath","input":"/arbitrary/path"}`, `{"method":"file.pickPath","input":"directory","value":{}}`, `{"method":"file.savePNG"}`, `{"method":"file.savePNG","commandId":"save","value":null}`, `{"method":"file.savePNG","commandId":"save","path":"/tmp/other.png"}`} {
 		if _, err := s.Call(context.Background(), []byte(raw)); err == nil {
 			t.Fatal("invalid request accepted", raw)
 		}
@@ -90,7 +90,7 @@ func TestImageOutputBridgeRejectsExtraFields(t *testing.T) {
 	if calls != 0 {
 		t.Fatal("malformed request reached host")
 	}
-	for _, raw := range []string{`{"method":"window.show"}`, `{"method":"window.hide"}`, `{"method":"file.openImage"}`, `{"method":"file.savePNG","commandId":"save","input":"opaque"}`} {
+	for _, raw := range []string{`{"method":"window.show"}`, `{"method":"window.hide"}`, `{"method":"file.openImage"}`, `{"method":"file.pickPath","input":"file"}`, `{"method":"file.pickPath","input":"directory"}`, `{"method":"file.savePNG","commandId":"save","input":"opaque"}`} {
 		if _, err := s.Call(context.Background(), []byte(raw)); err != nil {
 			t.Fatal(err)
 		}

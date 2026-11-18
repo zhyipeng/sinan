@@ -235,7 +235,7 @@ func TestHiddenCommandsRequireScopedWindowExecution(t *testing.T) {
 		return Manifest{ID: "example.capture", Name: "Capture", Version: "0.1.0", APIVersion: "1", Runtime: Runtime{Kind: "process", Entry: "backend/plugin"}, Contributes: Contributions{Commands: []Command{{ID: "capture", Title: "Capture", UIView: "editor", StartHidden: true, Shortcut: "CmdOrCtrl+Shift+A"}, {ID: "region", Title: "Region", SearchOnly: true}}, UIViews: []protocol.UIView{{ID: "editor", Entry: "index.html", BridgeVersion: "2", Commands: []string{"region"}, Permissions: []string{"window.execute"}}}}, ActivationEvents: []string{"onCommand:capture"}}
 	}
 	mf := valid()
-	mf.Contributes.UIViews[0].Permissions = []string{"window.execute", "window.show", "window.hide", "file.savePNG", "file.openImage", "clipboard.read"}
+	mf.Contributes.UIViews[0].Permissions = []string{"window.execute", "window.show", "window.hide", "file.pickPath", "file.openImage", "clipboard.read"}
 	if err := mf.Validate(); err != nil {
 		t.Fatal("six separately declared image permissions rejected", err)
 	}

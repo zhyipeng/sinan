@@ -18,14 +18,16 @@ export interface SearchResult { items: SearchItem[] }
 export interface EntryRequirement {id:string;version:"1"}
 export interface PluginDependency {id:string;pluginId:string;minVersion:string;optional:boolean;entries:EntryRequirement[]}
 export interface EntryPoint {id:string;version:"1";commandId:string;input:"image"}
-export interface UIView { dependencies?:string[]; id:string; entry:string; title?:string; bridgeVersion:'1'|'2'; commands?:string[]; permissions?:('storage'|'input.paste'|'storage.encrypted'|'llm'|'clipboard.read'|'clipboard.write'|'window.execute'|'window.show'|'window.hide'|'file.savePNG'|'file.openImage')[] }
-export type UIRequest = {method:'dependency.status'|'dependency.manage'} | {method:'dependency.open'|'image.upload.start';input:string;value:unknown} | {method:'image.upload.chunk'|'image.upload.finish'|'image.upload.cancel';input:string} | {method:'clipboard.readText'} | {method:'clipboard.writeText';input:string} | {method:'llm.config'} | {method:'llm.start';value:{profileId?:string;systemPrompt:string;input:string}} | {method:'llm.poll'|'llm.cancel';input:string} | {method:'command.execute'|'window.execute'|'file.savePNG';commandId:string;input:string} | {method:'input.paste'|'window.show'|'window.hide'|'file.openImage'} | {method:'launch.get'} | {method:'storage.get'} | {method:'storage.encrypted.get'} | {method:'storage.encrypted.put';revision:number;value:unknown} | {method:'storage.put';revision:number;value:unknown};
+export interface UIView { dependencies?:string[]; id:string; entry:string; title?:string; bridgeVersion:'1'|'2'; commands?:string[]; permissions?:('storage'|'input.paste'|'storage.encrypted'|'llm'|'clipboard.read'|'clipboard.write'|'window.execute'|'window.show'|'window.hide'|'file.savePNG'|'file.openImage'|'file.pickPath')[] }
+export type UIRequest = {method:'dependency.status'|'dependency.manage'} | {method:'dependency.open'|'image.upload.start';input:string;value:unknown} | {method:'image.upload.chunk'|'image.upload.finish'|'image.upload.cancel';input:string} | {method:'clipboard.readText'} | {method:'clipboard.writeText';input:string} | {method:'llm.config'} | {method:'llm.start';value:{profileId?:string;systemPrompt:string;input:string}} | {method:'llm.poll'|'llm.cancel';input:string} | {method:'command.execute'|'window.execute'|'file.savePNG';commandId:string;input:string} | {method:'input.paste'|'window.show'|'window.hide'|'file.openImage'} | {method:'file.pickPath';input:'file'|'directory'} | {method:'launch.get'} | {method:'storage.get'} | {method:'storage.encrypted.get'} | {method:'storage.encrypted.put';revision:number;value:unknown} | {method:'storage.put';revision:number;value:unknown};
 export interface PluginDocument<T=unknown> {revision:number;value:T|null}
 
 /** Data-only contract reserved for future theme providers; no CSS or scripts. */
 export interface ThemeDefinition {version:'1';id:string;name:string;appearance:'light'|'dark';tokens:Record<string,string>}
 export interface ThemeState {mode:'system'|'light'|'dark';revision:number;light:ThemeDefinition;dark:ThemeDefinition;error?:string}
 
+export const NOTIFICATIONS_CAPABILITY = 'notifications.v1' as const;
+export interface NotificationParams {title:string;body:string}
 export const CLIPBOARD_CAPABILITY = 'clipboard.v1' as const;
 /** data is base64, image content is PNG. */
 export interface ClipboardContent {kind:'text'|'image'|'';data:string|null}

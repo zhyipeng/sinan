@@ -145,6 +145,9 @@ func (h *HostService) callInputHost(ctx context.Context, session *uiview.Session
 	if req.Method == "dependency.open" || req.Method == "dependency.manage" || strings.HasPrefix(req.Method, "image.upload.") {
 		return h.callDependencyHost(ctx, session, req)
 	}
+	if req.Method == "file.pickPath" {
+		return h.callPickPath(ctx, session, req.Input)
+	}
 	if req.Method == "file.openImage" {
 		return h.callOpenImage(ctx, session)
 	}

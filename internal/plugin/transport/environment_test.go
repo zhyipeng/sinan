@@ -28,7 +28,7 @@ func TestPlatformEnvironmentAllowlist(t *testing.T) {
 		if platform == "linux" && (!found["DISPLAY"] || !found["DBUS_SESSION_BUS_ADDRESS"] || found["APPDATA"]) {
 			t.Fatal("wrong Linux environment")
 		}
-		if platform == "darwin" && len(env) != 3 {
+		if platform == "darwin" && (!found["PATH"] || len(env) != 4) {
 			t.Fatal("unexpected macOS environment expansion")
 		}
 	}

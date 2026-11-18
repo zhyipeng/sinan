@@ -393,3 +393,15 @@ Windows x64/ARM64 使用独立 Win32 GUI 截图程序，支持多屏选择、整
 三端共用插件中心名称匹配和安装界面。Go 按当前系统解析绝对路径，支持路径内空格及粘贴文本中的成对外层引号。选中搜索结果后复用本地安装流程。见 [ADR 0087](adr/0087-local-zip-search.md)。
 
 macOS arm64 的标准无界面回归、桌面构建及相关静态检查通过。Linux arm64 在无显示服务器的容器中通过 GTK3 桌面定向竞态测试、静态检查及构建。macOS amd64 和 Windows arm64、amd64 的桌面及共享包测试程序交叉编译通过，Linux amd64 完成共享包测试程序交叉编译。三端桌面交互待实机验证。
+
+### 官方脚本插件（未发行）
+
+`tools.script` 使用原生单选对话框配置文件和目录。macOS 复用 AppKit，Windows 复用系统文件对话框，Linux 复用 GTK3。解释器从宿主进程可见的 PATH 查找，缺少解释器时可以手动选择。Windows 的直接执行目标为 .exe/.com；macOS 与 Linux 要求执行位，`.sh` 可回退到 `/bin/sh`，Windows 需要已安装的 `sh.exe` 或适用的手动环境。脚本以原生进程运行。见 [ADR 0088](adr/0088-script-plugin-path-picker.md)。
+
+脚本包已构建并核对 macOS、Windows、Linux 的 arm64/amd64 原生入口。macOS arm64 宿主与插件无界面回归、桌面构建，以及临时安装到真实 CLI 后的目录配置、文件创建、关键字搜索和后台执行通过。Linux arm64 插件与宿主相关内核/桥竞态测试、GTK3 桌面静态检查与原生构建通过。Windows 两架构宿主和插件测试程序交叉编译与静态检查通过。三端原生对话框、隔离 WebView、输入法和焦点，及 Linux X11、Wayland 分别待实机验收。
+
+### 脚本执行输出与系统通知
+
+脚本 0.2.0 增加每脚本搜索和输出页开关。后台运行通过宿主 Wails Notifications 发送短输出或临时日志位置。macOS 使用打包签名应用和通知授权，Windows 使用系统 Toast，Linux 使用会话 D-Bus 和桌面通知守护程序。配套协议见 [ADR 0089](adr/0089-script-results-and-notifications.md)。
+
+macOS arm64 宿主和插件的无界面回归、桌面构建与临时签名应用包校验通过。真实插件进程配合宿主模拟通知接收器，验证默认静默、搜索开关、隔离输出命令、退出码、短通知和完整临时日志。Linux arm64 插件竞态测试、宿主内核与传输测试、GTK3 桌面静态检查及构建通过。Windows arm64/amd64 通过交叉编译和宿主静态检查；六个插件 ZIP 已核对原生入口和摘要。三端系统通知实际投递、macOS 首次授权、Windows Toast 注册和 Linux X11/Wayland 桌面交互尚未实机验收。配套宿主和插件尚未发布。
